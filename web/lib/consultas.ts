@@ -77,6 +77,18 @@ export async function resumo(id: number) {
   return r ?? null;
 }
 
+/** Até 4 imóveis parecidos: mesma cidade e tipo, preço mais próximo (livre). */
+export async function parecidos(id: number) {
+  return consulta<ItemBusca>(
+    `select ${COLUNAS_ITEM} from vw_busca v
+     where v.imovel_id <> $1
+       and (v.cidade, v.uf, v.tipo) = (select cidade, uf, tipo from vw_busca where imovel_id = $1)
+     order by abs(v.lance_minimo - (select lance_minimo from vw_busca where imovel_id = $1)) nulls last
+     limit 4`,
+    [id],
+  );
+}
+
 /** Cidade ou bairro → área do mapa (livre: é só para posicionar o mapa). */
 export async function lugares(q: string) {
   return consulta<{ rotulo: string; uf: string; n: number; o: number; s: number; l: number; nn: number }>(
@@ -134,6 +146,8 @@ export type Lote = {
   ocupacao: string;
   aceita_financiamento: boolean | null;
   aceita_fgts: boolean | null;
+  aceita_parcelamento: boolean | null;
+  debitos_por_conta: string;
   leiloeiro: string | null;
   comitente: string | null;
   processo: string | null;

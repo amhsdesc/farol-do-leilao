@@ -250,3 +250,67 @@ h1, h2, h3 { font-family: var(--display); line-height: 1.15; margin: 0; text-wra
 .rodape a { color: var(--ink-2); }
 .rodape .teste { margin-left: auto; font-weight: 800; color: var(--warn); }
 .link-travado { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--warn); text-decoration: none; }
+
+/* ---------- ficha do imóvel ---------- */
+.ficha-pagina { display: grid; gap: 14px; }
+.voltar { font-size: 13px; color: var(--muted); }
+.ficha-cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.ficha-cabecalho h1 { font-size: 34px; margin-top: 4px; }
+.ficha-cabecalho p { margin: 4px 0 0; }
+@media (max-width: 560px) { .ficha-cabecalho { flex-direction: column; } .ficha-cabecalho h1 { font-size: 26px; } }
+.ficha { margin-top: 0; align-items: start; }
+.ficha-principal, .ficha-lateral { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.sem-foto { background: var(--surface); border: 1px dashed var(--line); border-radius: var(--raio); padding: 28px; text-align: center; color: var(--muted); }
+.painel .texto { margin: 0; line-height: 1.6; }
+.painel .nota { margin: 0; font-size: 12.5px; }
+
+.linha-pracas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.linha-pracas li { display: grid; gap: 2px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); border: 2px solid transparent; font-size: 14px; }
+.linha-pracas li.atual { border-color: var(--accent); background: var(--surface); }
+.linha-pracas li.passou:not(.atual) { opacity: 0.6; }
+.linha-pracas b { display: flex; gap: 6px; align-items: center; }
+
+.condicoes { list-style: none; margin: 0; padding: 0; display: grid; }
+.condicoes li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.condicoes li:last-child { border-bottom: 0; }
+.cond-nome { font-weight: 800; }
+.cond-estado { font: 800 12.5px var(--body); padding: 3px 10px; border-radius: 999px; align-self: start; white-space: nowrap; }
+.cond-estado.bom { background: var(--good-bg); color: var(--good); }
+.cond-estado.aviso { background: var(--warn-bg); color: var(--warn); }
+.cond-estado.ruim { background: var(--bad-bg); color: var(--bad); }
+.cond-estado.neutro { background: var(--surface-2); color: var(--ink-2); }
+.cond-ajuda { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+
+.cartao-lance { border: 2px solid var(--accent); }
+.lance-data { font: 800 24px/1.1 var(--display); }
+.contagem { justify-self: start; font: 800 13px var(--body); padding: 4px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.contagem.urgente { background: var(--luz); color: #1f1b2e; }
+.contagem.passado { background: var(--surface-2); color: var(--muted); }
+.lance-valor { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--line); }
+.lance-valor span:first-child { font-size: 12px; color: var(--muted); }
+.lance-valor b { font-size: 28px; font-family: var(--body); font-weight: 800; }
+.selo-desconto.estatico { position: static; justify-self: start; }
+.lance-acoes { display: grid; gap: 8px; }
+
+.passos { margin: 0; padding: 0; list-style: none; counter-reset: passo; display: grid; gap: 10px; }
+.passos li { counter-increment: passo; display: grid; gap: 1px; padding-left: 36px; position: relative; font-size: 14px; }
+.passos li::before { content: counter(passo); position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: 800 13px/24px var(--body); text-align: center; }
+.passos span { color: var(--muted); font-size: 13px; }
+
+.grafico-preco { margin: 0; display: grid; gap: 8px; }
+.grafico-preco figcaption { font-size: 14px; }
+.grafico-preco svg { width: 100%; height: auto; }
+.linha-lance { fill: none; stroke: var(--accent); stroke-width: 3; }
+.ponto-lance { fill: var(--luz); stroke: var(--accent); stroke-width: 2; }
+.linha-avaliacao { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 5; }
+.rotulo-grafico { font: 12px var(--body); fill: var(--muted); }
+.historico summary { cursor: pointer; font-weight: 700; color: var(--accent); font-size: 14px; }
+.historico .tabela { margin-top: 8px; }
+.parecidos { display: grid; gap: 12px; margin-top: 8px; }
+.parecidos h2 { font-size: 24px; }
+@media (max-width: 960px) {
+  /* no celular: fotos, depois o cartão do lance, depois o resto */
+  .ficha-principal, .ficha-lateral { display: contents; }
+  .ficha > * > .galeria, .ficha > * > .sem-foto { order: -2; }
+  .ficha > * > .cartao-lance { order: -1; }
+}
