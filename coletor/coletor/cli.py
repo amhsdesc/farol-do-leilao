@@ -12,7 +12,6 @@ from .banco import conectar, migrar
 from .coleta import executar
 from .config import config
 
-CATALOGO = config.pasta_fontes / "catalogo_leiloeiros.csv"
 
 
 def _tabela(linhas: list[list], cabecalho: list[str]) -> None:
@@ -93,76 +92,67 @@ def cmd_nova_fonte(a):
     print(f"Criado: {arq}")
 
 
-def importar_catalogo(arquivo: str, uf: str | None, junta: str | None) -> int:
-    """Importa a relação oficial de leiloeiros de uma junta comercial (CSV) para o catálogo.
-
-    Aceita qualquer CSV com colunas de nome e site (nomes flexíveis). Ex.: dados.df.gov.br,
-    dataset "Relação de Leiloeiros Habilitados".
-    """
-    from .adaptadores.caixa_csv import decodificar
-    from .normalizar import simplificar
-
-    texto = decodificar(open(arquivo, "rb").read())
-    dialeto = csv.Sniffer().sniff(texto[:5000], delimiters=";,\t")
-    linhas = list(csv.DictReader(texto.splitlines(), dialect=dialeto))
-    if not linhas:
-        return 0
-
-    def coluna(*pistas):
-        for c in linhas[0].keys():
-            if any(p in simplificar(c) for p in pistas):
-                return c
-        return None
-
-    c_nome = coluna("nome", "leiloeiro")
-    c_site = coluna("site", "sitio", "endereco eletronico", "url", "pagina")
-    c_uf = coluna("uf")
-    if not c_nome:
-        sys.exit(f"Não achei a coluna de nome em {arquivo}. Colunas: {list(linhas[0])}")
-    with CATALOGO.open(encoding="utf-8") as fh:
-        existentes = {simplificar(l["nome"]) for l in csv.DictReader(fh)}
-    novos = 0
-    with CATALOGO.open("a", encoding="utf-8", newline="") as fh:
-        w = csv.writer(fh)
-        for l in linhas:
-            nome = (l.get(c_nome) or "").strip()
-            if not nome or simplificar(nome) in existentes:
-                continue
-            site = (l.get(c_site) or "").strip() if c_site else ""
-            if site and not site.startswith("http"):
-                site = "https://" + site.lstrip("/")
-            w.writerow([nome, site, (l.get(c_uf) if c_uf else None) or uf or "", junta or "", "", "a_mapear", "importado"])
-            existentes.add(simplificar(nome))
-            novos += 1
-    return novos
-
-
 def cmd_catalogo(a):
-    """Cobertura: quantos leiloeiros do catálogo já têm fonte. --criar-fontes gera YAML automático para os demais."""
-    from .inspecionar import nova_fonte, slug
-    if not CATALOGO.exists():
-        sys.exit(f"Catálogo não encontrado: {CATALOGO}")
-    if a.importar:
-        n = importar_catalogo(a.importar, a.uf, a.junta)
-        print(f"{n} leiloeiro(s) novo(s) adicionados ao catálogo a partir de {a.importar}")
-    fontes = registro.carregar()
-    dominios = {urlparse(f.get("site") or "").netloc.replace("www.", "") for f in fontes.values()}
-    with CATALOGO.open(encoding="utf-8") as fh:
-        linhas = list(csv.DictReader(fh))
-    cobertos = [l for l in linhas if urlparse(l.get("site") or "").netloc.replace("www.", "") in dominios]
-    pendentes = [l for l in linhas if l not in cobertos and l.get("site") and l.get("status") not in ("sem_imoveis", "bloqueado")]
-    print(f"Catálogo: {len(linhas)} leiloeiros | com fonte: {len(cobertos)} | a mapear: {len(pendentes)} | "
-          f"sem site: {sum(1 for l in linhas if not l.get('site'))}")
-    if a.criar_fontes:
-        criadas = 0
-        for l in pendentes:
-            ufs = [u.strip().upper() for u in (l.get("uf") or "").split("|") if u.strip()]
-            try:
-                nova_fonte(l["site"], ufs or ["DF"], l.get("nome"))
-                criadas += 1
-            except FileExistsError:
-                pass
-        print(f"{criadas} fonte(s) automática(s) criada(s) em fontes/leiloeiros/. Teste com: python -m coletor coletar --tipo automatico")
+    """Catálogo de cobertura: leiloeiros validados, comitentes (bancos/órgãos) e fontes oficiais."""
+    from datetime import date
+    from pathlib import Path
+
+    from . import catalogo as cat
+    from .http import Cliente
+
+    leiloeiros = cat.ler(cat.ARQ_LEILOEIROS, cat.COL_LEILOEIROS)
+    comitentes = cat.ler(cat.ARQ_COMITENTES, cat.COL_COMITENTES)
+    falsos = {f["dominio"] for f in cat.ler(cat.ARQ_FALSOS, cat.COL_FALSOS)}
+    ids_fontes = set(registro.carregar())
+    acao = a.acao
+
+    if acao == "importar":
+        regs = cat.ler_lista_oficial(Path(a.arquivo))
+        r = cat.importar_lista_oficial(regs, a.junta, (a.uf or "").upper(), leiloeiros)
+        oficiais = cat.ler(cat.ARQ_OFICIAIS, cat.COL_OFICIAIS)
+        for o in oficiais:
+            if o["nome"] == a.junta:
+                o["importado_em"] = date.today().isoformat()
+        cat.gravar(cat.ARQ_OFICIAIS, oficiais, cat.COL_OFICIAIS)
+        cat.gravar(cat.ARQ_LEILOEIROS, leiloeiros, cat.COL_LEILOEIROS)
+        print(f"{r.lidos} registros lidos de {a.arquivo}: {r.validados_existentes} já no catálogo (agora validados), "
+              f"{r.novos} novos. Próximo passo: python -m coletor catalogo verificar")
+    elif acao == "sites-falsos":
+        novos = {cat.dominio(l.strip()) for l in Path(a.arquivo).read_text(encoding="utf-8").splitlines() if l.strip()}
+        linhas = cat.ler(cat.ARQ_FALSOS, cat.COL_FALSOS)
+        hoje = date.today().isoformat()
+        for d in sorted(novos - falsos):
+            linhas.append({"dominio": d, "fonte": a.fonte or Path(a.arquivo).name, "incluido_em": hoje})
+        cat.gravar(cat.ARQ_FALSOS, linhas, cat.COL_FALSOS)
+        marcados = cat.aplicar_sites_falsos(leiloeiros, falsos | novos)
+        cat.gravar(cat.ARQ_LEILOEIROS, leiloeiros, cat.COL_LEILOEIROS)
+        print(f"{len(novos - falsos)} domínio(s) adicionados à lista de sites falsos; {len(marcados)} leiloeiro(s) marcados como suspeitos.")
+    elif acao == "verificar":
+        with Cliente(intervalo=1) as cli:
+            feitos = cat.verificar_sites(leiloeiros, cli, limite=a.limite, todos=a.todos, falsos=falsos)
+        cat.gravar(cat.ARQ_LEILOEIROS, leiloeiros, cat.COL_LEILOEIROS)
+        for id_, v in feitos:
+            print(f"  {id_:<32} {'no ar' if v.no_ar else 'FORA DO AR':<10} imóveis: {v.faz_imoveis:<11} "
+                  f"plataforma: {v.plataforma or '-':<10} ({v.detalhe})")
+        print(f"{len(feitos)} site(s) verificados.")
+    elif acao == "criar-fontes":
+        criados = cat.criar_fontes(leiloeiros, ids_fontes, config.pasta_fontes, incluir_pendentes=a.incluir_pendentes)
+        cat.gravar(cat.ARQ_LEILOEIROS, leiloeiros, cat.COL_LEILOEIROS)
+        print(f"{len(criados)} fonte(s) criada(s) em fontes/leiloeiros/: {', '.join(criados) or '-'}")
+    elif acao == "oficiais":
+        linhas = [[o["tipo"], o["nome"], o["uf"], o["importado_em"] or "-", o["url"][:70]]
+                  for o in cat.ler(cat.ARQ_OFICIAIS, cat.COL_OFICIAIS)]
+        _tabela(linhas, ["tipo", "fonte oficial", "uf", "importado em", "url"])
+    else:  # cobertura
+        c = cat.cobertura(leiloeiros, comitentes, ids_fontes)
+        print(f"Leiloeiros no catálogo: {c['leiloeiros']} | validados: {c['validados']} | pendentes: {c['pendentes']} "
+              f"| suspeitos: {c['suspeitos']}")
+        print(f"Trabalham com imóveis: {c['fazem_imoveis']} | a verificar: {c['a_verificar']} | com fonte ativa: {c['com_fonte']}")
+        print(f"Comitentes (bancos/órgãos): {c['comitentes']} | com fonte própria: {c['comitentes_com_fonte']}")
+        if c["imoveis_sem_fonte"]:
+            print(f"Fazem imóveis e ainda sem fonte ({len(c['imoveis_sem_fonte'])}): {', '.join(c['imoveis_sem_fonte'][:15])}")
+        _tabela([[uf, d["leiloeiros"], d["imoveis"], d["com_fonte"]] for uf, d in c["por_uf"].items()],
+                ["uf", "leiloeiros", "fazem imóveis", "com fonte"])
 
 
 def cmd_geocodificar(a):
@@ -205,12 +195,23 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--uf", nargs="+", default=["DF"])
     s.add_argument("--nome")
     s.set_defaults(f=cmd_nova_fonte)
-    s = sub.add_parser("catalogo", help="cobertura do catálogo de leiloeiros")
-    s.add_argument("--criar-fontes", action="store_true", help="cria YAML automático para cada leiloeiro sem fonte")
-    s.add_argument("--importar", metavar="CSV", help="importa a relação de leiloeiros de uma junta comercial")
-    s.add_argument("--uf", help="UF dos leiloeiros importados (se o CSV não tiver)")
-    s.add_argument("--junta", help="nome da junta (ex.: JUCIS-DF)")
-    s.set_defaults(f=cmd_catalogo)
+    s = sub.add_parser("catalogo", help="cobertura: leiloeiros validados, bancos e fontes oficiais")
+    cs = s.add_subparsers(dest="acao")
+    cs.add_parser("cobertura", help="resumo da cobertura (padrão)")
+    cs.add_parser("oficiais", help="lista as fontes oficiais de leiloeiros (juntas, tribunais)")
+    x = cs.add_parser("importar", help="importa lista oficial de leiloeiros (CSV, XLSX ou PDF)")
+    x.add_argument("arquivo")
+    x.add_argument("--junta", required=True, help="ex.: JUCIS-DF, JUCESP, TJRJ")
+    x.add_argument("--uf", help="UF da lista, se o arquivo não tiver")
+    x = cs.add_parser("sites-falsos", help="importa domínios denunciados como golpe (um por linha)")
+    x.add_argument("arquivo")
+    x.add_argument("--fonte", help="de onde veio a lista (ex.: FENALEI)")
+    x = cs.add_parser("verificar", help="abre o site de cada leiloeiro: no ar? faz imóveis? plataforma?")
+    x.add_argument("--limite", type=int, default=50)
+    x.add_argument("--todos", action="store_true", help="reverifica também os já verificados")
+    x = cs.add_parser("criar-fontes", help="cria YAML para leiloeiros que fazem imóveis e ainda não têm fonte")
+    x.add_argument("--incluir-pendentes", action="store_true", help="inclui os ainda não validados em lista oficial")
+    s.set_defaults(f=cmd_catalogo, acao="cobertura")
     s = sub.add_parser("geocodificar", help="põe no mapa os imóveis sem coordenada")
     s.add_argument("--limite", type=int, default=500)
     s.set_defaults(f=cmd_geocodificar)

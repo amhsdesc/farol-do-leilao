@@ -1,0 +1,35 @@
+id,nome,site,uf_atuacao,junta,matricula,status_validacao,validado_por,validado_em,faz_imoveis,plataforma,comitentes,site_no_ar,verificado_em,fonte_id,observacao
+portal-zuk,Portal Zuk (Zukerman),https://www.portalzuk.com.br,,,,pendente,,,sim,,santander|banco-do-brasil|brb|sicoob,,,portal-zuk,atuação nacional; nacional; alto volume: priorizar json_api
+mega-leiloes,Mega Leilões,https://www.megaleiloes.com.br,,,,pendente,,,sim,,itau,,,mega-leiloes,atuação nacional; nacional; alto volume; imóveis em /imoveis
+frazao-leiloes,Frazão Leilões,https://www.frazaoleiloes.com.br,,,,pendente,,,sim,,santander|itau,,,frazao-leiloes,atuação nacional; nacional
+biasi-leiloes,Biasi Leilões,https://www.biasileiloes.com.br,,,,pendente,,,sim,,santander|itau,,,biasi-leiloes,atuação nacional;
+sodre-santoro,Sodré Santoro,https://www.sodresantoro.com.br,,,,pendente,,,sim,,santander,,,sodre-santoro,atuação nacional; imóveis em /imoveis/lotes
+leiloes-judiciais,Leilões Judiciais (Grupo Lance),https://www.leiloesjudiciais.com.br,,,,pendente,,,sim,,,,,leiloes-judiciais,atuação nacional;
+superbid,Superbid Exchange,https://www.superbid.net,,,,pendente,,,sim,,banco-do-nordeste,,,superbid,atuação nacional; plataforma com vários leiloeiros; imóveis em /categorias/imoveis
+alfa-leiloes,Alfa Leilões,https://alfaleiloes.com,,,,pendente,,,sim,,,,,alfa-leiloes,site se apresenta como especialista em imóveis
+freitas-leiloeiro,Freitas Leiloeiro,https://www.freitasleiloeiro.com.br,SP,,,pendente,,,sim,,,,,freitas-leiloeiro,
+leiloeiros-de-brasilia,Leiloeiros de Brasília,https://www.leiloeirosdebrasilia.com.br,DF,,,pendente,,,sim,soleon,,,,leiloeiros-de-brasilia,Soleon confirmado; imóveis em /lotes/imovel
+kildare-leiloes,Kildare Leilões,https://www.kildareleiloes.com.br,,,,pendente,,,sim,soleon,banco-do-nordeste,,,kildare-leiloes,Soleon confirmado
+cravo-leiloes,Cravo Leilões,https://www.cravoleiloes.com.br,,,,pendente,,,sim,,banco-do-brasil|emgea,,,cravo-leiloes,URL no padrão Soleon (provável)
+machado-leiloes,Machado Leilões,https://machadoleiloes.com.br,RJ,,,pendente,,,sim,,emgea,,,machado-leiloes,URL no padrão Soleon (provável)
+moraes-leiloes,Moraes Leilões,https://www.moraesleiloes.com.br,,,,pendente,,,sim,,caixa,,,moraes-leiloes,URL no padrão Soleon (provável)
+central-dos-leiloes,Central dos Leilões,https://www.centraldosleiloes.com.br,,,,pendente,,,sim,,,,,central-dos-leiloes,tem /lotes/imovel (padrão Soleon)
+rodolfo-schontag,Rodolfo Schöntag (Leiloeiro Público),https://www.leiloeiropublico.com.br,DF,,,pendente,,,sim,,emgea,,,rodolfo-schontag,
+mult-leiloes,Mult Leilões,https://multleiloes.com,,,,pendente,,,sim,,emgea,,,mult-leiloes,
+trustbid,TrustBid Leilões,https://www.trustbid.com.br,,,,pendente,,,sim,,banco-inter,,,trustbid,
+machado-leiloeiro,Machado Leiloeiro,https://www.machadoleiloeiro.com.br,,,,pendente,,,a_verificar,,,,,,título no padrão Soleon
+fa-leiloes,FA Leilões,https://www.faleiloes.com.br,,,,pendente,,,a_verificar,,,,,,título no padrão Soleon
+italo-leiloes,Ítalo Leilões,https://www.italoleiloes.com,,,,pendente,,,a_verificar,,,,,,título no padrão Soleon
+3-torres-leiloes,3 Torres Leilões,https://www.3torresleiloes.com.br,,,,pendente,,,a_verificar,,,,,,
+lance-leiloes-se,Lance Leilões,https://www.lancese.com.br,SE,,,pendente,,,a_verificar,,,,,,
+rj-leiloes,RJ Leilões,https://www.rjleiloes.com.br,RJ,,,pendente,,,a_verificar,,,,,,
+isaias-leiloes,Isaias Jr. Leiloeiro,https://www.isaiasleiloes.com.br,MG,,,pendente,,,a_verificar,,,,,,site informa JUCEMG 831
+leiloes-brasil,Leilões Brasil,https://www.leiloesbrasil.com.br,,,,pendente,,,a_verificar,,,,,,
+o-leiloes,O Leilões,https://oleiloes.com.br,PR,,,pendente,,,a_verificar,,,,,,
+miranda-carvalho,Miranda Carvalho Leilões,https://www.mirandacarvalholeiloes.com.br,RJ,,,pendente,,,a_verificar,,,,,,
+muller-leiloes,Müller Leilões,https://www.mullerleiloes.com.br,,,,pendente,,,a_verificar,soleon,,,,,Soleon (página de teste da plataforma)
+grupo-arremate,Grupo Arremate Leilões,https://www.grupoarremateleiloes.com.br,SP,,,pendente,,,a_verificar,,,,,,gestor de leilões do TJSP
+leiloes-ceruli,Leilões Ceruli,http://leiloesceruli.soleon.com.br,,,,pendente,,,a_verificar,soleon,,,,,
+edgar-carvalho,Edgar de Carvalho Jr.,http://edgarcarvalho.soleon.com.br,,,,pendente,,,a_verificar,soleon,,,,,
+gr-leiloes,GR Leilões,http://grleiloes.soleon.com.br,,,,pendente,,,a_verificar,soleon,,,,,
+construbem-leiloes,Construbem Leilões,https://construbemleiloes.plataformasoleon.com.br,,,,pendente,,,a_verificar,soleon,,,,,

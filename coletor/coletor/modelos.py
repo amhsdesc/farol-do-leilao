@@ -58,6 +58,7 @@ class LoteBruto(BaseModel):
     aceita_fgts: Any = None
 
     leiloeiro: str | None = None
+    comitente: str | None = None   # quem vende: Caixa, Santander, Emgea, União...
     processo: str | None = None
     edital_url: str | None = None
     fotos: list[str] = Field(default_factory=list)
@@ -104,6 +105,7 @@ class Lote(BaseModel):
     aceita_fgts: bool | None = None
 
     leiloeiro: str | None = None
+    comitente: str | None = None
     processo: str | None = None
     edital_url: str | None = None
     fotos: list[str] = Field(default_factory=list)

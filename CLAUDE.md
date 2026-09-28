@@ -4,11 +4,13 @@ Leia este arquivo inteiro antes de mexer no código. Ele é o contexto do projet
 
 ## O que é
 
-Agregador que reúne imóveis em leilão do **máximo possível de fontes** (Caixa, bancos, leiloeiros oficiais,
-tribunais) numa busca única, com ficha única por imóvel, histórico de preço e praça, e — na próxima fase —
-valor de mercado estimado por comparáveis.
+Agregador que reúne imóveis em leilão do **máximo possível de fontes, no Brasil inteiro**: Caixa (27 UFs),
+todos os bancos e órgãos que vendem imóveis (BB, Santander, Itaú, Bradesco, BRB, Emgea, União...), e todos os
+leiloeiros oficiais validados que fazem leilão de imóveis. Ficha única por imóvel, histórico de preço e praça, e —
+na próxima fase — valor de mercado estimado por comparáveis. Objetivo: ser um agregador melhor que os existentes
+(BidMap, BidHero, Spot, Radar Leilão...), a começar pela cobertura.
 
-Praça inicial: DF e entorno (GO). Público inicial: investidor pessoa física.
+Público inicial: investidor pessoa física.
 
 ## Estrutura
 
@@ -17,7 +19,9 @@ db/migrations/     SQL do banco (PostgreSQL 16 + PostGIS). Aplicar em ordem.
 coletor/           Python 3.11+. Motor de coleta, normalização, deduplicação, geocodificação.
   coletor/adaptadores/   Um arquivo por TIPO de adaptador (não por site).
   fontes/                Um YAML por fonte (site). Adicionar fonte = adicionar YAML.
-  fontes/plataformas/    Modelos YAML compartilhados por leiloeiros que usam o mesmo software.
+  fontes/plataformas/    Modelos YAML compartilhados por leiloeiros que usam o mesmo software (ex.: soleon.yaml).
+  fontes/bancos/         Sites próprios de bancos e órgãos (Santander Imóveis, Seu Imóvel BB, Itaú, União...).
+  catalogo/              Mapa de cobertura: leiloeiros.csv, comitentes.csv, fontes_oficiais.csv, sites_falsos.csv.
   tests/                 pytest. Fixtures em tests/fixtures.
 web/               Next.js (App Router, TypeScript). Lê o banco direto com `pg`.
 docs/              Guias: como adicionar fonte, arquitetura.
@@ -33,7 +37,11 @@ docs/              Guias: como adicionar fonte, arquitetura.
 5. **Sem dados pessoais:** não guardar nome/CPF de executados nem contatos de anunciantes. Só o imóvel.
 6. **Proteção contra coletor quebrado:** um lote só vira `removido` se a execução terminou `ok` e leu
    pelo menos 50% dos lotes ativos anteriores daquela fonte.
-7. Valores em reais são `numeric`, nunca float. Datas com fuso (`timestamptz`, America/Sao_Paulo na origem).
+7. **Só fontes primárias:** leiloeiro oficial validado (junta comercial/tribunal), banco/órgão vendedor, ou
+   plataforma que publica leilões de leiloeiros oficiais. Agregadores concorrentes nunca são fonte.
+8. **Comitente ≠ fonte:** o comitente é quem vende (Caixa, Santander...); a fonte é onde coletamos. Um banco vende
+   por vários leiloeiros. Todo lote deve ter `comitente` quando a página disser.
+9. Valores em reais são `numeric`, nunca float. Datas com fuso (`timestamptz`, America/Sao_Paulo na origem).
 
 ## Tipos de adaptador (do mais barato ao mais caro de manter)
 
@@ -49,10 +57,10 @@ Se vários leiloeiros usam a mesma plataforma, crie o modelo em `fontes/platafor
 
 ## Modelo de dados (resumo)
 
-- `fonte` — cada site/fonte, espelha o YAML.
+- `fonte` — cada site/fonte, espelha o YAML (com `comitente` quando a fonte é de um vendedor só).
 - `imovel` — ficha única (deduplicada) com endereço, áreas, ponto geográfico.
 - `imovel_chave` — chaves de deduplicação (matrícula+cartório, endereço normalizado+área, id Caixa).
-- `lote` — cada anúncio de cada fonte (`unique(fonte_id, id_externo)`), estado atual.
+- `lote` — cada anúncio de cada fonte (`unique(fonte_id, id_externo)`), estado atual, com `comitente`.
 - `leitura` — snapshot a cada mudança de um lote. Nunca apagar.
 - `execucao_coleta` — log de cada rodada por fonte.
 - `vw_busca` — view que o site usa: um registro por imóvel com o melhor lote ativo.
@@ -67,6 +75,10 @@ python -m coletor coletar --todas        # coleta todas as fontes ativas
 python -m coletor inspecionar URL        # descobre APIs JSON, plataforma e salva amostras
 python -m coletor nova-fonte URL         # cria YAML inicial a partir de um site
 python -m coletor geocodificar           # põe no mapa os imóveis sem coordenada
+python -m coletor catalogo               # cobertura: leiloeiros validados, que fazem imóveis, com fonte
+python -m coletor catalogo importar ARQ --junta JUCIS-DF --uf DF   # lista oficial (CSV/XLSX/PDF)
+python -m coletor catalogo verificar     # site no ar? faz imóveis? qual plataforma?
+python -m coletor catalogo criar-fontes  # YAML para quem faz imóveis e ainda não tem fonte
 pytest                                   # testes
 ```
 

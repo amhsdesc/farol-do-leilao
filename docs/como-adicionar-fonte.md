@@ -5,21 +5,9 @@ A meta é cobrir o máximo de leiloeiros sem que cada site novo vire um projeto.
 
 ## 1. Catálogo: saber quem existe
 
-`coletor/fontes/catalogo_leiloeiros.csv` é a lista de todos os leiloeiros que queremos cobrir, com ou sem
-fonte pronta. Ela responde "qual é a nossa cobertura?".
-
-As juntas comerciais publicam a relação oficial de leiloeiros. Para o DF, o Portal de Dados Abertos tem o
-conjunto **Relação de Leiloeiros Habilitados** (dados.df.gov.br). Baixe o CSV e importe:
-
-```
-python -m coletor catalogo --importar relacao.csv --uf DF --junta JUCIS-DF
-```
-
-Repita com JUCEG (GO) e com as juntas dos estados seguintes. Leiloeiros sem site próprio costumam publicar em
-plataformas compartilhadas: vale anotar a plataforma na coluna `plataforma`.
-
-Status possíveis: `a_mapear`, `mapeado`, `sem_imoveis` (só veículos/bens móveis), `bloqueado` (site proíbe
-coleta ou exige login).
+Veja [catalogo.md](catalogo.md). Em resumo: importe as listas oficiais das juntas, rode `catalogo verificar` e
+`catalogo criar-fontes`. Cada leiloeiro validado que faz imóveis ganha uma fonte automática no mesmo dia.
+Este guia é para o passo seguinte: melhorar uma fonte específica.
 
 ## 2. Inspeção: decidir o tipo de adaptador
 

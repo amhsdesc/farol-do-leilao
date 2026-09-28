@@ -6,7 +6,7 @@ O cabeçalho é localizado por pontuação de nomes conhecidos, então pequenas 
 
 Configuração (YAML):
     tipo: csv_caixa
-    uf: [DF, GO]
+    uf: todas                  # ou uma lista, ex.: [DF, GO]
     url_modelo: https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_{uf}.csv   # opcional
     arquivo_local: C:/Users/voce/Downloads/Lista_imoveis_{uf}.csv                   # opcional (download manual)
     navegador: false                                                                # true se o site bloquear o download direto
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Iterator
 
 from ..modelos import LoteBruto
-from ..normalizar import simplificar
+from ..normalizar import UFS, simplificar
 from .base import Adaptador, ErroDeFonte
 
 URL_PADRAO = "https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_{uf}.csv"
@@ -103,6 +103,7 @@ def para_lote(r: dict[str, str]) -> LoteBruto | None:
         lance_minimo=r.get("lance_minimo"),
         praca_atual=int(m.group(1)) if m else None,
         leiloeiro="Caixa Econômica Federal",
+        comitente="Caixa Econômica Federal",
         dados={"desconto_informado": r.get("desconto"), "modalidade_original": mod},
     )
 
@@ -129,12 +130,22 @@ class CaixaCSV(Adaptador):
             ) from e
 
     def coletar(self) -> Iterator[LoteBruto]:
-        ufs = self.fonte.get("uf") or []
-        if not ufs:
-            raise ErroDeFonte("Informe 'uf' no YAML da fonte Caixa.")
+        ufs = self.fonte.get("uf") or ["todas"]
+        if ufs in (["todas"], ["TODAS"], "todas"):
+            ufs = sorted(UFS)
+        falhas = []
         for uf in ufs:
-            texto = decodificar(self._baixar(uf))
-            for r in ler_csv(texto):
+            try:
+                texto = decodificar(self._baixar(uf))
+                registros = ler_csv(texto)
+            except ErroDeFonte as e:
+                # uma UF que falha não impede as outras; a execução fica 'parcial' e nada é removido
+                self.registrar_erro(f"UF {uf}: {e}")
+                falhas.append(uf)
+                continue
+            for r in registros:
                 lote = para_lote(r)
                 if lote:
                     yield lote
+        if falhas and len(falhas) == len(ufs):
+            raise ErroDeFonte(f"Nenhuma UF baixada ({', '.join(falhas)}).")

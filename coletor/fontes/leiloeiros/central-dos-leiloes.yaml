@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-28). Validação: pendente.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: central-dos-leiloes
+nome: Central dos Leilões
+site: https://www.centraldosleiloes.com.br
+tipo: automatico
+uf: [todas]
+inicio:
+  - https://www.centraldosleiloes.com.br/lotes/imovel
+max_paginas_lista: 10
+max_lotes: 400
+navegador: false

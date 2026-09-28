@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-28). Validação: pendente.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: biasi-leiloes
+nome: Biasi Leilões
+site: https://www.biasileiloes.com.br
+tipo: automatico
+uf: [todas]
+inicio:
+  - https://www.biasileiloes.com.br
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false

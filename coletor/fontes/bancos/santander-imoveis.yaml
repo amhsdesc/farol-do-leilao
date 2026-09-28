@@ -1,0 +1,11 @@
+# Outlet de imóveis do Santander (venda direta do banco). Leilões do Santander também chegam por leiloeiros.
+id: santander-imoveis
+nome: Santander Imóveis
+site: https://www.santanderimoveis.com.br
+tipo: automatico
+comitente: Santander
+uf: todas
+inicio: [https://www.santanderimoveis.com.br/]
+max_paginas_lista: 15
+max_lotes: 400
+navegador: true      # site montado por JavaScript

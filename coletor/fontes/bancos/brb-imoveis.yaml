@@ -1,0 +1,10 @@
+id: brb-imoveis
+nome: Imóveis BRB
+site: https://novo.brb.com.br
+tipo: automatico
+comitente: BRB
+uf: [DF, GO]
+inicio: [https://novo.brb.com.br/imoveis-brb/]
+max_paginas_lista: 10
+max_lotes: 200
+navegador: true

@@ -1,0 +1,11 @@
+id: itau-imoveis
+nome: Imóveis Itaú
+site: https://www.itau.com.br
+tipo: automatico
+comitente: Itaú Unibanco
+uf: todas
+inicio: [https://www.itau.com.br/leiloes-imoveis]
+padrao_link_lote: "/imoveis-itau/detalhes\\?id=\\d+"
+max_paginas_lista: 15
+max_lotes: 400
+navegador: true

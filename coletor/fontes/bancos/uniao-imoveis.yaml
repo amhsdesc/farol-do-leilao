@@ -1,0 +1,13 @@
+# Imóveis da União (SPU) vendidos online.
+id: uniao-imoveis
+nome: Imóveis da União (SPU)
+site: https://imoveis.economia.gov.br
+tipo: automatico
+comitente: União (SPU)
+uf: todas
+inicio:
+  - https://imoveis.economia.gov.br/
+  - https://imoveis.economia.gov.br/concorrencia
+max_paginas_lista: 10
+max_lotes: 300
+navegador: true

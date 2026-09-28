@@ -17,7 +17,7 @@ from .modelos import Lote
 CAMPOS_LOTE = [
     "url", "titulo", "descricao", "modalidade", "status", "valor_avaliacao", "lance_minimo",
     "praca_atual", "data_praca1", "valor_praca1", "data_praca2", "valor_praca2", "ocupacao",
-    "aceita_financiamento", "aceita_fgts", "leiloeiro", "processo", "edital_url", "fotos",
+    "aceita_financiamento", "aceita_fgts", "leiloeiro", "comitente", "processo", "edital_url", "fotos",
 ]
 CAMPOS_IMOVEL = [
     "tipo", "uf", "cidade", "bairro", "endereco", "endereco_normalizado", "area_privativa",
@@ -66,16 +66,17 @@ class Repositorio:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                insert into fonte (id, nome, site, tipo_adaptador, plataforma, uf, ativa, config)
-                values (%(id)s, %(nome)s, %(site)s, %(tipo)s, %(plataforma)s, %(uf)s, %(ativa)s, %(config)s)
+                insert into fonte (id, nome, site, tipo_adaptador, plataforma, comitente, uf, ativa, config)
+                values (%(id)s, %(nome)s, %(site)s, %(tipo)s, %(plataforma)s, %(comitente)s, %(uf)s, %(ativa)s, %(config)s)
                 on conflict (id) do update set
                     nome = excluded.nome, site = excluded.site, tipo_adaptador = excluded.tipo_adaptador,
-                    plataforma = excluded.plataforma, uf = excluded.uf, ativa = excluded.ativa,
+                    plataforma = excluded.plataforma, comitente = excluded.comitente, uf = excluded.uf, ativa = excluded.ativa,
                     config = excluded.config, atualizado_em = now()
                 """,
                 {
                     "id": f["id"], "nome": f.get("nome", f["id"]), "site": f.get("site"),
-                    "tipo": f["tipo"], "plataforma": f.get("plataforma"), "uf": f.get("uf", []),
+                    "tipo": f["tipo"], "plataforma": f.get("plataforma"), "comitente": f.get("comitente"),
+                    "uf": f.get("uf", []),
                     "ativa": f.get("ativa", True), "config": Jsonb(f),
                 },
             )

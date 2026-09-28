@@ -146,6 +146,7 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
                   <span className="num">{reais(l.lance_minimo)}</span>
                 </div>
                 <div className="chips" style={{ marginTop: 0 }}>
+                  {l.comitente && <span className="chip">Vendedor: {l.comitente}</span>}
                   <span className="chip">{MODALIDADES[l.modalidade] ?? l.modalidade}</span>
                   <span className={`chip ${l.status === "ativo" ? "chip-bom" : "chip-aviso"}`}>{l.status}</span>
                   {l.data_praca1 && (

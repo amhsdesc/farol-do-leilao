@@ -46,6 +46,9 @@ def test_historico_dedup_e_remocao(conn, cliente_para):
     busca = _um(conn, """select v.n_fontes, v.lance_minimo from vw_busca v join lote l on l.imovel_id = v.imovel_id
                          where l.id_externo = '102'""")
     assert busca["n_fontes"] == 2
+    com = _um(conn, """select v.comitente from vw_busca v join lote l on l.imovel_id = v.imovel_id
+                       where l.id_externo = '102'""")
+    assert com["comitente"] == "Caixa Econômica Federal"
 
     # preço cai num lote e outro some da lista: 1 alterado, 1 removido, histórico preservado
     df = _csv_df(linhas_remover=("1444400000003",), trocar=("275.000,00", "250.000,00"))

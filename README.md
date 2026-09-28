@@ -1,7 +1,7 @@
 # Hasta
 
-Agregador de imóveis em leilão: Caixa, bancos, leiloeiros oficiais e tribunais numa busca só, com ficha única
-por imóvel, histórico de preço e praça e calculadora de arrematação.
+Agregador nacional de imóveis em leilão: Caixa (27 UFs), bancos e órgãos vendedores, e leiloeiros oficiais
+validados, numa busca só, com ficha única por imóvel, histórico de preço e praça e calculadora de arrematação.
 
 - `coletor/` — motor de coleta em Python (4 tipos de adaptador, normalização, deduplicação, histórico)
 - `web/` — site em Next.js (busca com mapa, ficha do imóvel, painel de fontes)
@@ -26,7 +26,7 @@ docker compose up -d
 # 3. Coletor
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -e "coletor[dev,navegador]"
+pip install -e "coletor[dev,navegador,listas]"
 playwright install chromium
 cd coletor
 python -m coletor migrar
@@ -43,7 +43,7 @@ npm run dev                      # abre em http://localhost:3000
 
 ```powershell
 cd coletor
-python -m coletor coletar caixa      # lista da Caixa para DF e GO
+python -m coletor coletar caixa      # lista da Caixa, 27 UFs
 python -m coletor geocodificar        # põe os imóveis no mapa (1 por segundo, é devagar na 1ª vez)
 python -m coletor status
 ```
@@ -54,16 +54,17 @@ CSV manualmente e aponte `arquivo_local`.
 Quer ver o site antes de coletar? `python scripts/carregar_demo.py` carrega 9 imóveis fictícios;
 `python scripts/carregar_demo.py --limpar` remove.
 
-## Adicionando leiloeiros
+## Cobertura: bancos e leiloeiros
 
-Resumo (detalhes em [docs/como-adicionar-fonte.md](docs/como-adicionar-fonte.md)):
+O mapa do que existe para coletar fica em `coletor/catalogo/` (ver [docs/catalogo.md](docs/catalogo.md)):
 
 ```powershell
-python -m coletor catalogo                                  # cobertura atual
-python -m coletor catalogo --importar relacao_jucis.csv --uf DF --junta JUCIS-DF
-python -m coletor inspecionar https://site-do-leiloeiro.com.br/imoveis
-python -m coletor nova-fonte https://site-do-leiloeiro.com.br/imoveis --uf DF GO
-python -m coletor coletar id-da-fonte
+python -m coletor catalogo                                   # resumo da cobertura
+python -m coletor catalogo oficiais                          # onde baixar as listas oficiais (juntas, tribunais)
+python -m coletor catalogo importar relacao.csv --junta JUCIS-DF --uf DF
+python -m coletor catalogo verificar --limite 100            # no ar? faz imóveis? plataforma?
+python -m coletor catalogo criar-fontes                      # cria as fontes dos validados que fazem imóveis
+python -m coletor coletar --todas
 ```
 
 ## Rotina automática

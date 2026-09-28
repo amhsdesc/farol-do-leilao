@@ -1,11 +1,12 @@
-# Lista oficial de imóveis da Caixa (leilões SFI, licitação aberta, venda direta e venda online).
+# Lista oficial de imóveis da Caixa, todas as UFs (leilões SFI, licitação aberta, venda direta e venda online).
 id: caixa
 nome: Caixa Econômica Federal
 site: https://venda-imoveis.caixa.gov.br
 tipo: csv_caixa
-uf: [DF, GO]
+comitente: Caixa Econômica Federal
+uf: todas
 # O site da Caixa às vezes recusa downloads automáticos. Se acontecer, use uma das opções:
-# navegador: true                                               # baixa via Chromium (precisa do Playwright)
-# arquivo_local: "C:/Users/SEU_USUARIO/Downloads/Lista_imoveis_{uf}.csv"   # download manual
+# navegador: true                                                            # baixa via Chromium (Playwright)
+# arquivo_local: "C:/Users/SEU_USUARIO/Downloads/Lista_imoveis_{uf}.csv"     # download manual
 intervalo_segundos: 3
 salvar_brutos: true

@@ -7,6 +7,7 @@ from typing import Any, Iterator
 
 from ..http import Cliente
 from ..modelos import LoteBruto
+from ..normalizar import UFS
 
 log = logging.getLogger(__name__)
 
@@ -31,8 +32,10 @@ class Adaptador:
         """Valores usados quando a fonte não informa o campo (ex.: uf de um leiloeiro de um só estado)."""
         p = dict(self.fonte.get("padroes") or {})
         ufs = self.fonte.get("uf") or []
-        if len(ufs) == 1:
+        if len(ufs) == 1 and str(ufs[0]).upper() in UFS:
             p.setdefault("uf", ufs[0])
+        if self.fonte.get("comitente"):  # fonte de um vendedor só (ex.: site de um banco)
+            p.setdefault("comitente", self.fonte["comitente"])
         return p
 
     def coletar(self) -> Iterator[LoteBruto]:  # pragma: no cover

@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-28). Validação: pendente.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: mult-leiloes
+nome: Mult Leilões
+site: https://multleiloes.com
+tipo: automatico
+uf: [todas]
+inicio:
+  - https://multleiloes.com
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false

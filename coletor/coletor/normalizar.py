@@ -247,6 +247,54 @@ def uf(valor: Any) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------- comitente (quem vende)
+
+# nome padronizado → padrões de reconhecimento (texto simplificado, sem acento)
+COMITENTES: dict[str, list[str]] = {
+    "Caixa Econômica Federal": [r"\bcaixa economica\b", r"\bcef\b", r"\bimovel caixa\b", r"\bcaixa\b(?! (?:postal|d.?agua|de agua|de gordura|de inspecao))"],
+    "Banco do Brasil": [r"\bbanco do brasil\b", r"\bbb s\.?a\b"],
+    "Santander": [r"\bsantander\b"],
+    "Bradesco": [r"\bbradesco\b"],
+    "Itaú Unibanco": [r"\bitau\b"],
+    "BRB": [r"\bbrb\b", r"\bbanco de brasilia\b"],
+    "Banrisul": [r"\bbanrisul\b"],
+    "Banestes": [r"\bbanestes\b"],
+    "Banpará": [r"\bbanpara\b"],
+    "Emgea": [r"\bemgea\b"],
+    "Sicoob": [r"\bsicoob\b"],
+    "Sicredi": [r"\bsicredi\b"],
+    "Banco Inter": [r"\bbanco inter\b"],
+    "BTG Pactual": [r"\bbtg\b"],
+    "Banco BV": [r"\bbanco bv\b", r"\bbv financeira\b", r"\bbanco votorantim\b"],
+    "Safra": [r"\bsafra\b"],
+    "Porto Seguro": [r"\bporto seguro\b", r"\bporto bank\b"],
+    "Banco do Nordeste": [r"\bbanco do nordeste\b", r"\bbnb\b"],
+    "Banco da Amazônia": [r"\bbanco da amazonia\b", r"\bbasa\b"],
+    "BNDES": [r"\bbndes\b"],
+    "União (SPU)": [r"\bsecretaria do patrimonio da uniao\b", r"\bspu\b", r"\bimoveis da uniao\b"],
+    "Embracon": [r"\bembracon\b"],
+    "Rodobens": [r"\brodobens\b"],
+    "Banco Pan": [r"\bbanco pan\b"],
+    "Daycoval": [r"\bdaycoval\b"],
+    "Mercantil do Brasil": [r"\bmercantil do brasil\b"],
+    "C6 Bank": [r"\bc6 bank\b"],
+}
+
+
+def comitente(valor: Any, *textos_extra: Any) -> str | None:
+    """Padroniza quem vende. Primeiro o campo informado, depois título/descrição."""
+    for texto in (valor, *textos_extra):
+        t = simplificar(texto)
+        if not t:
+            continue
+        for nome, padroes in COMITENTES.items():
+            if any(re.search(p, t) for p in padroes):
+                return nome
+        if texto is valor:  # comitente informado e não reconhecido: mantém como veio
+            return limpar(valor)
+    return None
+
+
 # ---------------------------------------------------------------- endereço
 
 _ABREVIACOES = {
@@ -365,6 +413,7 @@ def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: d
         aceita_financiamento=booleano(campo("aceita_financiamento")),
         aceita_fgts=booleano(campo("aceita_fgts")),
         leiloeiro=limpar(campo("leiloeiro")),
+        comitente=comitente(campo("comitente"), *textos),
         processo=limpar(campo("processo")),
         edital_url=limpar(campo("edital_url")),
         fotos=[f for f in (bruto.fotos or []) if f][:30],

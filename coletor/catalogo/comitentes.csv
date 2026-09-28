@@ -1,0 +1,23 @@
+id,nome,tipo,site_oficial,pagina_imoveis,como_vende,leiloeiros,fonte_id,referencia,observacao
+caixa,Caixa Econômica Federal,banco,https://www.caixa.gov.br,https://venda-imoveis.caixa.gov.br/sistema/download-lista.asp,ambos,moraes-leiloes,caixa,lista CSV oficial por UF,maior vendedor do país
+banco-do-brasil,Banco do Brasil,banco,https://www.bb.com.br,https://www.bb.com.br/site/compras-contratacao-e-venda-de-imoveis/venda-de-imoveis/,ambos,cravo-leiloes|portal-zuk,seu-imovel-bb,https://seuimovelbb.com.br/,plataforma Seu Imóvel BB
+santander,Santander,banco,https://www.santander.com.br,https://www.santanderimoveis.com.br/,ambos,sodre-santoro|biasi-leiloes|portal-zuk|frazao-leiloes,santander-imoveis,,
+bradesco,Bradesco,banco,https://banco.bradesco,https://banco.bradesco/html/classic/produtos-servicos/leiloes/index.shtm,leiloeiros,,,,página oficial lista os leilões e leva aos leiloeiros; cobertura via leiloeiros
+itau,Itaú Unibanco,banco,https://www.itau.com.br,https://www.itau.com.br/leiloes-imoveis,ambos,frazao-leiloes|biasi-leiloes|mega-leiloes,itau-imoveis,,
+brb,BRB – Banco de Brasília,banco,https://novo.brb.com.br,https://novo.brb.com.br/imoveis-brb/,ambos,portal-zuk,brb-imoveis,,
+banrisul,Banrisul,banco,https://www.banrisul.com.br,https://www.banrisul.com.br/bob/site/link/licitacoes-leiloes.html,proprio_site,,,,editais de licitação/leilão
+banestes,Banestes,banco,https://www.banestes.com.br,https://www.banestes.com.br/publicacoes_legais/leilao-bem-imovel.html,proprio_site,,,,editais
+emgea,Emgea,empresa_publica,,,leiloeiros,rodolfo-schontag|cravo-leiloes|machado-leiloes|mult-leiloes,,https://www.leilaoimovel.com.br/banco_leilao_de_imoveis/emgea,vende só por leiloeiros
+sicoob,Sicoob,cooperativa,https://www.sicoob.com.br,https://www.sicoob.com.br/web/sicoob/leilao,ambos,portal-zuk,sicoob-imoveis,,cada cooperativa também publica 'bens à venda'
+sicredi,Sicredi,cooperativa,https://www.sicredi.com.br,,leiloeiros,,,,leilões por cooperativa regional
+banco-inter,Banco Inter,banco,https://www.bancointer.com.br,,leiloeiros,trustbid,,,
+btg-pactual,BTG Pactual,banco,https://www.btgpactual.com,,leiloeiros,,,https://www.leilaoimovel.com.br/banco_leilao_de_imoveis/btg-pactual,
+banco-bv,Banco BV,banco,,,leiloeiros,,,,
+safra,Banco Safra,banco,,,leiloeiros,,,,
+porto-seguro,Porto Seguro / Porto Bank,financeira,,,leiloeiros,,,,
+embracon,Embracon,consorcio,,,leiloeiros,,,,
+banco-do-nordeste,Banco do Nordeste,banco,https://www.bnb.gov.br,https://www.bnb.gov.br/acesso-a-informacao/licitacoes-e-contratos/bens-a-venda,ambos,kildare-leiloes|superbid,,,relação de bens em PDF
+bndes,BNDES,banco,https://www.bndes.gov.br,https://www.bndes.gov.br/wps/portal/site/home/transparencia/licitacoes-contratos/licitacoes/leiloes,proprio_site,,,,
+uniao-spu,União (Secretaria do Patrimônio da União),governo,https://imoveis.economia.gov.br,https://imoveis.economia.gov.br/,proprio_site,,uniao-imoveis,https://imoveis.vendasgov.serpro.gov.br/leilao,venda online de imóveis da União
+banco-da-amazonia,Banco da Amazônia,banco,,,a_verificar,,,,
+banpara,Banpará,banco,,,a_verificar,,,,

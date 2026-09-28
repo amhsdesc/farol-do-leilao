@@ -16,6 +16,7 @@ export type ItemBusca = {
   lote_id: number;
   fonte_id: string;
   fonte_nome: string;
+  comitente: string | null;
   url: string | null;
   titulo: string | null;
   modalidade: string;
@@ -40,6 +41,7 @@ export type Filtros = {
   modalidade?: string;
   ocupacao?: string;
   fonte?: string;
+  comitente?: string;
   preco_max?: string;
   desconto_min?: string;
   q?: string;
@@ -68,6 +70,7 @@ function montarWhere(f: Filtros): { where: string; params: unknown[] } {
   if (f.tipo) add("tipo = $?", f.tipo);
   if (f.modalidade) add("modalidade = $?", f.modalidade);
   if (f.ocupacao) add("ocupacao = $?", f.ocupacao);
+  if (f.comitente) add("comitente = $?", f.comitente);
   if (f.fonte) add("imovel_id in (select imovel_id from lote where fonte_id = $? and status in ('ativo','suspenso'))", f.fonte);
   if (f.preco_max && Number(f.preco_max) > 0) add("lance_minimo <= $?", Number(f.preco_max));
   if (f.desconto_min && Number(f.desconto_min) > 0) add("desconto_avaliacao >= $?", Number(f.desconto_min) / 100);
@@ -99,15 +102,18 @@ export async function buscar(f: Filtros) {
 }
 
 export async function opcoesFiltro() {
-  const [ufs, fontes] = await Promise.all([
+  const [ufs, fontes, comitentes] = await Promise.all([
     consulta<{ uf: string; n: number }>("select uf, count(*)::int n from vw_busca where uf is not null group by uf order by uf"),
     consulta<{ id: string; nome: string; n: number }>(
       `select f.id, f.nome, count(l.*)::int n from fonte f
        left join lote l on l.fonte_id = f.id and l.status in ('ativo','suspenso')
        where f.ativa group by f.id order by n desc`,
     ),
+    consulta<{ comitente: string; n: number }>(
+      "select comitente, count(*)::int n from vw_busca where comitente is not null group by comitente order by n desc",
+    ),
   ]);
-  return { ufs, fontes };
+  return { ufs, fontes, comitentes };
 }
 
 export type Lote = {
@@ -131,6 +137,7 @@ export type Lote = {
   aceita_financiamento: boolean | null;
   aceita_fgts: boolean | null;
   leiloeiro: string | null;
+  comitente: string | null;
   processo: string | null;
   edital_url: string | null;
   fotos: string[];

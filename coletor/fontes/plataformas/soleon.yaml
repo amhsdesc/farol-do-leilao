@@ -1,0 +1,14 @@
+# Plataforma SOLEON ("Tecnologia SOLEON" no rodapé) — usada por mais de 100 leiloeiros.
+# Confirmada em leiloeirosdebrasilia.com.br e kildareleiloes.com.br.
+#   listagem de imóveis: {site}/lotes/imovel        (paginação ?page=N)
+#   página do lote:      {site}/item/<id>/detalhes
+# Começa como 'automatico' com o padrão de link exato. Quando alguém rodar `inspecionar` num site Soleon,
+# troque para 'seletores' ou 'json_api' AQUI: todos os leiloeiros que herdam ganham a melhoria de uma vez.
+tipo: automatico
+plataforma: soleon
+inicio:
+  - "{site}/lotes/imovel"
+padrao_link_lote: "/item/\\d+/detalhes"
+max_paginas_lista: 20
+max_lotes: 400
+navegador: false

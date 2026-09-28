@@ -1,0 +1,6 @@
+# Criado pelo catálogo (2026-09-28). Validação: pendente.
+herda: plataformas/soleon.yaml
+id: kildare-leiloes
+nome: Kildare Leilões
+site: https://www.kildareleiloes.com.br
+uf: [todas]

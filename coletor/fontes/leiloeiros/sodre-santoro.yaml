@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-28). Validação: pendente.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: sodre-santoro
+nome: Sodré Santoro
+site: https://www.sodresantoro.com.br
+tipo: automatico
+uf: [todas]
+inicio:
+  - https://www.sodresantoro.com.br/imoveis/lotes
+max_paginas_lista: 10
+max_lotes: 400
+navegador: false

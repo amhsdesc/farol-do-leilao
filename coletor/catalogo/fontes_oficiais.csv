@@ -1,0 +1,39 @@
+tipo,nome,uf,url,formato,importado_em,observacao
+junta,JUCIS-DF,DF,https://jucis.df.gov.br/leiloeiros/,html,,
+dados_abertos,DF – Relação de Leiloeiros Habilitados,DF,https://dados.df.gov.br/dataset/relacao-de-leiloeiros-habilitados,csv,,melhor fonte do DF: arquivo aberto
+junta,JUCEG,GO,https://goias.gov.br/juceg/leiloeiros-e-tradutores/,html,,
+junta,JUCESP,SP,https://www.institucional.jucesp.sp.gov.br/tradutores-leiloeiros.html,html,,
+dados_abertos,SP – Consultas a Leiloeiros e Tradutores Oficiais,SP,http://catalogo.governoaberto.sp.gov.br/dataset/leiloeiros,csv,,dados abertos do governo de SP
+junta,JUCEMG,MG,https://jucemg.mg.gov.br/pagina/139/leiloeiros-oficiais,html,,
+junta,JUCERJA,RJ,https://www.jucerja.rj.gov.br/AuxiliaresComercio/Leiloeiros,html,,
+junta,JUCEPAR,PR,https://www.juntacomercial.pr.gov.br/Pagina/LEILOEIROS-OFICIAIS,pdf,,"relação em PDF, atualizada anualmente"
+junta,JUCISRS,RS,https://sistemas.jucisrs.rs.gov.br/leiloeiros/,html,,publicação anual em PDF também
+junta,JUCESC,SC,https://www.jucesc.sc.gov.br/index.php/informacoes/edital-leiloeiro/lista-de-leiloeiros-publicos-oficiais-do-estado-de-santa-catarina,pdf,,consulta: https://leiloeiros.jucesc.sc.gov.br/site/
+junta,JUCEB,BA,https://www.ba.gov.br/juceb/home/matriculas-e-carteira-profissional/leiloeiros,html,,
+junta,JUCEES,ES,https://leiloeiros.jucees.es.gov.br/leiloeiros.html,html,,
+junta,JUCETINS,TO,https://www.to.gov.br/jucetins/leiloeiros/152aezl6blm0,html,,
+junta,Junta Comercial – AC,AC,,,,a localizar
+junta,Junta Comercial – AL,AL,,,,a localizar
+junta,Junta Comercial – AP,AP,,,,a localizar
+junta,Junta Comercial – AM,AM,,,,a localizar
+junta,Junta Comercial – CE,CE,,,,a localizar
+junta,Junta Comercial – MA,MA,,,,a localizar
+junta,Junta Comercial – MT,MT,,,,a localizar
+junta,Junta Comercial – MS,MS,,,,a localizar
+junta,Junta Comercial – PA,PA,,,,a localizar
+junta,Junta Comercial – PB,PB,,,,a localizar
+junta,Junta Comercial – PE,PE,,,,a localizar
+junta,Junta Comercial – PI,PI,,,,a localizar
+junta,Junta Comercial – RN,RN,,,,a localizar
+junta,Junta Comercial – RO,RO,,,,a localizar
+junta,Junta Comercial – RR,RR,,,,a localizar
+junta,Junta Comercial – SE,SE,,,,a localizar
+tribunal,TJRJ – Cadastro de Leiloeiros Públicos,RJ,https://www.tjrj.jus.br/pt/web/cgj/cadastro-de-leiloeiros-publicos,pdf,,
+tribunal,TJSP – Consulta de auxiliares da justiça,SP,https://www.tjsp.jus.br/auxiliaresjustica/auxiliarjustica/consultapublica,html,,gestores de leilão eletrônico credenciados
+tribunal,TJMG – Sistema AJ (leiloeiros credenciados),MG,https://www.tjmg.jus.br/portal-tjmg/informes/sistema-aj-novo-edital-de-credenciamento-de-corretores-e-leiloeiros-publicos.htm,html,,
+tribunal,TJDFT – Leilões e depósitos,DF,https://www.tjdft.jus.br/informacoes/leiloes-e-depositos,html,,lista de credenciados não é pública na página; pedir ao NULEJ
+tribunal,TJMA – Leiloeiros credenciados,MA,https://www.tjma.jus.br/index.php/midia/CGJ/pagina/site/507476/leiloeiros-credenciados,html,,
+tribunal,TRT12 – Leiloeiros,SC,https://portal.trt12.jus.br/corregedoria/leiloeiros,html,,
+tribunal,TRT18 – Leilões,GO,https://www.trt18.jus.br/portal/servicos/leiloes/,html,,
+federacao,FENALEI – diretório de leiloeiros,,https://fenalei.org.br/leiloeiros,html,,conteúdo carregado por JavaScript
+federacao,FENALEI – sites falsos,,https://fenalei.org.br/sites-falsos,html,,usar com: catalogo sites-falsos

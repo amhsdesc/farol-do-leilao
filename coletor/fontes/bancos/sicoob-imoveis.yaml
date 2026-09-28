@@ -1,0 +1,10 @@
+id: sicoob-imoveis
+nome: Imóveis do Sicoob
+site: https://www.sicoob.com.br
+tipo: automatico
+comitente: Sicoob
+uf: todas
+inicio: [https://www.sicoob.com.br/web/sicoob/leilao]
+max_paginas_lista: 10
+max_lotes: 300
+navegador: true

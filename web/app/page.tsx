@@ -77,7 +77,18 @@ export default async function Busca({ searchParams }: { searchParams: Promise<Fi
           <input name="desconto_min" type="number" min="0" max="95" defaultValue={f.desconto_min} />
         </label>
         <label>
-          Fonte
+          Vendedor
+          <select name="comitente" defaultValue={f.comitente ?? ""}>
+            <option value="">Todos</option>
+            {opcoes.comitentes.map((c) => (
+              <option key={c.comitente} value={c.comitente}>
+                {c.comitente} ({c.n})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Site de origem
           <select name="fonte" defaultValue={f.fonte ?? ""}>
             <option value="">Todas</option>
             {opcoes.fontes.map((o) => (
@@ -137,6 +148,7 @@ export default async function Busca({ searchParams }: { searchParams: Promise<Fi
                         {i.modalidade !== "outros" && <span className="chip">{MODALIDADES[i.modalidade] ?? i.modalidade}</span>}
                         {praca && <span className="chip">{praca}</span>}
                         <span className={`chip ${ocup.classe}`}>{ocup.rotulo}</span>
+                        {i.comitente && <span className="chip">{i.comitente}</span>}
                         {i.n_fontes > 1 && <span className="chip chip-fontes">{i.n_fontes} fontes</span>}
                         {i.status === "suspenso" && <span className="chip chip-ruim">Suspenso</span>}
                       </div>

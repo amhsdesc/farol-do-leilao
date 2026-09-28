@@ -1,0 +1,11 @@
+# Plataforma Seu Imóvel BB (venda direta do Banco do Brasil). Leilões do BB também chegam por leiloeiros.
+id: seu-imovel-bb
+nome: Seu Imóvel BB
+site: https://seuimovelbb.com.br
+tipo: automatico
+comitente: Banco do Brasil
+uf: todas
+inicio: [https://seuimovelbb.com.br/]
+max_paginas_lista: 15
+max_lotes: 400
+navegador: true
