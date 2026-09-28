@@ -1,0 +1,5 @@
+{"dados": {"totalPaginas": 2, "itens": [
+ {"id": 9003, "titulo": "Sala comercial no Setor Comercial Sul", "categoria": {"nome": "Sala comercial"}, "descricao": "Sala de 40 m².",
+  "endereco": {"uf": "DF", "cidade": "Brasília", "bairro": "Asa Sul", "logradouro": "SCS Quadra 2, Bloco C, Sala 310", "latitude": -15.797, "longitude": -47.887},
+  "valorAvaliacao": "210000.00", "pracas": [{"data": "2026-12-01T14:00:00", "lanceInicial": 126000}], "fotos": []}
+]}}

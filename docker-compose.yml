@@ -1,0 +1,16 @@
+# Banco de dados local (PostgreSQL 16 + PostGIS). Rodar: docker compose up -d
+services:
+  banco:
+    image: postgis/postgis:16-3.4
+    container_name: hasta-banco
+    environment:
+      POSTGRES_USER: hasta
+      POSTGRES_PASSWORD: hasta
+      POSTGRES_DB: hasta
+    ports:
+      - "5432:5432"
+    volumes:
+      - dados_banco:/var/lib/postgresql/data
+    restart: unless-stopped
+volumes:
+  dados_banco:

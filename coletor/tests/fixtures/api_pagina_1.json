@@ -1,0 +1,10 @@
+{"dados": {"totalPaginas": 2, "itens": [
+ {"id": 9001, "titulo": "Casa em Vicente Pires", "categoria": {"nome": "Casa"}, "descricao": "Casa com 3 quartos. Desocupada.",
+  "endereco": {"uf": "DF", "cidade": "Brasília", "bairro": "Vicente Pires", "logradouro": "Rua 8, Chácara 15, Casa 3", "latitude": -15.803, "longitude": -48.030},
+  "valorAvaliacao": "650000.00", "pracas": [{"data": "2026-11-05T15:00:00", "lanceInicial": 650000}, {"data": "2026-11-19T15:00:00", "lanceInicial": 390000}],
+  "fotos": ["https://cdn.exemplo/9001-1.jpg"], "visualizacoes": 88},
+ {"id": 9002, "titulo": "Lote em Luziânia", "categoria": {"nome": "Terreno"}, "descricao": "Terreno urbano de 360 m².",
+  "endereco": {"uf": "GO", "cidade": "Luziânia", "bairro": "Jardim Ingá", "logradouro": "Rua 40, Quadra 12, Lote 8", "latitude": null, "longitude": null},
+  "valorAvaliacao": "90000.00", "pracas": [{"data": "2026-11-12T10:00:00", "lanceInicial": 90000}],
+  "fotos": [], "visualizacoes": 12}
+]}}

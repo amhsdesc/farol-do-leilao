@@ -1,0 +1,32 @@
+# MODELO (ignorado). Use quando `python -m coletor inspecionar URL` mostrar uma resposta JSON com os lotes.
+id: leiloeiro-api-exemplo
+nome: Leiloeiro API Exemplo
+site: https://www.leiloeiro-api.com.br
+tipo: json_api
+uf: [DF, GO]
+requisicao:
+  url: https://api.leiloeiro-api.com.br/v1/lotes
+  metodo: GET
+  params: {categoria: imoveis, pagina: "{pagina}", tamanho: 50}
+  pagina_inicial: 1
+  paginas_max: 60
+itens: "dados.itens"
+total_paginas: "dados.totalPaginas"
+campos:
+  id_externo: {json: id}
+  titulo: {json: titulo}
+  descricao: {json: descricao}
+  tipo: {json: categoria.nome}
+  uf: {json: endereco.uf}
+  cidade: {json: endereco.cidade}
+  bairro: {json: endereco.bairro}
+  endereco: {json: endereco.logradouro}
+  lat: {json: endereco.latitude}
+  lon: {json: endereco.longitude}
+  valor_avaliacao: {json: valorAvaliacao}
+  data_praca1: {json: "pracas[0].data"}
+  valor_praca1: {json: "pracas[0].lanceInicial"}
+  data_praca2: {json: "pracas[1].data"}
+  valor_praca2: {json: "pracas[1].lanceInicial"}
+  fotos: {json: fotos}
+url_lote: "https://www.leiloeiro-api.com.br/lote/{id}"

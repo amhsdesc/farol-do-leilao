@@ -1,0 +1,1 @@
+"""Coletor do agregador Hasta."""

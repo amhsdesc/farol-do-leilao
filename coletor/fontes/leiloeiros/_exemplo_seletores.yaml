@@ -1,0 +1,33 @@
+# MODELO (arquivos com '_' no início são ignorados). Copie, renomeie e ajuste.
+# Use quando o site entrega o HTML pronto e o layout é estável.
+id: leiloeiro-exemplo
+nome: Leiloeiro Exemplo
+site: https://www.leiloeiro-exemplo.com.br
+tipo: seletores
+uf: [DF]
+navegador: false
+listagem:
+  url: https://www.leiloeiro-exemplo.com.br/imoveis?pagina={pagina}
+  pagina_inicial: 1
+  paginas_max: 20
+  item: "div.card-lote"
+  link: "a.ver-lote@href"
+  campos:
+    titulo: "h3.titulo"
+detalhe:
+  campos:
+    id_externo: {url_regex: "/lote/(\\d+)"}
+    titulo: "h1"
+    descricao: "div.descricao"
+    endereco: {rotulo: "Endereço"}
+    cidade: {rotulo: "Cidade", regex: "^([^/]+)"}
+    valor_avaliacao: {rotulo: ["Valor de avaliação", "Avaliação"]}
+    data_praca1: {texto_regex: "1[ºo°]\\s*(?:leil[aã]o|pra[cç]a)\\D{0,20}(\\d{2}/\\d{2}/\\d{4}[^R]{0,12})"}
+    valor_praca1: {texto_regex: "1[ºo°]\\s*(?:leil[aã]o|pra[cç]a).{0,60}?R\\$\\s*([\\d.,]+)"}
+    data_praca2: {texto_regex: "2[ºo°]\\s*(?:leil[aã]o|pra[cç]a)\\D{0,20}(\\d{2}/\\d{2}/\\d{4}[^R]{0,12})"}
+    valor_praca2: {texto_regex: "2[ºo°]\\s*(?:leil[aã]o|pra[cç]a).{0,60}?R\\$\\s*([\\d.,]+)"}
+    modalidade: {texto_regex: "(extrajudicial|judicial|venda direta)"}
+    processo: {texto_regex: "(\\d{7}-\\d{2}\\.\\d{4}\\.\\d\\.\\d{2}\\.\\d{4})"}
+    matricula: {texto_regex: "matr[ií]cula\\s*(?:n[º°o.]*)?\\s*([\\d.]+)"}
+    edital_url: "a[href*=edital]@href"
+    fotos: {css: ".galeria img", attr: src, todos: true}
