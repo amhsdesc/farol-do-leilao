@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import Calculadora from "@/components/Calculadora";
+import { Cadeado } from "@/components/busca/PainelFiltros";
 import Mapa from "@/components/Mapa";
+import { acesso } from "@/lib/acesso";
 import { imovel } from "@/lib/consultas";
 import { area, MODALIDADES, OCUPACAO, porcento, quando, reais, TIPOS } from "@/lib/formato";
 
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function PaginaImovel({ params }: { params: Promise<{ id: string }> }) {
-  const d = await carregar(params);
+  const [d, { assinante }] = await Promise.all([carregar(params), acesso()]);
   if (!d) notFound();
   const { imovel: im, lotes, historico } = d;
   const ativos = lotes.filter((l) => l.status === "ativo" || l.status === "suspenso");
@@ -166,15 +167,26 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
                     {quando(l.ultimo_visto_em)}
                   </span>
                   <span style={{ display: "flex", gap: 10 }}>
-                    {l.edital_url && (
-                      <a href={l.edital_url} target="_blank" rel="noopener noreferrer">
-                        Edital
-                      </a>
-                    )}
-                    {l.url && (
-                      <a href={l.url} target="_blank" rel="noopener noreferrer">
-                        Ver no site oficial ↗
-                      </a>
+                    {/* endereço real só no redirecionamento /ir/, e só para assinante */}
+                    {assinante ? (
+                      <>
+                        {l.edital_url && (
+                          <a href={`/ir/${l.id}?para=edital`} target="_blank" rel="noopener">
+                            Edital
+                          </a>
+                        )}
+                        {l.url && (
+                          <a href={`/ir/${l.id}`} target="_blank" rel="noopener">
+                            Ver no site do leiloeiro ↗
+                          </a>
+                        )}
+                      </>
+                    ) : (
+                      (l.url || l.edital_url) && (
+                        <Link href="/assinar" className="link-travado">
+                          <Cadeado tamanho={12} /> Site do leiloeiro e edital: para assinantes
+                        </Link>
+                      )
                     )}
                   </span>
                 </div>
@@ -212,9 +224,17 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
         </div>
 
         <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
-          <section className="painel">
-            <h2>Quanto custa arrematar</h2>
-            <Calculadora lance={melhor?.lance_minimo ?? null} avaliacao={melhor?.valor_avaliacao ?? null} uf={im.uf} />
+          <section className="painel destaque-assinante">
+            <h2>Quanto custa arrematar?</h2>
+            <p style={{ margin: 0 }}>
+              Leiloeiro, ITBI, cartório, reforma, imposto na venda: a calculadora soma tudo a partir do lance e mostra
+              o lucro e o lance máximo para a sua meta.
+            </p>
+            <div>
+              <Link className="botao" href={assinante ? "/calculadora" : "/assinar"}>
+                {assinante ? null : <Cadeado />} Fazer a conta na calculadora
+              </Link>
+            </div>
           </section>
           {im.lat != null && im.lon != null && (
             <section className="painel" style={{ padding: 0, overflow: "hidden" }}>

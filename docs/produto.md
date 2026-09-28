@@ -6,7 +6,8 @@ Decisão do Desc (set/2026). A busca é o centro da página inicial.
 |---|---|---|
 | Busca no mapa (Brasil inteiro, mover, aproximar, "cidade ou bairro") | ✓ | ✓ |
 | Lista dos imóveis da área visível do mapa | ✓ | ✓ |
-| Balão do imóvel no mapa e ficha do imóvel | ✓ | ✓ |
+| Balão do imóvel no mapa e ficha do imóvel (detalhes, fontes, histórico) | ✓ | ✓ |
+| Ir ao site do leiloeiro e abrir o edital (redirecionamento `/ir/<lote>`) | travado | ✓ |
 | Filtros (todos) e ordenação | travado | ✓ |
 | Calculadora (página própria `/calculadora`) | travado | ✓ |
 | Alertas de leilão (e-mail, WhatsApp, Telegram) | travado | ✓ |
@@ -34,4 +35,6 @@ Momentos: 7 dias antes, 1 dia antes, 1 hora antes, mudança de data/preço/edita
 
 - `web/lib/acesso.ts` diz se a pessoa é assinante. Até existir cadastro e pagamento, ninguém é.
 - `aplicarAcesso()` tira da consulta todo filtro de assinante enviado por visitante; as APIs devolvem `bloqueados`.
+- O endereço do site do leiloeiro e do edital nunca vai para a página nem para a API: o botão aponta para
+  `/ir/<lote>`, que confere a assinatura e só então redireciona. Visitante cai em `/assinar`.
 - Teste local: `FAROL_TESTE_ASSINANTE=permitir` em `web/.env.local` + link "Modo teste" no rodapé.

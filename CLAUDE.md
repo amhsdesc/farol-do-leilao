@@ -22,6 +22,8 @@ Todo texto do site segue a voz de lá: curto, sem juridiquês, termo explicado n
 Ver `docs/produto.md`. Resumo: mapa e ficha são livres; filtros, ordenação, calculadora, alertas e buscas salvas são
 de assinante. **A trava vale no servidor** (`web/lib/acesso.ts` + `aplicarAcesso` em `web/lib/busca/filtros.ts`):
 toda rota de API aplica `aplicarAcesso` antes de consultar. Nunca confie só na tela.
+Link para o site do leiloeiro ou edital: sempre `/ir/<lote>` (confere a assinatura e redireciona); nunca pôr `lote.url`
+ou `edital_url` no HTML ou em resposta de API.
 
 ## Estrutura
 
