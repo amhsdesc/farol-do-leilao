@@ -1,4 +1,4 @@
-# Hasta
+# Farol do Leilão
 
 Agregador nacional de imóveis em leilão: Caixa (27 UFs), bancos e órgãos vendedores, e leiloeiros oficiais
 validados, numa busca só, com ficha única por imóvel, histórico de preço e praça e calculadora de arrematação.
@@ -14,7 +14,7 @@ Instale: [Git](https://git-scm.com/download/win), [Python 3.12](https://www.pyth
 (marque "Add python.exe to PATH"), [Node.js 22 LTS](https://nodejs.org/) e
 [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-No PowerShell, dentro da pasta `hasta`:
+No PowerShell, dentro da pasta `farol-do-leilao`:
 
 ```powershell
 # 1. Configuração

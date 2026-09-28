@@ -2,11 +2,11 @@
 services:
   banco:
     image: postgis/postgis:16-3.4
-    container_name: hasta-banco
+    container_name: farol-banco
     environment:
-      POSTGRES_USER: hasta
-      POSTGRES_PASSWORD: hasta
-      POSTGRES_DB: hasta
+      POSTGRES_USER: farol
+      POSTGRES_PASSWORD: farol
+      POSTGRES_DB: farol
     ports:
       - "5432:5432"
     volumes:

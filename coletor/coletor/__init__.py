@@ -1,1 +1,1 @@
-"""Coletor do agregador Hasta."""
+"""Coletor do Farol do Leilão."""

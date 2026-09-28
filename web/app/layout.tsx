@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Hasta — imóveis em leilão", template: "%s · Hasta" },
+  title: { default: "Farol do Leilão — imóveis em leilão sem susto", template: "%s · Farol do Leilão" },
   description: "Imóveis em leilão da Caixa, bancos e leiloeiros oficiais numa busca só, com histórico de preço e praça.",
 };
 
@@ -16,7 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="topo-in">
             <Link href="/" className="marca">
               <i aria-hidden="true" />
-              Hasta
+              Farol do Leilão
             </Link>
             <nav>
               <Link href="/">Buscar imóveis</Link>

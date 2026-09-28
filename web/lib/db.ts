@@ -9,7 +9,7 @@ const global_ = globalThis as unknown as { __pool?: Pool };
 export const pool =
   global_.__pool ??
   new Pool({
-    connectionString: process.env.DATABASE_URL ?? "postgresql://hasta:hasta@localhost:5432/hasta",
+    connectionString: process.env.DATABASE_URL ?? "postgresql://farol:farol@localhost:5432/farol",
     max: 5,
   });
 if (process.env.NODE_ENV !== "production") global_.__pool = pool;

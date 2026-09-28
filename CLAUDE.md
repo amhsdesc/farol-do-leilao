@@ -1,4 +1,4 @@
-# Hasta — agregador de leilões de imóveis
+# Farol do Leilão — agregador de leilões de imóveis
 
 Leia este arquivo inteiro antes de mexer no código. Ele é o contexto do projeto para o Claude Code.
 
@@ -48,7 +48,7 @@ docs/              Guias: como adicionar fonte, arquitetura.
 | Tipo | Quando usar | Arquivo |
 |---|---|---|
 | `csv_caixa` | Lista oficial da Caixa por UF | `adaptadores/caixa_csv.py` |
-| `json_api` | Site carrega os lotes por uma API JSON (ver com `hasta inspecionar`) | `adaptadores/json_api.py` |
+| `json_api` | Site carrega os lotes por uma API JSON (ver com `python -m coletor inspecionar`) | `adaptadores/json_api.py` |
 | `seletores` | HTML estável; campos por seletor CSS/regex no YAML | `adaptadores/seletores.py` |
 | `automatico` | Cauda longa: qualquer site, extração por LLM (Claude Haiku), com cache por hash | `adaptadores/automatico.py` |
 

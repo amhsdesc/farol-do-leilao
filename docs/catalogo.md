@@ -1,6 +1,6 @@
 # Catálogo de cobertura
 
-O Hasta compete pela cobertura. O catálogo responde três perguntas, sempre com dados, nunca de memória:
+O Farol do Leilão compete pela cobertura. O catálogo responde três perguntas, sempre com dados, nunca de memória:
 
 1. **Quem vende imóveis em leilão?** (`catalogo/comitentes.csv`) — Caixa, BB, Santander, Itaú, Bradesco, BRB,
    Banrisul, Banestes, Emgea, Sicoob, Sicredi, Inter, BTG, BNB, BNDES, União (SPU) e outros. Para cada um: página

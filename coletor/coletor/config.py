@@ -7,14 +7,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-RAIZ = Path(__file__).resolve().parents[2]          # pasta hasta/
-PASTA_COLETOR = Path(__file__).resolve().parents[1]  # pasta hasta/coletor
+RAIZ = Path(__file__).resolve().parents[2]          # pasta do projeto/
+PASTA_COLETOR = Path(__file__).resolve().parents[1]  # pasta do projeto/coletor
 load_dotenv(RAIZ / ".env")
 
 
 @dataclass(frozen=True)
 class Config:
-    database_url: str = os.getenv("DATABASE_URL", "postgresql://hasta:hasta@localhost:5432/hasta")
+    database_url: str = os.getenv("DATABASE_URL", "postgresql://farol:farol@localhost:5432/farol")
     contato: str = os.getenv("CONTATO_EMAIL", "contato@exemplo.com")
     anthropic_api_key: str | None = os.getenv("ANTHROPIC_API_KEY") or None
     modelo_llm: str = os.getenv("MODELO_LLM", "claude-haiku-4-5-20251001")
@@ -26,7 +26,7 @@ class Config:
 
     @property
     def user_agent(self) -> str:
-        return f"HastaBot/0.1 (+agregador de leiloes; contato: {self.contato})"
+        return f"FarolDoLeilaoBot/0.1 (+agregador de leiloes; contato: {self.contato})"
 
 
 config = Config()

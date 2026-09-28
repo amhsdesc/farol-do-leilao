@@ -1,7 +1,7 @@
 [project]
-name = "hasta-coletor"
+name = "farol-coletor"
 version = "0.1.0"
-description = "Motor de coleta do agregador Hasta"
+description = "Motor de coleta do Farol do Leilão"
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27",
@@ -19,7 +19,7 @@ listas = ["openpyxl>=3.1", "pdfplumber>=0.11"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-hasta = "coletor.cli:main"
+farol = "coletor.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]

@@ -177,7 +177,7 @@ def cmd_status(_):
 
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    p = argparse.ArgumentParser(prog="coletor", description="Coletor do agregador Hasta")
+    p = argparse.ArgumentParser(prog="coletor", description="Coletor do Farol do Leilão")
     sub = p.add_subparsers(dest="comando", required=True)
     sub.add_parser("migrar", help="cria/atualiza as tabelas do banco").set_defaults(f=cmd_migrar)
     sub.add_parser("fontes", help="lista as fontes e o estado de cada uma").set_defaults(f=cmd_fontes)
