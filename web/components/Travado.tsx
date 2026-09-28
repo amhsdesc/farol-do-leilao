@@ -12,7 +12,7 @@ export default function Travado({ titulo, texto, itens }: { titulo: string; text
           {itens.map((i) => <li key={i}>{i}</li>)}
         </ul>
         <div>
-          <Link className="botao" href="/assinar">Conhecer os planos</Link>
+          <Link className="botao" href="/assinar">Testar 7 dias grátis</Link>
         </div>
       </div>
     </main>

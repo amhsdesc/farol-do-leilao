@@ -314,3 +314,45 @@ h1, h2, h3 { font-family: var(--display); line-height: 1.15; margin: 0; text-wra
   .ficha > * > .galeria, .ficha > * > .sem-foto { order: -2; }
   .ficha > * > .cartao-lance { order: -1; }
 }
+
+/* ---------- conta e planos ---------- */
+.topo-entrar { font-weight: 800; font-size: 14px; color: var(--ink); text-decoration: none; }
+.topo-conta { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); font-weight: 700; font-size: 14px; }
+.topo-conta img, .topo-conta .inicial { width: 30px; height: 30px; border-radius: 999px; }
+.topo-conta .inicial { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
+@media (max-width: 560px) { .topo-conta-nome { display: none; } }
+.botao.grande { font-size: 16px; padding: 14px 24px; }
+.botao.perigo { background: var(--bad); color: #fff; }
+.aviso.bom { background: var(--good-bg); color: var(--good); }
+.erro { margin: 0; background: var(--bad-bg); color: var(--bad); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 700; }
+.boas-vindas { margin: 16px 0 0; font-weight: 700; }
+.caixa-entrar { max-width: 520px; margin: 0 auto; gap: 14px; }
+.caixa-entrar h1 { font-size: 30px; }
+.botao-google { background: #fff; color: #1f1b2e; border: 1px solid var(--line); width: 100%; padding: 13px 18px; font-size: 15px; gap: 10px; }
+.form-teste { display: grid; gap: 8px; border: 2px dashed var(--warn); border-radius: 16px; padding: 14px; background: var(--warn-bg); }
+.form-celular, .form-pagar { display: grid; gap: 12px; }
+.campo-codigo { font: 800 24px var(--mono) !important; letter-spacing: 0.3em; text-align: center; }
+.acoes-secundarias { display: flex; gap: 16px; flex-wrap: wrap; }
+.planos-pagina { max-width: 1040px; display: grid; gap: 20px; }
+.planos-topo { display: grid; gap: 10px; justify-items: start; }
+.grade-planos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 760px) { .grade-planos { grid-template-columns: 1fr; } }
+.plano { position: relative; background: var(--surface); border-radius: var(--raio); padding: 22px; display: grid; gap: 8px; align-content: start; border: 2px solid transparent; }
+.plano.destaque { border-color: var(--accent); }
+.plano h2 { font-size: 22px; }
+.selo-plano { position: absolute; top: -12px; right: 18px; background: var(--luz); color: #1f1b2e; font: 800 12px var(--body); padding: 4px 12px; border-radius: 999px; }
+.plano-preco { white-space: nowrap; }
+.plano-preco b { font: 800 32px/1 var(--body); }
+.plano-preco span { margin-left: 6px; color: var(--muted); }
+.economia { font: 800 13px var(--body); color: var(--good); }
+.economia.vazia { color: var(--muted); font-weight: 600; }
+.plano .botao { margin-top: 6px; }
+.perguntas details { border-top: 1px solid var(--line); padding: 10px 0; }
+.perguntas summary { cursor: pointer; font-weight: 800; }
+.perguntas p { margin: 8px 0 0; color: var(--ink-2); }
+.conta { display: grid; gap: 16px; }
+.acoes-conta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.confirmar { display: grid; gap: 10px; background: var(--bad-bg); border-radius: 16px; padding: 14px; }
+.confirmar p { margin: 0; }
+.texto-legal h2 { font-size: 20px; margin-top: 24px; }
+.texto-legal p, .texto-legal li { line-height: 1.65; }

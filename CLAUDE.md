@@ -25,6 +25,11 @@ toda rota de API aplica `aplicarAcesso` antes de consultar. Nunca confie só na 
 Link para o site do leiloeiro ou edital: sempre `/ir/<lote>` (confere a assinatura e redireciona); nunca pôr `lote.url`
 ou `edital_url` no HTML ou em resposta de API.
 
+Conta e assinatura: login com Google (Auth.js, `web/auth.ts`), celular validado por código no WhatsApp
+(`web/lib/conta/celular.ts`), cobrança no Asaas (`web/lib/conta/asaas.ts`, webhook em `/api/asaas/webhook`).
+Regras puras e testadas em `web/lib/conta/regras.ts`. Nunca guardar CPF nem dado de cartão. `evento_pagamento`
+nunca é apagado. Configuração das contas: `docs/configurar-contas.md`.
+
 ## Estrutura
 
 ```

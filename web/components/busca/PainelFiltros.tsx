@@ -43,7 +43,7 @@ export function FiltrosTravados() {
       <div className="convite">
         <b>Filtre por banco, valor, FGTS, financiamento, data do leilão e mais 15 critérios.</b>
         <span>Assinantes também usam a calculadora e recebem alertas antes de cada leilão.</span>
-        <Link className="botao" href="/assinar">Conhecer os planos</Link>
+        <Link className="botao" href="/assinar">Testar 7 dias grátis</Link>
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
-  const { assinante, modoTeste } = await acesso();
+  const { assinante, modoTeste, usuario } = await acesso();
   const trava = assinante ? null : <Cadeado tamanho={12} />;
   return (
     <html lang="pt-BR">
@@ -30,11 +30,20 @@ export default async function Layout({ children }: { children: React.ReactNode }
               {!assinante && <Link href="/assinar">Planos</Link>}
             </nav>
             <div className="topo-acoes">
-              {assinante ? (
-                <span className="selo-assinante">Assinante</span>
+              {usuario ? (
+                <Link href="/conta" className="topo-conta" aria-label="Minha conta">
+                  {usuario.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={usuario.image} alt="" width={30} height={30} />
+                  ) : (
+                    <span className="inicial">{(usuario.name ?? usuario.email ?? "?").slice(0, 1).toUpperCase()}</span>
+                  )}
+                  <span className="topo-conta-nome">Minha conta</span>
+                </Link>
               ) : (
-                <Link href="/assinar" className="botao">Assinar</Link>
+                <Link href="/entrar" className="topo-entrar">Entrar</Link>
               )}
+              {!assinante && <Link href="/assinar" className="botao">7 dias grátis</Link>}
             </div>
           </div>
         </header>
@@ -42,11 +51,9 @@ export default async function Layout({ children }: { children: React.ReactNode }
         <footer className="rodape">
           <span>Farol do Leilão · dados copiados das fontes oficiais; confira sempre o edital antes de dar lance.</span>
           <Link href="/fontes">Fontes e atualização</Link>
-          {modoTeste && (
-            <a className="teste" href={`/api/teste-assinante?ligar=${assinante ? 0 : 1}`}>
-              Modo teste: {assinante ? "ver como visitante" : "ver como assinante"}
-            </a>
-          )}
+          <Link href="/termos">Termos de uso</Link>
+          <Link href="/privacidade">Privacidade</Link>
+          {modoTeste && <span className="teste">Modo teste ligado (login e pagamento simulados)</span>}
         </footer>
       </body>
     </html>

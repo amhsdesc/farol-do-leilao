@@ -56,8 +56,10 @@ Quer ver o site antes de coletar? `python scripts/carregar_demo.py` carrega 9 im
 Para testar a busca com volume, `python scripts/carregar_demo_nacional.py` carrega ~800 imóveis fictícios nas 27 capitais
 (`--limpar` remove).
 
-Para ver a página como assinante no seu computador, ponha `FAROL_TESTE_ASSINANTE=permitir` no arquivo `web/.env.local`
-(junto com o `DATABASE_URL`) e use o link "Modo teste" no rodapé. Nunca ligue isso no site publicado.
+Para testar cadastro e assinatura no seu computador antes de criar as contas no Google, na Meta e no Asaas,
+ponha `FAROL_MODO_TESTE=permitir` e um `AUTH_SECRET` no arquivo `web/.env.local` (junto com o `DATABASE_URL`).
+Aí o login aceita qualquer e-mail, o código do WhatsApp aparece na tela e o pagamento é simulado.
+Nunca ligue isso no site publicado. Para ligar as contas de verdade, siga `docs/configurar-contas.md`.
 
 ## Cobertura: bancos e leiloeiros
 

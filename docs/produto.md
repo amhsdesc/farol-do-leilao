@@ -33,8 +33,17 @@ Momentos: 7 dias antes, 1 dia antes, 1 hora antes, mudança de data/preço/edita
 
 ## Como a trava funciona
 
-- `web/lib/acesso.ts` diz se a pessoa é assinante. Até existir cadastro e pagamento, ninguém é.
+- `web/lib/acesso.ts` diz se a pessoa é assinante: logada (Google) e com teste grátis ou pagamento em dia
+  (regras em `web/lib/conta/regras.ts`: 7 dias de teste, 3 dias de tolerância depois do vencimento).
 - `aplicarAcesso()` tira da consulta todo filtro de assinante enviado por visitante; as APIs devolvem `bloqueados`.
 - O endereço do site do leiloeiro e do edital nunca vai para a página nem para a API: o botão aponta para
   `/ir/<lote>`, que confere a assinatura e só então redireciona. Visitante cai em `/assinar`.
-- Teste local: `FAROL_TESTE_ASSINANTE=permitir` em `web/.env.local` + link "Modo teste" no rodapé.
+- Teste local: `FAROL_MODO_TESTE=permitir` em `web/.env.local` (login por e-mail, código na tela, pagamento simulado).
+
+## Cadastro e assinatura
+
+1. Entrar com Google → 2. confirmar celular com código de 6 números pelo WhatsApp → 3. 7 dias grátis, sem cartão
+(uma vez por conta e por celular) → 4. plano mensal R$ 44,90, trimestral R$ 109,90 ou anual R$ 399,90, pago na
+página do Asaas (Pix, boleto ou cartão). Assinando durante o teste, a 1ª cobrança vence no fim do teste.
+Cancelamento em Minha conta; acesso segue até o fim do período pago. O webhook do Asaas (`/api/asaas/webhook`)
+atualiza o `pago_ate`; cada aviso fica guardado em `evento_pagamento`.
