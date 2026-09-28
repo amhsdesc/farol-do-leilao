@@ -356,3 +356,58 @@ h1, h2, h3 { font-family: var(--display); line-height: 1.15; margin: 0; text-wra
 .confirmar p { margin: 0; }
 .texto-legal h2 { font-size: 20px; margin-top: 24px; }
 .texto-legal p, .texto-legal li { line-height: 1.65; }
+
+/* ---------- calculadora ---------- */
+.calculadora-pagina { display: grid; gap: 12px; }
+.calc-topo .texto { margin: 0; color: var(--ink-2); }
+.calc-app { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .calc-app { grid-template-columns: minmax(0, 1fr); } }
+.dupla > * { min-width: 0; }
+.calc-entradas { display: grid; gap: 14px; }
+.calc-entradas fieldset.painel { border: 0; margin: 0; min-width: 0; }
+.calc-entradas legend { float: left; width: 100%; font: 800 18px var(--display); display: flex; align-items: center; gap: 10px; margin-bottom: 4px; padding: 0; }
+.passo-n { width: 28px; height: 28px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 800 14px/28px var(--body); text-align: center; }
+.campo small { color: var(--muted); font-size: 12px; }
+.campo-num { display: flex; align-items: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
+.campo-num:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.campo-num input { border: 0 !important; background: transparent !important; outline: none; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; font: 15px var(--body); color: var(--ink); padding: 9px 11px; }
+.campo-num em { font-style: normal; color: var(--muted); font-size: 13px; padding: 0 12px; white-space: nowrap; }
+.campo-num.curto { width: 110px; }
+.destaque-num { margin: 0; font-size: 15px; }
+.opcoes-reforma { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 640px) { .opcoes-reforma { grid-template-columns: 1fr 1fr; } }
+.opcao-reforma { display: grid; gap: 2px; padding: 12px; border-radius: 16px; border: 2px solid var(--line); cursor: pointer; background: var(--surface); }
+.opcao-reforma input { position: absolute; opacity: 0; pointer-events: none; }
+.opcao-reforma.ligada { border-color: var(--accent); background: var(--accent-soft); }
+.opcao-reforma:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.opcao-reforma span { font-size: 14px; }
+.opcao-reforma small { font-size: 12px; color: var(--muted); }
+.ajustes summary { cursor: pointer; font-weight: 800; }
+.ajustes[open] { gap: 12px; }
+.calc-resultado { display: grid; gap: 14px; }
+@media (min-width: 1001px) { .calc-resultado { position: sticky; top: 76px; } }
+.vazio-calc { text-align: center; color: var(--muted); }
+.placar { border: 2px solid var(--line); }
+.placar.positivo { border-color: var(--good); }
+.placar.negativo { border-color: var(--bad); }
+.placar-valor { font: 800 40px/1.05 var(--body); }
+.placar.positivo .placar-valor { color: var(--good); }
+.placar.negativo .placar-valor { color: var(--bad); }
+.meta { border: 2px solid var(--accent); }
+.meta-linha { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 800; }
+.lance-maximo { font: 800 32px/1.1 var(--body); }
+.meta .nota, .placar .nota { margin: 0; font-size: 14px; }
+.detalhamento table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.detalhamento th, .detalhamento td { text-align: left; padding: 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; font-weight: 600; }
+.detalhamento td { text-align: right; white-space: nowrap; padding-left: 12px; }
+.detalhamento th small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.detalhamento tr.grupo th { font: 800 11.5px var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding-top: 14px; }
+.detalhamento .linha-lance-calc th, .detalhamento .linha-lance-calc td { font-weight: 800; }
+.selo-estimativa { font: 800 10.5px var(--body); color: var(--warn); background: var(--warn-bg); padding: 1px 7px; border-radius: 999px; margin-left: 4px; cursor: help; }
+.barra-resultado-cel { display: none; }
+@media (max-width: 1000px) {
+  .barra-resultado-cel { display: flex; position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50; gap: 10px; align-items: baseline; padding: 12px 16px; border-radius: 999px; background: var(--ink); color: var(--bg); text-decoration: none; box-shadow: var(--shadow); font-size: 13px; }
+  .barra-resultado-cel b { font-size: 17px; }
+  .barra-resultado-cel .ver { margin-left: auto; font-weight: 800; color: var(--luz); }
+  .calculadora-pagina { padding-bottom: 80px; }
+}

@@ -167,7 +167,7 @@ function calcularParaLance(e: Entrada): Omit<Resultado, "lanceMaximo"> {
   const padrao = e.reformaPadrao ?? "nenhuma";
   const m2Reforma = e.reformaCustoM2 && e.reformaCustoM2 > 0 ? e.reformaCustoM2 : custoReformaM2(padrao, uf);
   const areaReforma = e.reformaAreaM2 ?? e.area;
-  add({ id: "reforma", grupo: "preparar", rotulo: `Reforma${padrao !== "nenhuma" ? ` (padrão ${padrao === "medio" ? "médio" : padrao})` : ""}`,
+  add({ id: "reforma", grupo: "preparar", rotulo: `Reforma${padrao !== "nenhuma" ? ` (${padrao === "medio" ? "médio padrão" : padrao === "alto" ? "alto padrão" : "baixo padrão"})` : ""}`,
         valor: m2Reforma * areaReforma,
         detalhe: `${areaReforma.toLocaleString("pt-BR")} m² × R$ ${m2Reforma.toLocaleString("pt-BR")}/m²`, fonte: P.FONTE_REFORMA });
 

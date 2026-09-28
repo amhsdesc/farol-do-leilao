@@ -363,7 +363,7 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
               lucro e o lance máximo para a sua meta.
             </p>
             <div>
-              <Link className="botao" href={assinante ? "/calculadora" : "/assinar"}>
+              <Link className="botao" href={assinante ? `/calculadora?imovel=${im.id}` : "/assinar"}>
                 {assinante ? null : <Cadeado />} Fazer a conta na calculadora
               </Link>
             </div>

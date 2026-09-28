@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import CalculadoraApp, { type Prefill } from "@/components/calculadora/CalculadoraApp";
 import Travado from "@/components/Travado";
 import { acesso } from "@/lib/acesso";
+import { resumo } from "@/lib/consultas";
+import { TIPOS } from "@/lib/formato";
 
 export const metadata: Metadata = { title: "Calculadora" };
 export const dynamic = "force-dynamic";
 
-export default async function Calculadora() {
+export default async function Calculadora({ searchParams }: { searchParams: Promise<{ imovel?: string }> }) {
   const { assinante } = await acesso();
   if (!assinante) {
     return (
@@ -21,12 +24,29 @@ export default async function Calculadora() {
       />
     );
   }
+  const id = Number((await searchParams).imovel);
+  const im = Number.isInteger(id) && id > 0 ? await resumo(id) : null;
+  const prefill: Prefill = im
+    ? {
+        imovelId: im.imovel_id,
+        titulo: `${TIPOS[im.tipo] ?? "Imóvel"}${im.bairro ? ` em ${im.bairro}` : ""}, ${im.cidade}/${im.uf}`,
+        lance: im.lance_minimo,
+        uf: im.uf,
+        cidade: im.cidade,
+        modalidade: im.modalidade,
+        area: im.area,
+        avaliacao: im.valor_avaliacao,
+        ocupado: im.ocupacao === "ocupado",
+        debitosComVoce: im.debitos_por_conta === "arrematante",
+      }
+    : {};
   return (
-    <main className="pagina estreita">
-      <div className="painel">
-        <h1>Calculadora</h1>
-        <p>A conta já está pronta por dentro; a tela chega na próxima etapa.</p>
-      </div>
+    <main className="pagina calculadora-pagina">
+      <header className="calc-topo">
+        <h1 className="titulo-pagina">Faça a conta</h1>
+        <p className="texto">Tudo parte do valor do lance. A conta muda enquanto você preenche.</p>
+      </header>
+      <CalculadoraApp prefill={prefill} />
     </main>
   );
 }
