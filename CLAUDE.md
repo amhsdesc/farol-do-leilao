@@ -12,6 +12,11 @@ na próxima fase — valor de mercado estimado por comparáveis. Objetivo: ser u
 
 Público inicial: investidor pessoa física.
 
+## Marca
+
+Nome, voz, cores e tipografia em `docs/marca.md`. Público: quem nunca arrematou. Promessa: "Encontre. Faça a conta. Decida."
+Todo texto do site segue a voz de lá: curto, sem juridiquês, termo explicado na hora, nunca promete lucro.
+
 ## Estrutura
 
 ```

@@ -31,6 +31,8 @@ export default function Mapa({ pontos, altura = "100%" }: { pontos: Ponto[]; alt
     if (!caixa.current) return;
     const m = new maplibregl.Map({ container: caixa.current, style: ESTILO, center: CENTRO_DF, zoom: 9 });
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    // sem internet ou provedor fora do ar: o mapa fica vazio, a página continua funcionando
+    m.on("error", (e) => console.warn("mapa:", (e as { error?: Error }).error?.message ?? e));
     mapa.current = m;
     return () => m.remove();
   }, []);
@@ -64,7 +66,7 @@ export default function Mapa({ pontos, altura = "100%" }: { pontos: Ponto[]; alt
           source: "imoveis",
           filter: ["has", "point_count"],
           paint: {
-            "circle-color": "#1c6b5f",
+            "circle-color": "#4B3BB0",
             "circle-radius": ["step", ["get", "point_count"], 14, 20, 18, 100, 24],
             "circle-stroke-width": 2,
             "circle-stroke-color": "#ffffff",
@@ -85,10 +87,10 @@ export default function Mapa({ pontos, altura = "100%" }: { pontos: Ponto[]; alt
           filter: ["!", ["has", "point_count"]],
           paint: {
             // mais desconto = mais escuro
-            "circle-color": ["interpolate", ["linear"], ["get", "desconto"], 0, "#e0a23a", 0.3, "#a8700f", 0.5, "#6b4508"],
+            "circle-color": ["interpolate", ["linear"], ["get", "desconto"], 0, "#B7AEEF", 0.3, "#4B3BB0", 0.5, "#2A1F7A"],
             "circle-radius": 7,
             "circle-stroke-width": 2,
-            "circle-stroke-color": "#ffffff",
+            "circle-stroke-color": "#FFC93C",
           },
         });
         m.on("click", "pontos", (e) => {
