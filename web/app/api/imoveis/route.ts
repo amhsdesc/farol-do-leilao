@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
-import { buscar, type Filtros } from "@/lib/consultas";
+import { acesso } from "@/lib/acesso";
+import { aplicarAcesso, lerFiltros } from "@/lib/busca/filtros";
+import { buscar } from "@/lib/consultas";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/imoveis?uf=DF&tipo=apartamento&desconto_min=30&pagina=1
-// Mesma busca da página inicial, em JSON (base para app, alertas e parceiros).
+// GET /api/imoveis?bbox=oeste,sul,leste,norte&pagina=1[&filtros de assinante]
+// Visitante: só o recorte do mapa. Filtros de assinante enviados por visitante são ignorados
+// e listados em `bloqueados` — a trava vale no servidor, não só na tela.
 export async function GET(req: Request) {
-  const params = Object.fromEntries(new URL(req.url).searchParams) as Filtros;
-  const { itens, total, pagina } = await buscar(params);
-  return NextResponse.json({ total, pagina, itens });
+  const { assinante } = await acesso();
+  const { filtros, bloqueados } = aplicarAcesso(lerFiltros(new URL(req.url).searchParams), assinante);
+  const r = await buscar(filtros);
+  return NextResponse.json({ ...r, bloqueados });
 }

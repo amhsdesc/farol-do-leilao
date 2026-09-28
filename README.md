@@ -53,6 +53,11 @@ CSV manualmente e aponte `arquivo_local`.
 
 Quer ver o site antes de coletar? `python scripts/carregar_demo.py` carrega 9 imóveis fictícios;
 `python scripts/carregar_demo.py --limpar` remove.
+Para testar a busca com volume, `python scripts/carregar_demo_nacional.py` carrega ~800 imóveis fictícios nas 27 capitais
+(`--limpar` remove).
+
+Para ver a página como assinante no seu computador, ponha `FAROL_TESTE_ASSINANTE=permitir` no arquivo `web/.env.local`
+(junto com o `DATABASE_URL`) e use o link "Modo teste" no rodapé. Nunca ligue isso no site publicado.
 
 ## Cobertura: bancos e leiloeiros
 

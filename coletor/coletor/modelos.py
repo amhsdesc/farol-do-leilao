@@ -56,6 +56,8 @@ class LoteBruto(BaseModel):
     ocupacao: str | None = None
     aceita_financiamento: Any = None
     aceita_fgts: Any = None
+    aceita_parcelamento: Any = None
+    debitos_por_conta: str | None = None  # quem paga IPTU/condomínio atrasados: vendedor | arrematante
 
     leiloeiro: str | None = None
     comitente: str | None = None   # quem vende: Caixa, Santander, Emgea, União...
@@ -103,6 +105,8 @@ class Lote(BaseModel):
     ocupacao: str = "nao_informado"
     aceita_financiamento: bool | None = None
     aceita_fgts: bool | None = None
+    aceita_parcelamento: bool | None = None
+    debitos_por_conta: str = "nao_informado"
 
     leiloeiro: str | None = None
     comitente: str | None = None

@@ -60,6 +60,8 @@ FERRAMENTA = {
             "valor_praca2": {"type": "number"},
             "ocupacao": {"type": "string", "description": "ocupado, desocupado ou nao_informado. Só afirme se o texto disser."},
             "aceita_financiamento": {"type": "boolean"}, "aceita_fgts": {"type": "boolean"},
+            "aceita_parcelamento": {"type": "boolean", "description": "só se a página disser que aceita (ou não) pagamento parcelado"},
+            "debitos_por_conta": {"type": "string", "description": "quem paga IPTU/condomínio atrasados: vendedor ou arrematante. Omita se a página não disser."},
             "processo": {"type": "string", "description": "número do processo judicial, se houver"},
             "leiloeiro": {"type": "string"},
         },

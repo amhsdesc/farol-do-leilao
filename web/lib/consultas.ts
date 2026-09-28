@@ -1,5 +1,7 @@
 import { consulta } from "./db";
 
+import { montarWhere, ORDEM_PADRAO, ORDENS, type Filtros } from "./busca/filtros";
+
 export type ItemBusca = {
   imovel_id: number;
   tipo: string;
@@ -12,108 +14,104 @@ export type ItemBusca = {
   vagas: number | null;
   lat: number | null;
   lon: number | null;
-  geo_precisao: string | null;
-  lote_id: number;
-  fonte_id: string;
   fonte_nome: string;
   comitente: string | null;
-  url: string | null;
+  leiloeiro: string | null;
   titulo: string | null;
   modalidade: string;
   status: string;
   valor_avaliacao: number | null;
   lance_minimo: number | null;
   praca_atual: number | null;
-  data_praca1: string | null;
-  data_praca2: string | null;
+  data_leilao: string | null;
   ocupacao: string;
+  debitos_por_conta: string;
   aceita_financiamento: boolean | null;
+  aceita_fgts: boolean | null;
+  aceita_parcelamento: boolean | null;
   foto: string | null;
   n_fontes: number;
   desconto_avaliacao: number | null;
-  primeiro_visto_em: string;
+  preco_m2: number | null;
+  preco_caiu: boolean;
 };
 
-export type Filtros = {
-  uf?: string;
-  cidade?: string;
-  tipo?: string;
-  modalidade?: string;
-  ocupacao?: string;
-  fonte?: string;
-  comitente?: string;
-  preco_max?: string;
-  desconto_min?: string;
-  q?: string;
-  ordem?: string;
-  pagina?: string;
-};
+const COLUNAS_ITEM = `imovel_id, tipo, uf, cidade, bairro, endereco, area::float8 area, quartos, vagas, lat, lon, fonte_nome,
+  comitente, leiloeiro, titulo, modalidade, status, valor_avaliacao::float8 valor_avaliacao, lance_minimo::float8 lance_minimo,
+  praca_atual, data_leilao, ocupacao, debitos_por_conta, aceita_financiamento, aceita_fgts, aceita_parcelamento, foto,
+  n_fontes::int n_fontes, desconto_avaliacao::float8 desconto_avaliacao, preco_m2::float8 preco_m2, preco_caiu`;
 
-const ORDENS: Record<string, string> = {
-  desconto: "desconto_avaliacao desc nulls last",
-  preco: "lance_minimo asc nulls last",
-  recentes: "primeiro_visto_em desc",
-  praca: "coalesce(case when praca_atual = 2 then data_praca2 else data_praca1 end, 'infinity') asc",
-};
+export const POR_PAGINA = 24;
+export const MAX_PONTOS = 20000;
 
-export const POR_PAGINA = 40;
-
-function montarWhere(f: Filtros): { where: string; params: unknown[] } {
-  const cond: string[] = [];
-  const params: unknown[] = [];
-  const add = (sql: string, v: unknown) => {
-    params.push(v);
-    cond.push(sql.replace("$?", `$${params.length}`));
-  };
-  if (f.uf) add("uf = $?", f.uf.toUpperCase());
-  if (f.cidade) add("unaccent(lower(cidade)) like unaccent(lower($?))", `%${f.cidade}%`);
-  if (f.tipo) add("tipo = $?", f.tipo);
-  if (f.modalidade) add("modalidade = $?", f.modalidade);
-  if (f.ocupacao) add("ocupacao = $?", f.ocupacao);
-  if (f.comitente) add("comitente = $?", f.comitente);
-  if (f.fonte) add("imovel_id in (select imovel_id from lote where fonte_id = $? and status in ('ativo','suspenso'))", f.fonte);
-  if (f.preco_max && Number(f.preco_max) > 0) add("lance_minimo <= $?", Number(f.preco_max));
-  if (f.desconto_min && Number(f.desconto_min) > 0) add("desconto_avaliacao >= $?", Number(f.desconto_min) / 100);
-  if (f.q)
-    add(
-      "unaccent(lower(coalesce(titulo,'') || ' ' || coalesce(endereco,'') || ' ' || coalesce(bairro,''))) like unaccent(lower($?))",
-      `%${f.q}%`,
-    );
-  return { where: cond.length ? "where " + cond.join(" and ") : "", params };
-}
-
+/** Lista de imóveis (a área visível do mapa, quando há bbox). */
 export async function buscar(f: Filtros) {
-  const { where, params } = montarWhere(f);
-  const ordem = ORDENS[f.ordem ?? "desconto"] ?? ORDENS.desconto;
-  const pagina = Math.max(1, Number(f.pagina ?? 1) || 1);
-  const [itens, total, pontos] = await Promise.all([
+  const { where, params } = montarWhere(f, true);
+  const ordem = ORDENS[f.ordem ?? ORDEM_PADRAO] ?? ORDENS[ORDEM_PADRAO];
+  const pagina = f.pagina ?? 1;
+  const [itens, total] = await Promise.all([
     consulta<ItemBusca>(
-      `select * from vw_busca ${where} order by ${ordem}, imovel_id limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`,
+      `select ${COLUNAS_ITEM} from vw_busca ${where} order by ${ordem}, imovel_id
+       limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`,
       params,
     ),
     consulta<{ n: number }>(`select count(*)::int n from vw_busca ${where}`, params),
-    consulta<Pick<ItemBusca, "imovel_id" | "lat" | "lon" | "lance_minimo" | "tipo" | "titulo" | "desconto_avaliacao">>(
-      `select imovel_id, lat, lon, lance_minimo, tipo, titulo, desconto_avaliacao from vw_busca ${where}
-       ${where ? "and" : "where"} lat is not null limit 3000`,
-      params,
-    ),
   ]);
-  return { itens, total: total[0]?.n ?? 0, pontos, pagina };
+  return { itens, total: total[0]?.n ?? 0, pagina, por_pagina: POR_PAGINA };
+}
+
+/** Pontos do mapa: compactos, [id, lat, lon, desconto] (sem recorte de tela). */
+export async function pontos(f: Filtros) {
+  const { where, params } = montarWhere(f, false);
+  const linhas = await consulta<{ p: [number, number, number, number | null] }>(
+    `select json_build_array(imovel_id, round(lat::numeric, 5), round(lon::numeric, 5), desconto_avaliacao) p
+     from vw_busca ${where} ${where ? "and" : "where"} lat is not null limit ${MAX_PONTOS}`,
+    params,
+  );
+  return linhas.map((l) => l.p.map((v) => (v == null ? null : Number(v))) as [number, number, number, number | null]);
+}
+
+/** Resumo de um imóvel para o balão do mapa (livre). */
+export async function resumo(id: number) {
+  const [r] = await consulta<ItemBusca>(`select ${COLUNAS_ITEM} from vw_busca where imovel_id = $1`, [id]);
+  return r ?? null;
+}
+
+/** Cidade ou bairro → área do mapa (livre: é só para posicionar o mapa). */
+export async function lugares(q: string) {
+  return consulta<{ rotulo: string; uf: string; n: number; o: number; s: number; l: number; nn: number }>(
+    `with alvo as (select unaccent(lower($1)) t)
+     select max(rotulo) rotulo, max(uf) uf, count(*)::int n, min(lon) o, min(lat) s, max(lon) l, max(lat) nn from (
+       select cidade || '/' || uf rotulo, uf, lat, lon from vw_busca, alvo
+        where lat is not null and unaccent(lower(cidade)) like alvo.t || '%'
+       union all
+       select bairro || ', ' || cidade || '/' || uf, uf, lat, lon from vw_busca, alvo
+        where lat is not null and bairro is not null and unaccent(lower(bairro)) like alvo.t || '%'
+     ) x group by unaccent(lower(rotulo)) order by n desc limit 8`,
+    [q],
+  );
+}
+
+export async function totais() {
+  const [r] = await consulta<{ imoveis: number; fontes: number; atualizado: string | null }>(
+    `select (select count(*)::int from vw_busca) imoveis,
+            (select count(distinct fonte_id)::int from lote where status in ('ativo','suspenso')) fontes,
+            (select max(finalizada_em) from execucao_coleta where status = 'ok') atualizado`,
+  );
+  return r;
 }
 
 export async function opcoesFiltro() {
-  const [ufs, fontes, comitentes] = await Promise.all([
+  const [ufs, comitentes, leiloeiros] = await Promise.all([
     consulta<{ uf: string; n: number }>("select uf, count(*)::int n from vw_busca where uf is not null group by uf order by uf"),
-    consulta<{ id: string; nome: string; n: number }>(
-      `select f.id, f.nome, count(l.*)::int n from fonte f
-       left join lote l on l.fonte_id = f.id and l.status in ('ativo','suspenso')
-       where f.ativa group by f.id order by n desc`,
-    ),
     consulta<{ comitente: string; n: number }>(
       "select comitente, count(*)::int n from vw_busca where comitente is not null group by comitente order by n desc",
     ),
+    consulta<{ leiloeiro: string; n: number }>(
+      "select leiloeiro, count(*)::int n from vw_busca where leiloeiro is not null group by leiloeiro order by n desc limit 300",
+    ),
   ]);
-  return { ufs, fontes, comitentes };
+  return { ufs, comitentes, leiloeiros };
 }
 
 export type Lote = {

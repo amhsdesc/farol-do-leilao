@@ -232,6 +232,57 @@ def ocupacao(valor: Any, *textos_extra: Any) -> str:
     return "nao_informado"
 
 
+_DIVIDAS = r"(?:debitos?|dividas?|iptu|condominio|taxas? condominia|tributos?|encargos?)"
+_VENDEDOR = r"(?:vendedor|comitente|credor(?: fiduciario)?|banco|caixa|alienante|proprietario|exequente)"
+_COMPRADOR = r"(?:arrematante|comprador|adquirente|licitante vencedor)"
+
+
+def debitos_por_conta(valor: Any, *textos_extra: Any) -> str:
+    """Quem paga IPTU/condomínio atrasados. Só afirma o que a fonte afirma.
+
+    Se qualquer trecho põe alguma dívida com o arrematante, devolve 'arrematante' (o mais cauteloso),
+    mesmo que outro trecho ponha outra dívida com o vendedor.
+    """
+    direto = simplificar(valor)
+    if direto in {"vendedor", "comitente"}:
+        return "vendedor"
+    if direto in {"arrematante", "comprador"}:
+        return "arrematante"
+    achou_vendedor = False
+    for texto in (valor, *textos_extra):
+        t = simplificar(texto)
+        if not t:
+            continue
+        perto = r"[^.;]{0,120}?"
+        dono = r"(?:por conta|a cargo|de responsabilidade|sob responsabilidade|responsabilidade|pagos?|quitad[oa]s?|arcad[oa]s?) (?:do|da|pelo|pela)"
+        if re.search(rf"{_DIVIDAS}{perto}{dono} {_COMPRADOR}", t) or re.search(rf"{_COMPRADOR}{perto}(?:arcara|pagara|assume|assumira|responde){perto}{_DIVIDAS}", t):
+            return "arrematante"
+        if (
+            re.search(rf"{_DIVIDAS}{perto}{dono} {_VENDEDOR}", t)
+            or re.search(rf"{_VENDEDOR}{perto}(?:arcara|pagara|quitara|assume|assumira){perto}{_DIVIDAS}", t)
+            or re.search(r"livre e desembaracad[oa] de (?:quaisquer )?(?:onus|debitos|dividas)", t)
+            or re.search(r"sub-?rogam?(?:-se)? no (?:respectivo )?preco", t)  # CTN art. 130: saem do valor do lance
+        ):
+            achou_vendedor = True
+    return "vendedor" if achou_vendedor else "nao_informado"
+
+
+def aceita_parcelamento(valor: Any, *textos_extra: Any) -> bool | None:
+    """True/False só quando a fonte diz; None quando não fala nada."""
+    b = booleano(valor)
+    if b is not None:
+        return b
+    for texto in textos_extra:
+        t = simplificar(texto)
+        if not t:
+            continue
+        if re.search(r"nao (?:aceita|admite|sera aceito|sera admitido|ha possibilidade de) (?:o )?(?:pagamento )?parcela|somente a vista|apenas a vista|exclusivamente a vista", t):
+            return False
+        if re.search(r"(?:aceita|admite|permite|possibilidade de)[^.;]{0,40}parcela|pagamento parcelado|proposta(?:s)? de parcelamento|em ate \d+ (?:parcelas|vezes|prestacoes)|art(?:igo)?\.? 895", t):
+            return True
+    return None
+
+
 def uf(valor: Any) -> str | None:
     if valor is None:
         return None
@@ -412,6 +463,8 @@ def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: d
         ocupacao=ocupacao(campo("ocupacao"), *textos),
         aceita_financiamento=booleano(campo("aceita_financiamento")),
         aceita_fgts=booleano(campo("aceita_fgts")),
+        aceita_parcelamento=aceita_parcelamento(campo("aceita_parcelamento"), *textos),
+        debitos_por_conta=debitos_por_conta(campo("debitos_por_conta"), *textos),
         leiloeiro=limpar(campo("leiloeiro")),
         comitente=comitente(campo("comitente"), *textos),
         processo=limpar(campo("processo")),

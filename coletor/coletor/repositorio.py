@@ -17,7 +17,7 @@ from .modelos import Lote
 CAMPOS_LOTE = [
     "url", "titulo", "descricao", "modalidade", "status", "valor_avaliacao", "lance_minimo",
     "praca_atual", "data_praca1", "valor_praca1", "data_praca2", "valor_praca2", "ocupacao",
-    "aceita_financiamento", "aceita_fgts", "leiloeiro", "comitente", "processo", "edital_url", "fotos",
+    "aceita_financiamento", "aceita_fgts", "aceita_parcelamento", "debitos_por_conta", "leiloeiro", "comitente", "processo", "edital_url", "fotos",
 ]
 CAMPOS_IMOVEL = [
     "tipo", "uf", "cidade", "bairro", "endereco", "endereco_normalizado", "area_privativa",
@@ -42,6 +42,11 @@ def hash_lote(lote: Lote) -> str:
     """Hash do conteúdo relevante. `dados` fica de fora (campos voláteis como visualizações)."""
     d = snapshot(lote)
     d.pop("dados", None)
+    # campos criados depois (migração 003): sem valor, ficam fora do hash para não marcar
+    # todos os lotes antigos como "alterado" na primeira coleta depois da atualização
+    for campo, vazio in (("aceita_parcelamento", None), ("debitos_por_conta", "nao_informado")):
+        if d.get(campo) == vazio:
+            d.pop(campo, None)
     return hashlib.sha1(json.dumps(d, sort_keys=True).encode()).hexdigest()
 
 

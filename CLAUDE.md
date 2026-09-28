@@ -17,6 +17,12 @@ Público inicial: investidor pessoa física.
 Nome, voz, cores e tipografia em `docs/marca.md`. Público: quem nunca arrematou. Promessa: "Encontre. Faça a conta. Decida."
 Todo texto do site segue a voz de lá: curto, sem juridiquês, termo explicado na hora, nunca promete lucro.
 
+## Produto: o que é livre e o que é de assinante
+
+Ver `docs/produto.md`. Resumo: mapa e ficha são livres; filtros, ordenação, calculadora, alertas e buscas salvas são
+de assinante. **A trava vale no servidor** (`web/lib/acesso.ts` + `aplicarAcesso` em `web/lib/busca/filtros.ts`):
+toda rota de API aplica `aplicarAcesso` antes de consultar. Nunca confie só na tela.
+
 ## Estrutura
 
 ```

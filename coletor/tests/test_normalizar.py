@@ -91,3 +91,28 @@ def test_praca_vigente_pelas_datas():
 def test_coordenada_fora_do_brasil_descartada():
     lote = n.normalizar(LoteBruto(id_externo="1", lat=48.85, lon=2.35))
     assert lote.lat is None and lote.lon is None
+
+
+def test_debitos_so_afirma_o_que_a_fonte_diz():
+    assert n.debitos_por_conta(None, "Apartamento com 2 quartos.") == "nao_informado"
+    assert n.debitos_por_conta(None, "Débitos de IPTU e condomínio por conta do arrematante.") == "arrematante"
+    assert n.debitos_por_conta(None, "Os débitos de condomínio e IPTU até a data do leilão são de responsabilidade do vendedor.") == "vendedor"
+    assert n.debitos_por_conta(None, "Débitos tributários sub-rogam-se no preço, nos termos do art. 130 do CTN.") == "vendedor"
+    # uma dívida com cada lado: vale a mais cautelosa
+    assert n.debitos_por_conta(None, "IPTU por conta do comitente. Condomínio por conta do arrematante.") == "arrematante"
+    assert n.debitos_por_conta("arrematante") == "arrematante"
+
+
+def test_parcelamento():
+    assert n.aceita_parcelamento(None, "Imóvel residencial.") is None
+    assert n.aceita_parcelamento(None, "Admite-se proposta de pagamento parcelado, art. 895 do CPC.") is True
+    assert n.aceita_parcelamento(None, "Pagamento em até 30 parcelas.") is True
+    assert n.aceita_parcelamento(None, "Não aceita parcelamento. Pagamento somente à vista.") is False
+    assert n.aceita_parcelamento("Sim") is True
+
+
+def test_normalizar_preenche_debitos_e_parcelamento():
+    b = LoteBruto(id_externo="1", descricao="Condomínio por conta do arrematante. Aceita parcelamento em até 12 vezes.")
+    lote = n.normalizar(b)
+    assert lote.debitos_por_conta == "arrematante"
+    assert lote.aceita_parcelamento is True
