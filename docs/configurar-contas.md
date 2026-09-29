@@ -50,3 +50,25 @@ Antes de tudo: `AUTH_SECRET`. Na pasta `web`, rode `npx auth secret` e ele grava
 
 Depois de colar as chaves, reinicie o site e faça um teste completo no sandbox: entrar, confirmar celular, assinar,
 pagar com o Pix de teste do Asaas e ver a assinatura ativa em Minha conta.
+
+## 4. Avisos de alerta (e-mail pela Resend e WhatsApp)
+
+Os alertas (mudança de preço/data, suspensão, indisponibilidade e lembretes antes do leilão) são detectados pelo
+coletor e mandados por um script separado — `npm run notificacoes` — que você agenda para rodar a cada 15-30
+minutos (o mesmo cron que já roda `python -m coletor coletar --todas`). Sem as chaves abaixo, o alerta continua
+sendo criado e a mudança detectada normalmente; só o envio de verdade fica pendente (rodar o script sem chave não
+manda nada e não dá erro).
+
+**E-mail (Resend, plano grátis cobre o começo):**
+1. Crie a conta em https://resend.com.
+2. Em *Domains*, adicione e verifique o domínio do site (registros DNS que a Resend mostra na hora).
+3. Em *API Keys*, crie uma chave → `RESEND_API_KEY`.
+4. Em `RESEND_REMETENTE`, ponha um endereço desse domínio, ex. `Farol do Leilão <avisos@SEU-DOMINIO>`.
+
+**WhatsApp (reaproveita o número já configurado no passo 2):**
+1. Em *Gerenciador do WhatsApp → Modelos de mensagem*, crie um segundo modelo, categoria **Utilidade**, idioma
+   **Português (BR)**, nome `alerta_leilao`, corpo com uma variável de texto (`{{1}}`) — é nela que entra a
+   mensagem do alerta. A Meta aprova em minutos (utilidade é mais rápido que marketing).
+2. Se usar outro nome de modelo, ajuste `WHATSAPP_MODELO_ALERTA`.
+
+Ponha também `SITE_URL=https://SEU-DOMINIO` (sem isso o link nos avisos aponta para localhost).
