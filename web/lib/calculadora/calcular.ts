@@ -123,9 +123,16 @@ function calcularParaLance(e: Entrada): Omit<Resultado, "lanceMaximo"> {
         detalhe: `${comPct}% do lance, pagos ao leiloeiro no dia do arremate`, fonte: P.FONTE_COMISSAO });
 
   const advPct = e.advogadoPct ?? P.ADVOGADO_PCT;
-  const adv = e.advogadoFixo && e.advogadoFixo > 0 ? e.advogadoFixo : (L * advPct) / 100;
+  const advPorPct = (L * advPct) / 100;
+  const advComPiso = Math.max(advPorPct, P.ADVOGADO_MINIMO);
+  const adv = e.advogadoFixo && e.advogadoFixo > 0 ? e.advogadoFixo : advComPiso;
   add({ id: "advogado", grupo: "arrematar", rotulo: "Advogado",
-        valor: adv, detalhe: e.advogadoFixo ? "valor fixo informado" : `${advPct}% do lance: análise do edital, matrícula e acompanhamento`,
+        valor: adv,
+        detalhe: e.advogadoFixo
+          ? "valor fixo informado"
+          : advPorPct < P.ADVOGADO_MINIMO
+            ? `mínimo de R$ ${P.ADVOGADO_MINIMO.toLocaleString("pt-BR")} (${advPct}% do lance ficaria abaixo disso): análise do edital, matrícula e acompanhamento`
+            : `${advPct}% do lance: análise do edital, matrícula e acompanhamento`,
         fonte: P.FONTE_ADVOGADO });
 
   const itbi = aliquotaItbi(uf, e.cidade, e.imovelNovo);
@@ -137,21 +144,30 @@ function calcularParaLance(e: Entrada): Omit<Resultado, "lanceMaximo"> {
 
   // escritura só existe fora do leilão judicial (no judicial, registra-se a carta de arrematação)
   const precisaEscritura = e.modalidade !== "judicial";
+  const rotuloRegistro = e.modalidade === "judicial" ? "Registro da carta de arrematação" : "Registro na matrícula";
   if (e.cartorioManual && e.cartorioManual > 0) {
     add({ id: "cartorio", grupo: "arrematar", rotulo: "Cartório (escritura e registro)", valor: e.cartorioManual,
           detalhe: "valor informado por você", fonte: { descricao: "Orçamento do cartório", situacao: "confirmado" } });
-  } else if (uf === "DF") {
-    if (precisaEscritura)
-      add({ id: "escritura", grupo: "arrematar", rotulo: "Escritura (tabelionato)", valor: P.valorFaixa(P.DF_ESCRITURA, L),
-            detalhe: "tabela oficial do DF pela faixa de valor", fonte: P.FONTE_CARTORIO_DF });
-    add({ id: "registro", grupo: "arrematar", rotulo: e.modalidade === "judicial" ? "Registro da carta de arrematação" : "Registro na matrícula",
-          valor: P.valorFaixa(P.DF_REGISTRO, L), detalhe: "tabela oficial do DF pela faixa de valor", fonte: P.FONTE_CARTORIO_DF });
   } else {
-    if (precisaEscritura)
-      add({ id: "escritura", grupo: "arrematar", rotulo: "Escritura (tabelionato)", valor: (L * P.ESCRITURA_PCT_PADRAO) / 100,
-            detalhe: `cerca de ${P.ESCRITURA_PCT_PADRAO}% do valor`, fonte: P.FONTE_CARTORIO_PADRAO });
-    add({ id: "registro", grupo: "arrematar", rotulo: e.modalidade === "judicial" ? "Registro da carta de arrematação" : "Registro na matrícula",
-          valor: (L * P.REGISTRO_PCT_PADRAO) / 100, detalhe: `cerca de ${P.REGISTRO_PCT_PADRAO}% do valor`, fonte: P.FONTE_CARTORIO_PADRAO });
+    const faixasEscritura = P.ESCRITURA_FAIXAS_UF[uf];
+    const faixasRegistro = P.REGISTRO_FAIXAS_UF[uf];
+    const fonteUf = P.FONTE_CARTORIO_UF[uf];
+    if (precisaEscritura) {
+      if (faixasEscritura) {
+        add({ id: "escritura", grupo: "arrematar", rotulo: "Escritura (tabelionato)", valor: P.valorFaixa(faixasEscritura, L),
+              detalhe: `tabela oficial de ${uf} pela faixa de valor`, fonte: fonteUf });
+      } else {
+        add({ id: "escritura", grupo: "arrematar", rotulo: "Escritura (tabelionato)", valor: (L * P.ESCRITURA_PCT_PADRAO) / 100,
+              detalhe: `cerca de ${P.ESCRITURA_PCT_PADRAO}% do valor (tabela de ${uf} ainda não está na calculadora)`, fonte: P.FONTE_CARTORIO_PADRAO });
+      }
+    }
+    if (faixasRegistro) {
+      add({ id: "registro", grupo: "arrematar", rotulo: rotuloRegistro, valor: P.valorFaixa(faixasRegistro, L),
+            detalhe: `tabela oficial de ${uf} pela faixa de valor`, fonte: fonteUf });
+    } else {
+      add({ id: "registro", grupo: "arrematar", rotulo: rotuloRegistro, valor: (L * P.REGISTRO_PCT_PADRAO) / 100,
+            detalhe: `cerca de ${P.REGISTRO_PCT_PADRAO}% do valor (tabela de ${uf} ainda não está na calculadora)`, fonte: P.FONTE_CARTORIO_PADRAO });
+    }
   }
   add({ id: "taxas", grupo: "arrematar", rotulo: "Certidões e taxas (e-Notariado, prenotação)",
         valor: e.outrasTaxasCartorio ?? P.OUTRAS_TAXAS_CARTORIO, detalhe: "valor de partida", fonte: P.FONTE_OUTRAS_TAXAS });

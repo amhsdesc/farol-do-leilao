@@ -374,6 +374,14 @@ h1, h2, h3 { font-family: var(--display); line-height: 1.15; margin: 0; text-wra
 .campo-num em { font-style: normal; color: var(--muted); font-size: 13px; padding: 0 12px; white-space: nowrap; }
 .campo-num.curto { width: 110px; }
 .destaque-num { margin: 0; font-size: 15px; }
+.linha-m2-busca { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.linha-m2-busca > .campo { flex: 1; min-width: 180px; }
+.botao-pesquisar-mercado { white-space: nowrap; }
+.anuncios-mercado { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
+.anuncios-mercado summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+.anuncios-mercado ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.anuncios-mercado li { font-size: 13px; line-height: 1.4; }
+.anuncios-mercado a { font-weight: 600; }
 .opcoes-reforma { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 @media (max-width: 640px) { .opcoes-reforma { grid-template-columns: 1fr 1fr; } }
 .opcao-reforma { display: grid; gap: 2px; padding: 12px; border-radius: 16px; border: 2px solid var(--line); cursor: pointer; background: var(--surface); }

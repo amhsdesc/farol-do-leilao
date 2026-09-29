@@ -18,9 +18,11 @@ export const FONTE_COMISSAO: Fonte = {
 // ---------------------------------------------------------------- advogado
 
 export const ADVOGADO_PCT = 2;
+export const ADVOGADO_MINIMO = 4_000;
 export const FONTE_ADVOGADO: Fonte = {
   descricao:
-    "Valor de partida. Cada advogado cobra de um jeito (percentual ou valor fixo); as tabelas da OAB de cada estado servem de referência. Troque pelo orçamento que receber.",
+    "Valor de partida: 2% do lance, com mínimo de R$ 4.000 (análise do edital e da matrícula costuma justificar esse piso mesmo em lances baixos). Cada advogado cobra de um jeito " +
+    "(percentual ou valor fixo); as tabelas da OAB de cada estado servem de referência. Troque pelo orçamento que receber.",
   situacao: "estimativa",
 };
 
@@ -58,7 +60,12 @@ export const FONTE_ITBI_BASE: Fonte = {
 
 type Faixa = { ate: number; valor: number };
 
-/** DF 2026 (ANOREG-DF, tabela completa de emolumentos). Emolumentos + CCRCPN. */
+/**
+ * Tabelas reais de emolumentos por UF, por faixa de valor. Cada estado publica a sua (normalmente via
+ * corregedoria/ANOREG local) e elas mudam em janeiro. Preenchidas aos poucos, um estado de cada vez —
+ * ver a UF em `FONTE_CARTORIO_UF` para a fonte e a data de cada tabela. Onde ainda não há tabela real,
+ * a calculadora cai no percentual de partida (`ESCRITURA_PCT_PADRAO`/`REGISTRO_PCT_PADRAO`).
+ */
 export const DF_ESCRITURA: Faixa[] = [
   { ate: 200_351.09, valor: 2_020.76 },
   { ate: 343_224.42, valor: 2_196.48 },
@@ -74,17 +81,92 @@ export const DF_REGISTRO: Faixa[] = [
   { ate: 1_477_999.89, valor: 1_273.07 },
   { ate: Infinity, valor: 1_291.52 },
 ];
-export const FONTE_CARTORIO_DF: Fonte = {
-  descricao: "Tabela de emolumentos 2026 do DF (escritura e registro de compra e venda ou carta de arrematação).",
-  url: "https://anoregdf.org.br/wp-content/uploads/2025/12/TABELA-COMPLETA-DE-EMOLUMENTOS-2026.pdf",
-  situacao: "confirmado",
+
+/** SP 2026 (ARISP, tabela de registro de imóveis — "registro com valor declarado", capital e interior). */
+export const SP_REGISTRO: Faixa[] = [
+  { ate: 2_306, valor: 257.2 },
+  { ate: 5_761, valor: 412.72 },
+  { ate: 9_603, valor: 740.42 },
+  { ate: 19_210, valor: 1_098.57 },
+  { ate: 38_420, valor: 1_335.6 },
+  { ate: 115_260, valor: 1_489.46 },
+  { ate: 192_100, valor: 1_901.09 },
+  { ate: 230_520, valor: 2_311.88 },
+  { ate: 268_940, valor: 2_516.87 },
+  { ate: 307_360, valor: 2_723.02 },
+  { ate: 345_780, valor: 2_870.61 },
+  { ate: 384_200, valor: 2_945.43 },
+  { ate: 768_400, valor: 3_284.18 },
+  { ate: 1_152_600, valor: 3_846.1 },
+  { ate: 1_536_800, valor: 4_427.79 },
+  { ate: Infinity, valor: 4_427.79 }, // tabela sobe por faixas maiores; confirme para imóveis acima de R$ 1,5 milhão
+];
+
+/** MG 2026 (Corregedoria-Geral de Justiça de MG, tabela 4 — "registro com conteúdo financeiro", valor final ao usuário). */
+export const MG_REGISTRO: Faixa[] = [
+  { ate: 1_400, valor: 224.25 },
+  { ate: 2_720, valor: 365.8 },
+  { ate: 5_440, valor: 530.1 },
+  { ate: 7_000, valor: 733.86 },
+  { ate: 14_000, valor: 978.62 },
+  { ate: 28_000, valor: 1_264.34 },
+  { ate: 42_000, valor: 1_590.32 },
+  { ate: 56_000, valor: 1_957.62 },
+  { ate: 70_000, valor: 2_365.56 },
+  { ate: 105_000, valor: 2_977.2 },
+  { ate: 140_000, valor: 3_780.6 },
+  { ate: 175_000, valor: 4_042.86 },
+  { ate: 210_000, valor: 4_305.6 },
+  { ate: 280_000, valor: 4_843.46 },
+  { ate: 350_000, valor: 4_976.89 },
+  { ate: 420_000, valor: 5_110.92 },
+  { ate: 560_000, valor: 5_600.46 },
+  { ate: 700_000, valor: 5_908.27 },
+  { ate: 840_000, valor: 6_216.7 },
+  { ate: 1_120_000, valor: 6_956.63 },
+  { ate: 1_400_000, valor: 7_535.23 },
+  { ate: 1_680_000, valor: 8_114.82 },
+  { ate: 3_200_000, valor: 8_695.59 },
+  { ate: Infinity, valor: 8_695.59 }, // acima disso a tabela usa regra própria por faixa de R$ 500 mil; confirme no cartório
+];
+
+/** Tabelas de escritura por UF (faixa de valor). Só DF por enquanto. */
+export const ESCRITURA_FAIXAS_UF: Record<string, Faixa[]> = {
+  DF: DF_ESCRITURA,
 };
-/** Demais UFs até a tabela de cada estado entrar: percentuais de partida. */
+/** Tabelas de registro por UF (faixa de valor). */
+export const REGISTRO_FAIXAS_UF: Record<string, Faixa[]> = {
+  DF: DF_REGISTRO,
+  SP: SP_REGISTRO,
+  MG: MG_REGISTRO,
+};
+
+export const FONTE_CARTORIO_UF: Record<string, Fonte> = {
+  DF: {
+    descricao: "Tabela de emolumentos 2026 do DF (escritura e registro de compra e venda ou carta de arrematação).",
+    url: "https://anoregdf.org.br/wp-content/uploads/2025/12/TABELA-COMPLETA-DE-EMOLUMENTOS-2026.pdf",
+    situacao: "confirmado",
+  },
+  SP: {
+    descricao:
+      "Tabela de emolumentos 2026 de SP (ARISP), item de registro com valor declarado. Não inclui ISS do município (varia por cidade). Escritura de SP ainda não está na calculadora: usa o percentual de partida.",
+    url: "https://arisp.com.br/wp-content/uploads/2026/01/0.pdf",
+    situacao: "confirmado",
+  },
+  MG: {
+    descricao:
+      "Tabela de emolumentos 2026 da Corregedoria-Geral de Justiça de MG (item 5-e, registro com conteúdo financeiro), valor final ao usuário (já com FUNDESP/FAJUD e taxa judiciária). Escritura de MG ainda não está na calculadora: usa o percentual de partida.",
+    url: "https://betim.ribmg.org.br/wp-content/uploads/sites/87/2026/01/Tabela-4-de-Emolumentos-2026.pdf",
+    situacao: "confirmado",
+  },
+};
+
+/** Demais UFs (e escritura fora do DF) até a tabela de cada estado entrar: percentuais de partida. */
 export const ESCRITURA_PCT_PADRAO = 1.0;
 export const REGISTRO_PCT_PADRAO = 0.6;
 export const FONTE_CARTORIO_PADRAO: Fonte = {
   descricao:
-    "Estimativa até a tabela de emolumentos deste estado entrar na calculadora. Cada estado tem sua tabela, publicada pelo Tribunal de Justiça.",
+    "Estimativa até a tabela de emolumentos deste estado entrar na calculadora. Cada estado tem sua tabela, publicada pelo Tribunal de Justiça ou pela associação de cartórios local.",
   url: "https://www.anoreg.org.br/site/tabela-de-emolumentos/",
   situacao: "estimativa",
 };

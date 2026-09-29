@@ -54,6 +54,21 @@ test("conta completa de um apartamento no DF", () => {
   assert.ok(r.lucro > 0 && r.retornoPct > 0 && r.descontoRealPct > 0);
 });
 
+test("cartório por UF: SP e MG usam tabela real de registro; outros estados caem no percentual", () => {
+  const sp = calcular({ ...exemplo, uf: "SP", cidade: "São Paulo" });
+  assert.equal(sp.itens.find((i) => i.id === "registro")?.valor, 2_723.02); // faixa 268.940,01–307.360
+  assert.match(sp.itens.find((i) => i.id === "registro")?.detalhe ?? "", /tabela oficial de SP/);
+  // escritura de SP ainda não tem tabela real: cai no percentual de partida
+  assert.equal(sp.itens.find((i) => i.id === "escritura")?.valor, (275_000 * 1) / 100);
+
+  const mg = calcular({ ...exemplo, uf: "MG", cidade: "Belo Horizonte" });
+  assert.equal(mg.itens.find((i) => i.id === "registro")?.valor, 4_843.46); // faixa 210.000,01–280.000
+
+  const outro = calcular({ ...exemplo, uf: "GO", cidade: "Goiânia" });
+  assert.equal(outro.itens.find((i) => i.id === "registro")?.valor, (275_000 * 0.6) / 100);
+  assert.match(outro.itens.find((i) => i.id === "registro")?.detalhe ?? "", /tabela de GO ainda não está na calculadora/);
+});
+
 test("leilão judicial não tem escritura", () => {
   const r = calcular({ ...exemplo, modalidade: "judicial" });
   assert.ok(!r.itens.some((i) => i.id === "escritura"));
@@ -83,4 +98,16 @@ test("meta impossível devolve zero; sem valor de mercado devolve null", () => {
 test("valor de mercado pelo preço do m² da região", () => {
   const r = calcular({ ...exemplo, valorMercado: undefined, precoM2Regiao: 7_000 });
   assert.equal(r.valorMercado, 434_000);
+});
+
+test("advogado: mínimo de R$ 4.000 quando 2% do lance fica abaixo disso", () => {
+  const baixo = calcular({ ...exemplo, lance: 100_000 }); // 2% = 2.000, abaixo do piso
+  assert.equal(baixo.itens.find((i) => i.id === "advogado")?.valor, 4_000);
+  assert.match(baixo.itens.find((i) => i.id === "advogado")?.detalhe ?? "", /mínimo de R\$ 4.000/);
+
+  const alto = calcular({ ...exemplo, lance: 500_000 }); // 2% = 10.000, acima do piso
+  assert.equal(alto.itens.find((i) => i.id === "advogado")?.valor, 10_000);
+
+  const fixo = calcular({ ...exemplo, lance: 100_000, advogadoFixo: 1_500 }); // valor fixo informado não sofre o piso
+  assert.equal(fixo.itens.find((i) => i.id === "advogado")?.valor, 1_500);
 });

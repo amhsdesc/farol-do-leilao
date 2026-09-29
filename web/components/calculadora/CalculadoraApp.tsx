@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { calcular, custoReformaM2, type Entrada, type Grupo, type Item, type Modalidade } from "@/lib/calculadora/calcular";
 import * as P from "@/lib/calculadora/parametros";
+import { pesquisarValorMercado, type AmostraMercado } from "@/lib/calculadora/pesquisaMercado";
+import { TIPOS } from "@/lib/formato";
 
 export type Prefill = {
   imovelId?: number;
@@ -10,6 +12,8 @@ export type Prefill = {
   lance?: number | null;
   uf?: string | null;
   cidade?: string | null;
+  bairro?: string | null;
+  tipo?: string | null;
   modalidade?: string | null;
   area?: number | null;
   avaliacao?: number | null;
@@ -18,6 +22,7 @@ export type Prefill = {
 };
 
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
+const TIPOS_CALC = ["apartamento", "casa", "terreno", "comercial", "galpao", "rural"] as const;
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const pct = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 const GRUPOS: { id: Grupo; titulo: string }[] = [
@@ -69,10 +74,14 @@ function Selo({ item }: { item: Item }) {
   );
 }
 
-export default function CalculadoraApp({ prefill }: { prefill: Prefill }) {
+export default function CalculadoraApp({ prefill, pesquisaMercadoDisponivel }: { prefill: Prefill; pesquisaMercadoDisponivel: boolean }) {
   const [lance, setLance] = useState(txt(prefill.lance));
   const [uf, setUf] = useState(prefill.uf ?? "DF");
   const [cidade, setCidade] = useState(prefill.cidade ?? "");
+  const [bairro, setBairro] = useState(prefill.bairro ?? "");
+  const [tipo, setTipo] = useState<string>(
+    (TIPOS_CALC as readonly string[]).includes(prefill.tipo ?? "") ? (prefill.tipo as string) : "apartamento",
+  );
   const [modalidade, setModalidade] = useState<Modalidade>(
     (["judicial", "extrajudicial", "venda_direta", "licitacao"].includes(prefill.modalidade ?? "") ? prefill.modalidade : "extrajudicial") as Modalidade,
   );
@@ -81,6 +90,10 @@ export default function CalculadoraApp({ prefill }: { prefill: Prefill }) {
   const [modoMercado, setModoMercado] = useState<"m2" | "total">("m2");
   const [m2, setM2] = useState("");
   const [mercadoTotal, setMercadoTotal] = useState("");
+  const [buscandoMercado, setBuscandoMercado] = useState(false);
+  const [erroMercado, setErroMercado] = useState("");
+  const [amostrasMercado, setAmostrasMercado] = useState<AmostraMercado[] | null>(null);
+  const [observacaoMercado, setObservacaoMercado] = useState("");
   const [padrao, setPadrao] = useState<P.PadraoReforma>("simples");
   const [meses, setMeses] = useState("12");
   const [condominio, setCondominio] = useState("");
@@ -134,6 +147,24 @@ export default function CalculadoraApp({ prefill }: { prefill: Prefill }) {
   const semMercado = r != null && r.valorMercado <= 0;
   const mercadoCalc = modoMercado === "m2" ? n(m2) * n(area) : n(mercadoTotal);
 
+  const podePesquisarMercado = pesquisaMercadoDisponivel && uf && cidade.trim() && n(area) > 0;
+  async function pesquisarMercado() {
+    if (!podePesquisarMercado || buscandoMercado) return;
+    setBuscandoMercado(true);
+    setErroMercado("");
+    setAmostrasMercado(null);
+    const r = await pesquisarValorMercado({ uf, cidade, bairro: bairro || undefined, tipo, area: n(area) });
+    setBuscandoMercado(false);
+    if (!r.ok) {
+      setErroMercado(r.erro);
+      return;
+    }
+    setModoMercado("m2");
+    setM2(String(r.precoM2Medio));
+    setAmostrasMercado(r.amostras);
+    setObservacaoMercado(r.observacao ?? "");
+  }
+
   return (
     <div className="calc-app">
       <form className="calc-entradas" onSubmit={(e) => e.preventDefault()}>
@@ -154,6 +185,18 @@ export default function CalculadoraApp({ prefill }: { prefill: Prefill }) {
             <label className="campo">
               <span>Cidade</span>
               <input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex.: Goiânia" />
+            </label>
+          </div>
+          <div className="dupla">
+            <label className="campo">
+              <span>Bairro <small>(opcional, ajuda a pesquisa de valor de mercado)</small></span>
+              <input value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="Ex.: Setor Bueno" />
+            </label>
+            <label className="campo">
+              <span>Tipo de imóvel</span>
+              <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                {TIPOS_CALC.map((t) => <option key={t} value={t}>{TIPOS[t]}</option>)}
+              </select>
             </label>
           </div>
           <div className="dupla">
@@ -186,17 +229,46 @@ export default function CalculadoraApp({ prefill }: { prefill: Prefill }) {
             <button type="button" className={`pilula${modoMercado === "m2" ? " ligada" : ""}`} onClick={() => setModoMercado("m2")}>Pelo m² da região</button>
             <button type="button" className={`pilula${modoMercado === "total" ? " ligada" : ""}`} onClick={() => setModoMercado("total")}>Valor total</button>
           </div>
-          {modoMercado === "m2" ? (
-            <Num rotulo="Preço médio do m² na região" valor={m2} set={setM2} sufixo="R$/m²" passo={100} />
-          ) : (
-            <Num rotulo="Valor de venda esperado" valor={mercadoTotal} set={setMercadoTotal} sufixo="R$" passo={1000} />
-          )}
+          <div className="linha-m2-busca">
+            {modoMercado === "m2" ? (
+              <Num rotulo="Preço médio do m² na região" valor={m2} set={setM2} sufixo="R$/m²" passo={100} />
+            ) : (
+              <Num rotulo="Valor de venda esperado" valor={mercadoTotal} set={setMercadoTotal} sufixo="R$" passo={1000} />
+            )}
+            {pesquisaMercadoDisponivel && (
+              <button
+                type="button"
+                className="botao secundario botao-pesquisar-mercado"
+                disabled={!podePesquisarMercado || buscandoMercado}
+                onClick={pesquisarMercado}
+                title={podePesquisarMercado ? "Busca anúncios parecidos e calcula a média do m²" : "Informe estado, cidade e área para pesquisar"}
+              >
+                {buscandoMercado ? "Pesquisando…" : "Pesquisar valor de mercado"}
+              </button>
+            )}
+          </div>
+          {erroMercado && <p className="nota ruim">{erroMercado}</p>}
           {mercadoCalc > 0 && (
             <p className="destaque-num">Valor de mercado estimado: <b>{brl.format(mercadoCalc)}</b></p>
           )}
           {prefill.avaliacao ? (
             <p className="muted nota">Avaliação do edital: {brl.format(prefill.avaliacao)}.</p>
           ) : null}
+          {amostrasMercado && amostrasMercado.length > 0 && (
+            <details className="anuncios-mercado" open>
+              <summary>{amostrasMercado.length} anúncios usados na pesquisa</summary>
+              {observacaoMercado && <p className="muted nota">{observacaoMercado}</p>}
+              <ul>
+                {amostrasMercado.map((a, i) => (
+                  <li key={i}>
+                    {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer">{a.titulo}</a> : <span>{a.titulo}</span>}
+                    <span className="muted num"> — {brl.format(a.preco)}, {a.area.toLocaleString("pt-BR")} m² (R$ {a.precoM2.toLocaleString("pt-BR")}/m²)</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="muted nota">Anúncios encontrados numa busca automática. Confira antes de decidir: preço pedido não é preço vendido.</p>
+            </details>
+          )}
         </fieldset>
 
         <fieldset className="painel">

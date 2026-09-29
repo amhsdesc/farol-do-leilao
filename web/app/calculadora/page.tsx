@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import CalculadoraApp, { type Prefill } from "@/components/calculadora/CalculadoraApp";
 import Travado from "@/components/Travado";
 import { acesso } from "@/lib/acesso";
+import { mercadoConfigurado } from "@/lib/calculadora/pesquisaMercado";
 import { resumo } from "@/lib/consultas";
 import { TIPOS } from "@/lib/formato";
 
@@ -25,7 +26,10 @@ export default async function Calculadora({ searchParams }: { searchParams: Prom
     );
   }
   const id = Number((await searchParams).imovel);
-  const im = Number.isInteger(id) && id > 0 ? await resumo(id) : null;
+  const [im, pesquisaMercadoDisponivel] = await Promise.all([
+    Number.isInteger(id) && id > 0 ? resumo(id) : Promise.resolve(null),
+    mercadoConfigurado(),
+  ]);
   const prefill: Prefill = im
     ? {
         imovelId: im.imovel_id,
@@ -33,6 +37,8 @@ export default async function Calculadora({ searchParams }: { searchParams: Prom
         lance: im.lance_minimo,
         uf: im.uf,
         cidade: im.cidade,
+        bairro: im.bairro,
+        tipo: im.tipo,
         modalidade: im.modalidade,
         area: im.area,
         avaliacao: im.valor_avaliacao,
@@ -46,7 +52,7 @@ export default async function Calculadora({ searchParams }: { searchParams: Prom
         <h1 className="titulo-pagina">Faça a conta</h1>
         <p className="texto">Tudo parte do valor do lance. A conta muda enquanto você preenche.</p>
       </header>
-      <CalculadoraApp prefill={prefill} />
+      <CalculadoraApp prefill={prefill} pesquisaMercadoDisponivel={pesquisaMercadoDisponivel} />
     </main>
   );
 }
