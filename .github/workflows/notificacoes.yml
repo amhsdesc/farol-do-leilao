@@ -1,0 +1,29 @@
+name: Notificações
+
+on:
+  schedule:
+    - cron: "*/20 * * * *" # a cada 20 min: eventos do coletor, lembretes de leilão e buscas salvas
+  workflow_dispatch: {}
+
+jobs:
+  notificacoes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_REMETENTE: ${{ vars.RESEND_REMETENTE }}
+      WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+      WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+      WHATSAPP_MODELO_ALERTA: ${{ vars.WHATSAPP_MODELO_ALERTA }}
+      SITE_URL: ${{ vars.SITE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: node --experimental-strip-types lib/notificacoes/executar.ts

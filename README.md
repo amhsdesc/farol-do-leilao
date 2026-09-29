@@ -74,10 +74,16 @@ python -m coletor catalogo criar-fontes                      # cria as fontes do
 python -m coletor coletar --todas
 ```
 
-## Rotina automática
+## Publicar e rodar sozinho
 
+O site fica no ar com Vercel + Neon + GitHub Actions (coleta e alertas rodando sozinhos, sem servidor pra
+administrar) — passo a passo em [docs/publicar.md](docs/publicar.md). Os workflows já estão em
+`.github/workflows/` (`coletar.yml` a cada 6h, `notificacoes.yml` a cada 20 min).
+
+Enquanto isso não está publicado, ou pra rodar no seu computador:
 - No Windows: agende `scripts\coletar.ps1` no Agendador de Tarefas (3 vezes ao dia).
-- No servidor: `scripts/coletar.sh` no cron.
+- Numa VPS própria (alternativa ao GitHub Actions): `scripts/coletar.sh` no cron.
+- Notificações no seu computador: `cd web && npm run notificacoes`.
 
 ## Trabalhando com o Claude Code
 
