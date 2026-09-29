@@ -1,8 +1,6 @@
 name: Coleta
 
 on:
-  push:
-    branches: [master]
   schedule:
     - cron: "17 */6 * * *" # a cada 6h, minuto fora da hora cheia (menos fila no GitHub)
   workflow_dispatch: {} # botão "Run workflow" pra rodar na hora, quando quiser testar
@@ -10,7 +8,7 @@ on:
 jobs:
   coletar:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 340
     defaults:
       run:
         working-directory: coletor
