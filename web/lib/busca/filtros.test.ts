@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { aplicarAcesso, contarFiltros, lerFiltros, montarWhere, paraUrl } from "./filtros.ts";
+import { aplicarAcesso, contarFiltros, lerFiltros, montarWhere, paraUrl, rotuloFiltros } from "./filtros.ts";
 
 test("lê a URL e descarta o que é inválido", () => {
   const f = lerFiltros(new URLSearchParams("uf=df&tipo=apartamento,xyz&desconto_min=300&fgts=1&bbox=-48,-16,-47,-15&pagina=0"));
@@ -46,4 +46,11 @@ test("ida e volta pela URL", () => {
   const f = lerFiltros({ uf: "SP", tipo: "casa,apartamento", financiamento: "1", prazo_dias: "30" });
   assert.deepEqual(lerFiltros(paraUrl(f)), f);
   assert.equal(contarFiltros(f), 4);
+});
+
+test("rótulo de uma busca salva", () => {
+  assert.equal(rotuloFiltros({ pagina: 1 }), "Todos os imóveis");
+  const rotulo = rotuloFiltros({ pagina: 1, cidade: "Goiânia", tipo: ["apartamento"], lance_max: 300_000, desconto_min: 40 });
+  assert.match(rotulo, /^Goiânia, Apartamento, até R\$\s?300\.000, 40%\+ de desconto$/);
+  assert.equal(rotuloFiltros({ pagina: 1, uf: "DF", tipo: ["casa", "terreno"] }), "DF, 2 tipos de imóvel");
 });

@@ -1,6 +1,8 @@
 // Filtros da busca: leitura da URL, trava de assinante e montagem do SQL.
 // Código puro (sem banco), para poder testar com node:test.
 
+import { MODALIDADES as MODALIDADES_ROTULO, TIPOS as TIPOS_ROTULO } from "../formato.ts";
+
 export type Filtros = {
   // livres para todo mundo: é a busca pelo mapa
   bbox?: [number, number, number, number]; // oeste, sul, leste, norte
@@ -197,4 +199,18 @@ export function montarWhere(f: Filtros, usarBbox = true): { where: string; param
   if (f.varias_fontes) cond.push("n_fontes > 1");
   if (f.com_fotos) cond.push("n_fotos > 0");
   return { where: cond.length ? "where " + cond.join(" and ") : "", params };
+}
+
+const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+
+/** Rótulo curto para uma busca salva, quando a pessoa não dá um nome. */
+export function rotuloFiltros(f: Filtros): string {
+  const partes: string[] = [];
+  if (f.cidade) partes.push(f.cidade);
+  else if (f.uf) partes.push(f.uf);
+  if (f.tipo?.length) partes.push(f.tipo.length === 1 ? (TIPOS_ROTULO[f.tipo[0]] ?? f.tipo[0]) : `${f.tipo.length} tipos de imóvel`);
+  if (f.modalidade?.length === 1) partes.push(MODALIDADES_ROTULO[f.modalidade[0]] ?? f.modalidade[0]);
+  if (f.lance_max) partes.push(`até ${brl.format(f.lance_max)}`);
+  if (f.desconto_min) partes.push(`${f.desconto_min}%+ de desconto`);
+  return partes.length ? partes.join(", ") : "Todos os imóveis";
 }

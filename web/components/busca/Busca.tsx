@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import BotaoAlerta from "@/components/alertas/BotaoAlerta";
 import { contarFiltros, ORDENS, paraUrl, type Filtros } from "@/lib/busca/filtros";
 import type { ItemBusca } from "@/lib/consultas";
 import { area, reais } from "@/lib/formato";
@@ -205,9 +206,7 @@ export default function Busca({ assinante, opcoes, filtrosIniciais, totais }: Pr
                 <div className="balao-acoes">
                   <Link className="botao" href={`/imovel/${balao.imovel_id}`}>Ver imóvel</Link>
                   {assinante ? (
-                    <button type="button" className="botao secundario" disabled title="Os alertas chegam numa próxima etapa">
-                      Criar alerta
-                    </button>
+                    <BotaoAlerta imovelId={balao.imovel_id} ativoInicial={false} textoCriar="Criar alerta" />
                   ) : (
                     <Link className="botao secundario" href="/assinar"><Cadeado /> Alerta</Link>
                   )}

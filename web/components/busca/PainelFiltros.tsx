@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { Filtros } from "@/lib/busca/filtros";
+import SalvarBusca from "@/components/alertas/SalvarBusca";
+import { contarFiltros, type Filtros } from "@/lib/busca/filtros";
 import { MODALIDADES, TIPOS } from "@/lib/formato";
 
 export type Opcoes = {
@@ -259,6 +260,7 @@ export default function PainelFiltros({ filtros: f, opcoes, centroMapa, mudar, l
 
       <div className="painel-rodape">
         <span className="num">{total == null ? "…" : `${total.toLocaleString("pt-BR")} imóveis`}</span>
+        <SalvarBusca key={JSON.stringify(f)} filtros={f} nFiltros={contarFiltros(f)} />
       </div>
     </form>
   );

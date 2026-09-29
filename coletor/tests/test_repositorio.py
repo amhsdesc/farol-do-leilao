@@ -66,6 +66,53 @@ def test_historico_dedup_e_remocao(conn, cliente_para):
     assert ev["evento"] == "reaparecido"
 
 
+def _criar_alerta_imovel(conn, imovel_id: int) -> int:
+    with conn.cursor() as cur:
+        cur.execute("insert into users (email) values ('alerta-teste@exemplo.com') returning id")
+        usuario_id = cur.fetchone()["id"]
+        cur.execute(
+            "insert into alerta (usuario_id, tipo, imovel_id) values (%s, 'imovel', %s) returning id",
+            (usuario_id, imovel_id),
+        )
+        alerta_id = cur.fetchone()["id"]
+    conn.commit()
+    return alerta_id
+
+
+def test_alerta_preco_data_suspensao_e_indisponibilidade(conn, cliente_para):
+    go = "Lista_imoveis_GO.csv"
+    executar(FONTE_CAIXA, conn, cliente_para({CAIXA.format("DF"): "Lista_imoveis_DF.csv", CAIXA.format("GO"): go}))
+    lote = _um(conn, "select id, imovel_id from lote where id_externo = '1444400000002'")
+    _criar_alerta_imovel(conn, lote["imovel_id"])
+
+    # outro imóvel sem alerta: mudança de preço não deve gerar evento
+    outro = _um(conn, "select imovel_id from lote where id_externo = '1444400000001'")
+
+    # preço cai no lote com alerta
+    df = _csv_df(trocar=("275.000,00", "250.000,00"))
+    r = executar(FONTE_CAIXA, conn, cliente_para({CAIXA.format("DF"): df, CAIXA.format("GO"): go}))
+    assert r.status == "ok" and r.contadores.alterados >= 1
+    ev = _um(
+        conn,
+        "select tipo, valor_anterior, valor_novo from evento_alerta where imovel_id = %s and tipo = 'preco'",
+        lote["imovel_id"],
+    )
+    assert ev is not None and ev["tipo"] == "preco"
+    assert float(ev["valor_anterior"]) == 275000.0 and float(ev["valor_novo"]) == 250000.0
+    semev = _um(conn, "select count(*) n from evento_alerta where imovel_id = %s", outro["imovel_id"])
+    assert semev["n"] == 0
+
+    # imóvel some da lista: sem outro lote ativo, evento indisponível
+    df2 = _csv_df(linhas_remover=("1444400000002",), trocar=("275.000,00", "250.000,00"))
+    executar(FONTE_CAIXA, conn, cliente_para({CAIXA.format("DF"): df2, CAIXA.format("GO"): go}))
+    ev2 = _um(
+        conn,
+        "select tipo from evento_alerta where imovel_id = %s and tipo = 'indisponivel'",
+        lote["imovel_id"],
+    )
+    assert ev2 is not None
+
+
 def test_coletor_quebrado_nao_apaga_nada(conn, cliente_para):
     go = "Lista_imoveis_GO.csv"
     executar(FONTE_CAIXA, conn, cliente_para({CAIXA.format("DF"): "Lista_imoveis_DF.csv", CAIXA.format("GO"): go}))

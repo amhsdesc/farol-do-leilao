@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import BotaoAlerta from "@/components/alertas/BotaoAlerta";
 import CardImovel, { tituloCurto } from "@/components/busca/CardImovel";
 import { Cadeado } from "@/components/busca/PainelFiltros";
 import Compartilhar from "@/components/ficha/Compartilhar";
 import GraficoPreco from "@/components/ficha/GraficoPreco";
 import Mapa from "@/components/Mapa";
 import { acesso } from "@/lib/acesso";
+import { alertaDoImovel } from "@/lib/alertas/consultas";
 import { imovel, parecidos, type Lote } from "@/lib/consultas";
 import { area, MODALIDADES, porcento, quando, reais, TIPOS } from "@/lib/formato";
 
@@ -119,10 +121,13 @@ function condicoes(ocupacao: string, debitos: string, fgts: boolean | null, fin:
 }
 
 export default async function PaginaImovel({ params }: { params: Promise<{ id: string }> }) {
-  const [d, { assinante }] = await Promise.all([carregar(params), acesso()]);
+  const [d, { assinante, usuario }] = await Promise.all([carregar(params), acesso()]);
   if (!d) notFound();
   const { imovel: im, lotes, historico } = d;
-  const vizinhos = await parecidos(im.id);
+  const [vizinhos, alertaExistente] = await Promise.all([
+    parecidos(im.id),
+    assinante && usuario ? alertaDoImovel(usuario.id, im.id) : Promise.resolve(null),
+  ]);
 
   const ativos = lotes.filter((l) => l.status === "ativo" || l.status === "suspenso");
   const base = ativos.length ? ativos : lotes;
@@ -345,7 +350,7 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
               {assinante ? (
                 <>
                   {melhor?.url && <a className="botao" href={`/ir/${melhor.id}`} target="_blank" rel="noopener">Ir ao site do leiloeiro ↗</a>}
-                  <button type="button" className="botao secundario" disabled title="Os alertas chegam numa próxima etapa">{textoAlerta}</button>
+                  <BotaoAlerta imovelId={im.id} ativoInicial={alertaExistente?.ativo ?? false} textoCriar={textoAlerta} />
                 </>
               ) : (
                 <>

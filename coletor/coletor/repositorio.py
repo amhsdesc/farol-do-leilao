@@ -120,7 +120,7 @@ class Repositorio:
             if pode_remover:
                 cur.execute(
                     """
-                    select id, hash_conteudo from lote
+                    select id, hash_conteudo, imovel_id from lote
                     where fonte_id = %s and status in ('ativo','suspenso') and not (id = any(%s))
                     """,
                     (fonte_id, list(c.vistos)),
@@ -133,6 +133,18 @@ class Repositorio:
                         (r["id"], execucao_id, r["hash_conteudo"]),
                     )
                     c.removidos += 1
+                    # só avisa "imóvel indisponível" se não sobrou nenhum outro lote ativo dessa ficha
+                    if r["imovel_id"] is not None:
+                        cur.execute(
+                            "select 1 from lote where imovel_id = %s and status in ('ativo','suspenso') limit 1",
+                            (r["imovel_id"],),
+                        )
+                        if cur.fetchone() is None and self._tem_alerta_ativo(cur, r["imovel_id"]):
+                            cur.execute(
+                                """insert into evento_alerta (imovel_id, lote_id, tipo, valor_anterior, valor_novo)
+                                   values (%s, %s, 'indisponivel', 'ativo', 'removido')""",
+                                (r["imovel_id"], r["id"]),
+                            )
             cur.execute(
                 """
                 update execucao_coleta set finalizada_em = now(), status = %s, lotes_lidos = %s,
@@ -191,13 +203,47 @@ class Repositorio:
 
     # ------------------------------------------------------------ lote
 
+    def _tem_alerta_ativo(self, cur, imovel_id: int) -> bool:
+        cur.execute(
+            "select 1 from alerta where imovel_id = %s and tipo = 'imovel' and ativo = true limit 1",
+            (imovel_id,),
+        )
+        return cur.fetchone() is not None
+
+    def _registrar_eventos_alerta(self, cur, imovel_id: int, lote_id: int, atual: dict, lote: Lote) -> None:
+        """Compara os valores antigos x novos do lote e enfileira eventos para quem tem alerta desse imóvel.
+        Não apaga nem sobrescreve: cada mudança vira uma linha nova em evento_alerta."""
+        if not self._tem_alerta_ativo(cur, imovel_id):
+            return
+        eventos: list[tuple[str, Any, Any]] = []
+        if atual["lance_minimo"] != lote.lance_minimo:
+            eventos.append(("preco", atual["lance_minimo"], lote.lance_minimo))
+        if atual["data_praca1"] != lote.data_praca1 or atual["data_praca2"] != lote.data_praca2:
+            anterior = atual["data_praca1"] or atual["data_praca2"]
+            novo = lote.data_praca1 or lote.data_praca2
+            if anterior != novo:
+                eventos.append(("data", anterior, novo))
+        if atual["status"] != lote.status and lote.status == "suspenso":
+            eventos.append(("suspenso", atual["status"], lote.status))
+        for tipo, anterior, novo in eventos:
+            cur.execute(
+                """insert into evento_alerta (imovel_id, lote_id, tipo, valor_anterior, valor_novo)
+                   values (%s, %s, %s, %s, %s)""",
+                (
+                    imovel_id, lote_id, tipo,
+                    str(anterior) if anterior is not None else None,
+                    str(novo) if novo is not None else None,
+                ),
+            )
+
     def gravar(self, fonte_id: str, lote: Lote, execucao_id: int, c: Contadores) -> str:
         """Insere ou atualiza o lote. Grava leitura só quando algo mudou. Devolve o evento."""
         h = hash_lote(lote)
         snap = snapshot(lote)
         with self.conn.cursor() as cur:
             cur.execute(
-                "select id, hash_conteudo, status, imovel_id from lote where fonte_id = %s and id_externo = %s",
+                """select id, hash_conteudo, status, imovel_id, lance_minimo, data_praca1, data_praca2
+                   from lote where fonte_id = %s and id_externo = %s""",
                 (fonte_id, lote.id_externo),
             )
             atual = cur.fetchone()
@@ -231,6 +277,8 @@ class Repositorio:
                     c.iguais += 1
                 else:
                     c.alterados += 1
+                if evento != "igual":
+                    self._registrar_eventos_alerta(cur, imovel_id, lote_id, atual, lote)
 
             if evento != "igual":
                 cur.execute(

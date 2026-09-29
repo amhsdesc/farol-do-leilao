@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import LinhaAlertaBusca from "@/components/alertas/LinhaAlertaBusca";
+import LinhaAlertaImovel from "@/components/alertas/LinhaAlertaImovel";
 import Travado from "@/components/Travado";
 import { acesso } from "@/lib/acesso";
+import { meusAlertas } from "@/lib/alertas/consultas";
 
 export const metadata: Metadata = { title: "Meus alertas" };
 export const dynamic = "force-dynamic";
 
 export default async function Alertas() {
-  const { assinante } = await acesso();
-  if (!assinante) {
+  const { assinante, usuario } = await acesso();
+  if (!assinante || !usuario) {
     return (
       <Travado
         titulo="Não perca o dia do leilão"
@@ -21,12 +25,47 @@ export default async function Alertas() {
       />
     );
   }
+
+  const alertas = await meusAlertas(usuario.id);
+  const doImovel = alertas.filter((a) => a.tipo === "imovel");
+  const deBusca = alertas.filter((a) => a.tipo === "busca");
+
   return (
-    <main className="pagina estreita">
-      <div className="painel">
-        <h1>Meus alertas</h1>
-        <p>Os alertas chegam numa próxima etapa.</p>
-      </div>
+    <main className="pagina estreita alertas-pagina">
+      <header className="calc-topo">
+        <h1 className="titulo-pagina">Meus alertas</h1>
+        <p className="texto">
+          Por e-mail e WhatsApp, por enquanto (Telegram chega numa próxima etapa). Ative ou pause quando quiser.
+        </p>
+      </header>
+
+      {!alertas.length && (
+        <div className="painel vazio-calc">
+          <h2>Nenhum alerta ainda</h2>
+          <p>
+            Abra um imóvel e clique em <b>&quot;Me avise antes do leilão&quot;</b>, ou salve uma busca no{" "}
+            <Link href="/">mapa</Link> para ser avisado de imóveis novos.
+          </p>
+        </div>
+      )}
+
+      {doImovel.length > 0 && (
+        <section className="painel lista-alertas">
+          <h2>Imóveis ({doImovel.length})</h2>
+          <ul>
+            {doImovel.map((a) => <LinhaAlertaImovel key={a.id} a={a} />)}
+          </ul>
+        </section>
+      )}
+
+      {deBusca.length > 0 && (
+        <section className="painel lista-alertas">
+          <h2>Buscas salvas ({deBusca.length})</h2>
+          <ul>
+            {deBusca.map((a) => <LinhaAlertaBusca key={a.id} a={a} />)}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }
