@@ -6,7 +6,8 @@
 // evento de verdade).
 import { consulta } from "../db.ts";
 import { enviarAlertaWhatsapp, whatsappConfigurado } from "../conta/whatsapp.ts";
-import { mensagemEvento, mensagemLembrete, type ImovelResumo, type TipoLembrete } from "./mensagens.ts";
+import { montarWhere, rotuloFiltros, type Filtros } from "../busca/filtros.ts";
+import { mensagemEvento, mensagemLembrete, mensagemNovoImovel, type ImovelResumo, type TipoLembrete } from "./mensagens.ts";
 import { enviarEmail, resendConfigurado } from "./resend.ts";
 
 function siteUrl(): string {
@@ -145,8 +146,45 @@ export async function processarLembretes(): Promise<ResultadoEnvio> {
   return r;
 }
 
-export async function processarNotificacoes(): Promise<{ eventos: ResultadoEnvio; lembretes: ResultadoEnvio }> {
+const LIMITE_NOVOS_POR_BUSCA = 5;
+
+/** Buscas salvas: acha imóvel novo (visto pela 1ª vez depois que o alerta foi criado) que bate com os
+ * filtros, reaproveitando montarWhere — a mesma lógica da busca na página inicial. Não repete o mesmo
+ * imóvel graças à chave única em notificacao_enviada (alerta_id, imovel_id, 'novo_imovel', canal). */
+export async function processarBuscasSalvas(): Promise<ResultadoEnvio> {
+  const r: ResultadoEnvio = { enviados: 0, ignorados: 0, falhas: 0 };
+  const buscas = await consulta<{
+    alerta_id: number; filtros: Filtros; nome: string | null; criado_em: string;
+    canal_email: boolean; canal_whatsapp: boolean; email: string | null; telefone: string | null;
+  }>(
+    `select a.id as alerta_id, a.filtros, a.nome, a.criado_em, a.canal_email, a.canal_whatsapp, u.email, u.telefone
+     from alerta a join users u on u.id = a.usuario_id
+     where a.tipo = 'busca' and a.ativo = true`,
+  );
+
+  for (const b of buscas) {
+    const { where, params } = montarWhere(b.filtros, false);
+    const desde = `primeiro_visto_em > $${params.length + 1}`;
+    const cond = where ? `${where} and ${desde}` : `where ${desde}`;
+    const novos = await consulta<ImovelResumo & { imovel_id: number }>(
+      `select imovel_id, tipo, uf, cidade, bairro, lance_minimo as "lanceMinimo", data_leilao as "dataLeilao"
+       from vw_busca ${cond} order by primeiro_visto_em desc limit ${LIMITE_NOVOS_POR_BUSCA}`,
+      [...params, b.criado_em],
+    );
+    if (novos.length === 0) continue;
+    const rotulo = b.nome || rotuloFiltros(b.filtros);
+    const d: Destinatario = { alerta_id: b.alerta_id, canal_email: b.canal_email, canal_whatsapp: b.canal_whatsapp, email: b.email, telefone: b.telefone };
+    for (const imv of novos) {
+      const msg = mensagemNovoImovel(imv.imovel_id, imv, rotulo, siteUrl());
+      await mandarParaDestinatario(d, imv.imovel_id, "novo_imovel", msg, r);
+    }
+  }
+  return r;
+}
+
+export async function processarNotificacoes(): Promise<{ eventos: ResultadoEnvio; lembretes: ResultadoEnvio; buscas: ResultadoEnvio }> {
   const eventos = await processarEventosAlerta();
   const lembretes = await processarLembretes();
-  return { eventos, lembretes };
+  const buscas = await processarBuscasSalvas();
+  return { eventos, lembretes, buscas };
 }

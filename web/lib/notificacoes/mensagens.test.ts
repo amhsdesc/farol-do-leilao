@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mensagemEvento, mensagemLembrete, tituloImovel } from "./mensagens.ts";
+import { mensagemEvento, mensagemLembrete, mensagemNovoImovel, tituloImovel } from "./mensagens.ts";
 
 const IMOVEL = { tipo: "apartamento", cidade: "Brasilia", uf: "DF", bairro: "Asa Norte", lanceMinimo: 300000, dataLeilao: "2026-10-29T10:00:00-03:00" };
 
@@ -29,6 +29,12 @@ test("mensagemEvento data", () => {
 test("mensagemEvento suspenso e indisponivel", () => {
   assert.match(mensagemEvento("suspenso", 7, IMOVEL, null, null, "https://exemplo.com").assunto, /suspenso/);
   assert.match(mensagemEvento("indisponivel", 7, IMOVEL, null, null, "https://exemplo.com").assunto, /não está mais disponível/);
+});
+
+test("mensagemNovoImovel cita o rótulo da busca salva", () => {
+  const m = mensagemNovoImovel(7, IMOVEL, "GO, Apartamento", "https://exemplo.com");
+  assert.match(m.assunto, /GO, Apartamento/);
+  assert.match(m.texto, /https:\/\/exemplo\.com\/imovel\/7/);
 });
 
 test("mensagemLembrete usa o rótulo certo por faixa", () => {

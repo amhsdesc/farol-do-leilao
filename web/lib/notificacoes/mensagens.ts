@@ -71,6 +71,18 @@ const ROTULO_LEMBRETE: Record<TipoLembrete, string> = {
   lembrete_1h: "daqui a pouco",
 };
 
+/** Imóvel novo que bateu com uma busca salva. */
+export function mensagemNovoImovel(imovelId: number, i: ImovelResumo, rotuloBusca: string, siteUrl: string): Mensagem {
+  const titulo = tituloImovel(i);
+  const url = link(siteUrl, imovelId);
+  return {
+    assunto: `Novo imóvel em "${rotuloBusca}": ${titulo}`,
+    texto:
+      `Apareceu um imóvel novo que bate com a sua busca salva "${rotuloBusca}": ${titulo}, lance mínimo ${reais(i.lanceMinimo)}.` +
+      `\n\nVeja a ficha: ${url}`,
+  };
+}
+
 /** Lembrete antes do leilão (7 dias, 1 dia ou 1 hora antes). */
 export function mensagemLembrete(tipo: TipoLembrete, imovelId: number, i: ImovelResumo, siteUrl: string): Mensagem {
   const titulo = tituloImovel(i);

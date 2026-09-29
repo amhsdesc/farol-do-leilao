@@ -4,11 +4,10 @@ import { processarNotificacoes } from "./motor.ts";
 import { pool } from "../db.ts";
 
 processarNotificacoes()
-  .then(({ eventos, lembretes }) => {
-    console.log(
-      `eventos: ${eventos.enviados} enviados, ${eventos.ignorados} ignorados, ${eventos.falhas} falhas | ` +
-        `lembretes: ${lembretes.enviados} enviados, ${lembretes.ignorados} ignorados, ${lembretes.falhas} falhas`,
-    );
+  .then(({ eventos, lembretes, buscas }) => {
+    const linha = (nome: string, r: { enviados: number; ignorados: number; falhas: number }) =>
+      `${nome}: ${r.enviados} enviados, ${r.ignorados} ignorados, ${r.falhas} falhas`;
+    console.log([linha("eventos", eventos), linha("lembretes", lembretes), linha("buscas salvas", buscas)].join(" | "));
   })
   .catch((e) => {
     console.error("notificacoes: erro", e);
