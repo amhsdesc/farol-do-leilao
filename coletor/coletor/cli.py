@@ -130,7 +130,7 @@ def cmd_catalogo(a):
     elif acao == "verificar":
         with Cliente(intervalo=1) as cli:
             feitos = cat.verificar_sites(leiloeiros, cli, limite=a.limite, todos=a.todos, falsos=falsos,
-                                          paralelo=a.paralelo)
+                                          paralelo=a.paralelo, reforcar=a.reforcar)
         cat.gravar(cat.ARQ_LEILOEIROS, leiloeiros, cat.COL_LEILOEIROS)
         for id_, v in feitos:
             print(f"  {id_:<32} {'no ar' if v.no_ar else 'FORA DO AR':<10} imóveis: {v.faz_imoveis:<11} "
@@ -211,6 +211,8 @@ def main(argv: list[str] | None = None) -> None:
     x.add_argument("--limite", type=int, default=200)
     x.add_argument("--todos", action="store_true", help="reverifica também os já verificados")
     x.add_argument("--paralelo", type=int, default=12, help="quantos sites verificar ao mesmo tempo")
+    x.add_argument("--reforcar", action="store_true",
+                    help="segunda passada: só quem não confirmou site_no_ar=sim, com navegador headless de reforço")
     x = cs.add_parser("criar-fontes", help="cria YAML para leiloeiros que fazem imóveis e ainda não têm fonte")
     x.add_argument("--incluir-pendentes", action="store_true", help="inclui os ainda não validados em lista oficial")
     s.set_defaults(f=cmd_catalogo, acao="cobertura")
