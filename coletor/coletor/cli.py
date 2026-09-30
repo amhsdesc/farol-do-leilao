@@ -129,7 +129,8 @@ def cmd_catalogo(a):
         print(f"{len(novos - falsos)} domínio(s) adicionados à lista de sites falsos; {len(marcados)} leiloeiro(s) marcados como suspeitos.")
     elif acao == "verificar":
         with Cliente(intervalo=1) as cli:
-            feitos = cat.verificar_sites(leiloeiros, cli, limite=a.limite, todos=a.todos, falsos=falsos)
+            feitos = cat.verificar_sites(leiloeiros, cli, limite=a.limite, todos=a.todos, falsos=falsos,
+                                          paralelo=a.paralelo)
         cat.gravar(cat.ARQ_LEILOEIROS, leiloeiros, cat.COL_LEILOEIROS)
         for id_, v in feitos:
             print(f"  {id_:<32} {'no ar' if v.no_ar else 'FORA DO AR':<10} imóveis: {v.faz_imoveis:<11} "
@@ -207,8 +208,9 @@ def main(argv: list[str] | None = None) -> None:
     x.add_argument("arquivo")
     x.add_argument("--fonte", help="de onde veio a lista (ex.: FENALEI)")
     x = cs.add_parser("verificar", help="abre o site de cada leiloeiro: no ar? faz imóveis? plataforma?")
-    x.add_argument("--limite", type=int, default=50)
+    x.add_argument("--limite", type=int, default=200)
     x.add_argument("--todos", action="store_true", help="reverifica também os já verificados")
+    x.add_argument("--paralelo", type=int, default=12, help="quantos sites verificar ao mesmo tempo")
     x = cs.add_parser("criar-fontes", help="cria YAML para leiloeiros que fazem imóveis e ainda não têm fonte")
     x.add_argument("--incluir-pendentes", action="store_true", help="inclui os ainda não validados em lista oficial")
     s.set_defaults(f=cmd_catalogo, acao="cobertura")
