@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date
 from difflib import SequenceMatcher
