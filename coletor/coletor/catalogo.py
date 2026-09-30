@@ -266,13 +266,20 @@ def analisar_html(html: str) -> Verificacao:
 
 
 def verificar_sites(linhas: list[dict[str, str]], cliente, limite: int = 50, todos: bool = False,
-                    falsos: set[str] | None = None, paralelo: int = 12) -> list[tuple[str, Verificacao]]:
+                    falsos: set[str] | None = None, paralelo: int = 12,
+                    reforcar: bool = False) -> list[tuple[str, Verificacao]]:
     """Abre a página inicial de cada leiloeiro: está no ar? trabalha com imóveis? qual plataforma?
 
     As checagens rodam em paralelo (um domínio nunca serializa outro): o `Cliente` já garante o
     intervalo mínimo por domínio e o robots.txt por fora, então paralelizar aqui só acelera os casos
     (a imensa maioria) em que cada leiloeiro está num domínio diferente. `paralelo` é o número de
     requisições simultâneas; `limite` continua sendo o total de leiloeiros verificados nesta chamada.
+
+    `reforcar=True` é uma segunda passada: em vez de olhar `verificado_em`, pega só quem ainda não
+    confirmou `site_no_ar == "sim"` (ou seja, quem falhou ou nunca foi verificado) e, se a requisição
+    HTTP simples falhar, tenta de novo com um navegador headless (via `cliente.html_navegador`) antes
+    de desistir — muito "fora do ar" é na verdade bloqueio de bot ou site que só monta o conteúdo em
+    JavaScript, não o site estar realmente fora do ar.
     """
     falsos = falsos or set()
     hoje = date.today().isoformat()
@@ -283,7 +290,10 @@ def verificar_sites(linhas: list[dict[str, str]], cliente, limite: int = 50, tod
             break
         if not l["site"] or l["status_validacao"] == "suspeito":
             continue
-        if not todos and l["verificado_em"]:
+        if reforcar:
+            if l["site_no_ar"] == "sim":
+                continue
+        elif not todos and l["verificado_em"]:
             continue
         if dominio(l["site"]) in falsos:
             l["status_validacao"] = "suspeito"
@@ -302,6 +312,21 @@ def verificar_sites(linhas: list[dict[str, str]], cliente, limite: int = 50, tod
             futuros = {executor.submit(verificar_uma, l): l["id"] for l in candidatas}
             for futuro in as_completed(futuros):
                 resultados[futuros[futuro]] = futuro.result()
+
+    # Segunda chance com navegador: só para quem falhou na requisição simples, um de cada vez
+    # (a API síncrona do Playwright não é segura para chamar de várias threads ao mesmo tempo).
+    if reforcar and hasattr(cliente, "html_navegador"):
+        for l in candidatas:
+            v = resultados[l["id"]]
+            if v.no_ar:
+                continue
+            try:
+                html = cliente.html_navegador(l["site"], timeout_ms=20000)
+                v2 = analisar_html(html)
+                v2.detalhe = f"via navegador: {v2.detalhe}"
+                resultados[l["id"]] = v2
+            except Exception as e2:
+                v.detalhe = f"{v.detalhe}; navegador: {type(e2).__name__}"
 
     feitos = []
     for l in candidatas:
