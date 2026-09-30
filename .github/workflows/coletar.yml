@@ -27,24 +27,9 @@ jobs:
       - run: pip install -e ".[navegador,listas]"
       - run: python -m coletor migrar
 
-  caixa:
-    needs: migrar
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: coletor
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -e ".[navegador,listas]"
-      - run: python -m coletor coletar caixa
-
   # Cria o YAML de fonte para todo leiloeiro validado do catálogo (catalogo/leiloeiros.csv) que ainda
-  # não tem um. Não precisa de banco. Roda antes de "preparar-matriz" pra garantir que a lista de fontes
-  # já inclua quem acabou de ser validado (ex.: pelo verificar-catalogo.yml).
+  # não tem um. Não precisa de banco. Roda antes de "preparar" pra garantir que a lista de fontes já
+  # inclua quem acabou de ser validado (ex.: pelo verificar-catalogo.yml).
   gerar-fontes:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -74,15 +59,17 @@ jobs:
             git push
           fi
 
-  # Monta a lista de grupos pra coleta paralela na hora, lendo quantos arquivos existem em fontes/
-  # (em vez de manter uma lista fixa aqui). Uma fonte nova = um arquivo novo em fontes/; nunca precisa
-  # editar este workflow por causa disso.
-  preparar-matriz:
+  # Monta os grupos de coleta paralela na hora, lendo quantos arquivos existem em fontes/ (em vez de
+  # manter listas fixas aqui). Uma fonte nova = um arquivo novo em fontes/; nunca precisa editar este
+  # workflow por causa disso. A Caixa vira um grupo por UF (27, rápidas, sem navegador) e os leiloeiros/
+  # bancos viram grupos de 3 (mais lentos, IA e às vezes navegador).
+  preparar:
     needs: gerar-fontes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      matriz: ${{ steps.grupos.outputs.matriz }}
+      matriz_caixa: ${{ steps.grupos.outputs.matriz_caixa }}
+      matriz_leiloeiros: ${{ steps.grupos.outputs.matriz_leiloeiros }}
     defaults:
       run:
         working-directory: coletor
@@ -93,32 +80,60 @@ jobs:
           python3 <<'PY'
           import glob, json, os
 
-          TAM = 3  # fontes por grupo/job; menor = mais paralelismo, mais jobs
-          ids = sorted(
-              os.path.splitext(os.path.basename(f))[0]
-              for pasta in ("fontes/leiloeiros", "fontes/bancos")
-              for f in glob.glob(f"{pasta}/*.yaml")
-              if not os.path.basename(f).startswith("_")
-          )
-          grupos = [
-              {"nome": f"grupo{i // TAM + 1}", "fontes": " ".join(ids[i:i + TAM])}
-              for i in range(0, len(ids), TAM)
-          ]
+          def grupos_de(ids, tamanho):
+              ids = sorted(ids)
+              return [
+                  {"nome": f"grupo{i // tamanho + 1}", "fontes": " ".join(ids[i:i + tamanho])}
+                  for i in range(0, len(ids), tamanho)
+              ]
+
+          def ids_em(pasta):
+              return [
+                  os.path.splitext(os.path.basename(f))[0]
+                  for f in glob.glob(f"{pasta}/*.yaml")
+                  if not os.path.basename(f).startswith("_")
+              ]
+
+          caixa = grupos_de(ids_em("fontes/caixa"), 1)
+          leiloeiros = grupos_de(ids_em("fontes/leiloeiros") + ids_em("fontes/bancos"), 3)
+
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"matriz={json.dumps(grupos)}\n")
-          print(f"{len(ids)} fontes em {len(grupos)} grupos de até {TAM}.")
+              f.write(f"matriz_caixa={json.dumps(caixa)}\n")
+              f.write(f"matriz_leiloeiros={json.dumps(leiloeiros)}\n")
+          print(f"caixa: {len(caixa)} grupos. leiloeiros/bancos: {len(leiloeiros)} grupos.")
           PY
+
+  # Uma UF por job: csv_caixa só usa httpx (dependência base), sem navegador, então cada grupo sobe rápido.
+  caixa:
+    needs: [migrar, preparar]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        grupo: ${{ fromJson(needs.preparar.outputs.matriz_caixa) }}
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Coletar ${{ matrix.grupo.nome }}
+        run: python -m coletor coletar ${{ matrix.grupo.fontes }}
 
   # As fontes "automatico" (IA lê cada site) e as de banco rodam em paralelo, um grupo pequeno por
   # máquina, pra terminar o mais rápido possível dentro do limite de jobs simultâneos do GitHub.
   leiloeiros:
-    needs: [migrar, preparar-matriz]
+    needs: [migrar, preparar]
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
-        grupo: ${{ fromJson(needs.preparar-matriz.outputs.matriz) }}
+        grupo: ${{ fromJson(needs.preparar.outputs.matriz_leiloeiros) }}
     defaults:
       run:
         working-directory: coletor
