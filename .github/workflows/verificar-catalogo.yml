@@ -1,0 +1,49 @@
+name: Verificar catálogo de leiloeiros
+
+# Roda só quando você mandar (botão "Run workflow"). Abre o site de cada leiloeiro do catalogo/leiloeiros.csv
+# que ainda não foi verificado, olha se está no ar e se vende imóveis, e salva o resultado de volta no arquivo
+# (commit automático). Não mexe no banco de dados, só no catálogo (arquivo CSV do repositório).
+on:
+  workflow_dispatch:
+    inputs:
+      limite:
+        description: "Quantos leiloeiros verificar nesta rodada"
+        default: "900"
+      todos:
+        description: "Reverificar também os que já foram verificados antes?"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Verificar sites
+        run: >
+          python -m coletor catalogo verificar
+          --limite ${{ inputs.limite }}
+          ${{ inputs.todos == 'true' && '--todos' || '' }}
+      - name: Salvar resultado no catálogo
+        run: |
+          cd ..
+          git config user.name "farol-bot"
+          git config user.email "bot@faroldoleilao.com.br"
+          git add coletor/catalogo/leiloeiros.csv
+          if git diff --cached --quiet; then
+            echo "Nada mudou no catálogo."
+          else
+            git commit -m "Verificação automática do catálogo de leiloeiros"
+            git push
+          fi
