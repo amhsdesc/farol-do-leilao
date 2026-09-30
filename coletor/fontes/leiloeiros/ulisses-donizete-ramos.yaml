@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: ulisses-donizete-ramos
+nome: Ulisses Donizete Ramos
+site: https://donizetteleiloes.leilao.br
+tipo: automatico
+uf: [GO, MG, MT, PR, SC]
+inicio:
+  - https://donizetteleiloes.leilao.br
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false

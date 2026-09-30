@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: dora-plat
+nome: Dora Plat
+site: https://www.zukerman.com.br
+tipo: automatico
+uf: [BA, ES, GO, MA, MS, PI, PR, RJ, RO, SC, SP]
+inicio:
+  - https://www.zukerman.com.br
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false

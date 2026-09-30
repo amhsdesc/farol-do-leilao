@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: jose-antonio-rodovalho-junior
+nome: José Antônio Rodovalho Junior
+site: https://www.leiloesjudiciaismgnorte.com.br
+tipo: automatico
+uf: [MG, MT, PA, PE]
+inicio:
+  - https://www.leiloesjudiciaismgnorte.com.br
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false

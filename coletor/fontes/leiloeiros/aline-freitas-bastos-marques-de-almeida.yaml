@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: aline-freitas-bastos-marques-de-almeida
+nome: Aline Freitas Bastos Marques De Almeida
+site: https://WWW.ALINEMARQUESLEILOEIRA.LEL.BR
+tipo: automatico
+uf: [RJ]
+inicio:
+  - https://WWW.ALINEMARQUESLEILOEIRA.LEL.BR
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false

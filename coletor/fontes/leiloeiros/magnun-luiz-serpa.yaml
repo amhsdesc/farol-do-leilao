@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: magnun-luiz-serpa
+nome: Magnun Luiz Serpa
+site: https://www.serpaleiloes.com.br
+tipo: automatico
+uf: [GO, MG, SC]
+inicio:
+  - https://www.serpaleiloes.com.br
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false
