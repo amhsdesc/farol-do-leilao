@@ -27,10 +27,11 @@ jobs:
       - run: pip install -e ".[navegador,listas]"
       - run: python -m coletor migrar
 
-  caixa:
-    needs: migrar
+  gerar-fontes:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: coletor
@@ -39,47 +40,90 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e ".[navegador,listas]"
-      - run: python -m coletor coletar caixa
+      - run: pip install -e .
+      - run: python -m coletor catalogo criar-fontes --incluir-pendentes
+      - name: Salvar fontes novas
+        run: |
+          cd ..
+          git config user.name "farol-bot"
+          git config user.email "bot@faroldoleilao.com.br"
+          git add coletor/fontes coletor/catalogo/leiloeiros.csv
+          if git diff --cached --quiet; then
+            echo "Nenhuma fonte nova."
+          else
+            git commit -m "Gera fontes para leiloeiros validados"
+            git pull --rebase
+            git push
+          fi
 
-  # Descobre sozinho todas as fontes de bancos/órgãos e de leiloeiros (um YAML = uma fonte,
-  # em coletor/fontes/bancos/ e coletor/fontes/leiloeiros/) e reparte em grupos paralelos de
-  # 5, cada um em sua própria máquina. Não precisa mais editar esta lista à mão quando uma
-  # fonte nova aparece (ex.: via `catalogo criar-fontes`) — ela entra sozinha na próxima rodada.
-  listar:
-    needs: migrar
+  preparar:
+    needs: gerar-fontes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      matrix: ${{ steps.montar.outputs.matrix }}
+      matriz_caixa: ${{ steps.grupos.outputs.matriz_caixa }}
+      matriz_leiloeiros: ${{ steps.grupos.outputs.matriz_leiloeiros }}
+    defaults:
+      run:
+        working-directory: coletor
     steps:
       - uses: actions/checkout@v4
-      - id: montar
-        working-directory: coletor/fontes
+      - id: grupos
         run: |
-          python3 << 'EOF' >> "$GITHUB_OUTPUT"
+          python3 <<'PY'
           import glob, json, os
 
-          arquivos = sorted(glob.glob("bancos/*.yaml") + glob.glob("leiloeiros/*.yaml"))
-          ids = [os.path.splitext(os.path.basename(a))[0] for a in arquivos]
+          def grupos_de(ids, tamanho):
+              ids = sorted(ids)
+              return [
+                  {"nome": f"grupo{i // tamanho + 1}", "fontes": " ".join(ids[i:i + tamanho])}
+                  for i in range(0, len(ids), tamanho)
+              ]
 
-          tamanho = 5
-          grupos = [
-              {"nome": f"grupo{i // tamanho + 1}", "fontes": " ".join(ids[i:i + tamanho])}
-              for i in range(0, len(ids), tamanho)
-          ]
+          def ids_em(pasta):
+              return [
+                  os.path.splitext(os.path.basename(f))[0]
+                  for f in glob.glob(f"{pasta}/*.yaml")
+                  if not os.path.basename(f).startswith("_")
+              ]
 
-          print("matrix=" + json.dumps(grupos))
-          EOF
+          caixa = grupos_de(ids_em("fontes/caixa"), 1)
+          leiloeiros = grupos_de(ids_em("fontes/leiloeiros") + ids_em("fontes/bancos"), 3)
 
-  leiloeiros:
-    needs: listar
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"matriz_caixa={json.dumps(caixa)}\n")
+              f.write(f"matriz_leiloeiros={json.dumps(leiloeiros)}\n")
+          print(f"caixa: {len(caixa)} grupos. leiloeiros/bancos: {len(leiloeiros)} grupos.")
+          PY
+
+  caixa:
+    needs: [migrar, preparar]
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        grupo: ${{ fromJson(needs.listar.outputs.matrix) }}
+        grupo: ${{ fromJson(needs.preparar.outputs.matriz_caixa) }}
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Coletar ${{ matrix.grupo.nome }}
+        run: python -m coletor coletar ${{ matrix.grupo.fontes }}
+
+  leiloeiros:
+    needs: [migrar, preparar]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        grupo: ${{ fromJson(needs.preparar.outputs.matriz_leiloeiros) }}
     defaults:
       run:
         working-directory: coletor
