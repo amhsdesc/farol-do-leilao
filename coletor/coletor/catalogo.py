@@ -266,13 +266,20 @@ def analisar_html(html: str) -> Verificacao:
 
 
 def verificar_sites(linhas: list[dict[str, str]], cliente, limite: int = 50, todos: bool = False,
-                    falsos: set[str] | None = None) -> list[tuple[str, Verificacao]]:
-    """Abre a página inicial de cada leiloeiro: está no ar? trabalha com imóveis? qual plataforma?"""
+                    falsos: set[str] | None = None, paralelo: int = 12) -> list[tuple[str, Verificacao]]:
+    """Abre a página inicial de cada leiloeiro: está no ar? trabalha com imóveis? qual plataforma?
+
+    As checagens rodam em paralelo (um domínio nunca serializa outro): o `Cliente` já garante o
+    intervalo mínimo por domínio e o robots.txt por fora, então paralelizar aqui só acelera os casos
+    (a imensa maioria) em que cada leiloeiro está num domínio diferente. `paralelo` é o número de
+    requisições simultâneas; `limite` continua sendo o total de leiloeiros verificados nesta chamada.
+    """
     falsos = falsos or set()
     hoje = date.today().isoformat()
-    feitos = []
+
+    candidatas: list[dict[str, str]] = []
     for l in linhas:
-        if len(feitos) >= limite:
+        if len(candidatas) >= limite:
             break
         if not l["site"] or l["status_validacao"] == "suspeito":
             continue
@@ -281,10 +288,24 @@ def verificar_sites(linhas: list[dict[str, str]], cliente, limite: int = 50, tod
         if dominio(l["site"]) in falsos:
             l["status_validacao"] = "suspeito"
             continue
+        candidatas.append(l)
+
+    def verificar_uma(l: dict[str, str]) -> Verificacao:
         try:
-            v = analisar_html(cliente.get(l["site"]).text)
+            return analisar_html(cliente.get(l["site"]).text)
         except Exception as e:
-            v = Verificacao(False, l["faz_imoveis"] or "a_verificar", l["plataforma"], f"erro: {type(e).__name__}")
+            return Verificacao(False, l["faz_imoveis"] or "a_verificar", l["plataforma"], f"erro: {type(e).__name__}")
+
+    resultados: dict[str, Verificacao] = {}
+    if candidatas:
+        with ThreadPoolExecutor(max_workers=max(1, paralelo)) as executor:
+            futuros = {executor.submit(verificar_uma, l): l["id"] for l in candidatas}
+            for futuro in as_completed(futuros):
+                resultados[futuros[futuro]] = futuro.result()
+
+    feitos = []
+    for l in candidatas:
+        v = resultados[l["id"]]
         l["site_no_ar"] = "sim" if v.no_ar else "nao"
         if v.no_ar:
             # 'sim' manual não é rebaixado pela heurística; 'nao' só vale se não houver sinal nenhum
