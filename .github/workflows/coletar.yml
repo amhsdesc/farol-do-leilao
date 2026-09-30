@@ -107,7 +107,7 @@ jobs:
   caixa:
     needs: [migrar, preparar]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
