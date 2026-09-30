@@ -12,22 +12,22 @@ junta,JUCESC,SC,https://www.jucesc.sc.gov.br/index.php/informacoes/edital-leiloe
 junta,JUCEB,BA,https://www.ba.gov.br/juceb/home/matriculas-e-carteira-profissional/leiloeiros,html,,
 junta,JUCEES,ES,https://leiloeiros.jucees.es.gov.br/leiloeiros.html,html,,
 junta,JUCETINS,TO,https://www.to.gov.br/jucetins/leiloeiros/152aezl6blm0,html,,
-junta,Junta Comercial – AC,AC,,,,a localizar
-junta,Junta Comercial – AL,AL,,,,a localizar
-junta,Junta Comercial – AP,AP,,,,a localizar
-junta,Junta Comercial – AM,AM,,,,a localizar
-junta,Junta Comercial – CE,CE,,,,a localizar
-junta,Junta Comercial – MA,MA,,,,a localizar
-junta,Junta Comercial – MT,MT,,,,a localizar
-junta,Junta Comercial – MS,MS,,,,a localizar
-junta,Junta Comercial – PA,PA,,,,a localizar
-junta,Junta Comercial – PB,PB,,,,a localizar
-junta,Junta Comercial – PE,PE,,,,a localizar
-junta,Junta Comercial – PI,PI,,,,a localizar
-junta,Junta Comercial – RN,RN,,,,a localizar
-junta,Junta Comercial – RO,RO,,,,a localizar
-junta,Junta Comercial – RR,RR,,,,a localizar
-junta,Junta Comercial – SE,SE,,,,a localizar
+junta,Junta Comercial – AC,AC,http://juceac.acre.gov.br/leiloeiros/,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – AL,AL,http://juceal.al.gov.br/servicos/leiloeiros,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – AP,AP,http://www.jucap.ap.gov.br/leiloeiros,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – AM,AM,http://www.jucea.am.gov.br/leiloeiros/,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – CE,CE,https://www.jucec.ce.gov.br/leiloeiros/,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – MA,MA,http://portal.jucema.ma.gov.br/pagina/11,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – MT,MT,http://www.jucemat.mt.gov.br/leiloeiros,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – MS,MS,http://www.jucems.ms.gov.br/servicos/controles-especiais/leiloeiros,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – PA,PA,https://www.jucepa.pa.gov.br/node/135,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – PB,PB,https://jucep.pb.gov.br/contatos/leiloeiros/leiloeiros,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – PE,PE,https://portal.jucepe.pe.gov.br/leiloeiros,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – PI,PI,https://portal.pi.gov.br/jucepi/leiloeiro-oficial/,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – RN,RN,http://www.jucern.rn.gov.br/Conteudo.asp?TRAN=ITEM&TARG=8695&ACT=&PAGE=0&PARM=&LBL=Leiloeiros,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – RO,RO,https://rondonia.ro.gov.br/jucer/lista-de-leiloeiros-oficiais/,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – RR,RR,https://jucerr.rr.gov.br/servicos/,html,,fonte: FENAJU/federados (2026-09)
+junta,Junta Comercial – SE,SE,https://www.jucese.se.gov.br/index.php/leiloeiros/,html,,fonte: FENAJU/federados (2026-09)
 tribunal,TJRJ – Cadastro de Leiloeiros Públicos,RJ,https://www.tjrj.jus.br/pt/web/cgj/cadastro-de-leiloeiros-publicos,pdf,,
 tribunal,TJSP – Consulta de auxiliares da justiça,SP,https://www.tjsp.jus.br/auxiliaresjustica/auxiliarjustica/consultapublica,html,,gestores de leilão eletrônico credenciados
 tribunal,TJMG – Sistema AJ (leiloeiros credenciados),MG,https://www.tjmg.jus.br/portal-tjmg/informes/sistema-aj-novo-edital-de-credenciamento-de-corretores-e-leiloeiros-publicos.htm,html,,
@@ -37,3 +37,4 @@ tribunal,TRT12 – Leiloeiros,SC,https://portal.trt12.jus.br/corregedoria/leiloe
 tribunal,TRT18 – Leilões,GO,https://www.trt18.jus.br/portal/servicos/leiloes/,html,,
 federacao,FENALEI – diretório de leiloeiros,,https://fenalei.org.br/leiloeiros,html,,conteúdo carregado por JavaScript
 federacao,FENALEI – sites falsos,,https://fenalei.org.br/sites-falsos,html,,usar com: catalogo sites-falsos
+federacao,FENAJU – federados (índice nacional de juntas comerciais),,https://www.fenaju.org.br/federados,html,,lista os links de leiloeiros de cada junta estadual; útil pra reconferir todos de uma vez
