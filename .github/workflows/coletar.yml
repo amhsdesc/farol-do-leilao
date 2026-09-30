@@ -5,19 +5,123 @@ on:
     - cron: "17 */6 * * *" # a cada 6h, minuto fora da hora cheia (menos fila no GitHub)
   workflow_dispatch: {} # botão "Run workflow" pra rodar na hora, quando quiser testar
 
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  CONTATO_EMAIL: ${{ vars.CONTATO_EMAIL }}
+  INTERVALO_MINIMO_SEGUNDOS: "2"
+  RESPEITAR_ROBOTS: "1"
+
 jobs:
-  coletar:
+  migrar:
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: coletor
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      CONTATO_EMAIL: ${{ vars.CONTATO_EMAIL }}
-      INTERVALO_MINIMO_SEGUNDOS: "2"
-      RESPEITAR_ROBOTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[navegador,listas]"
+      - run: python -m coletor migrar
+
+  caixa:
+    needs: migrar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[navegador,listas]"
+      - run: python -m coletor coletar caixa
+
+  # Cria o YAML de fonte para todo leiloeiro validado do catálogo (catalogo/leiloeiros.csv) que ainda
+  # não tem um. Não precisa de banco. Roda antes de "preparar-matriz" pra garantir que a lista de fontes
+  # já inclua quem acabou de ser validado (ex.: pelo verificar-catalogo.yml).
+  gerar-fontes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - run: python -m coletor catalogo criar-fontes --incluir-pendentes
+      - name: Salvar fontes novas
+        run: |
+          cd ..
+          git config user.name "farol-bot"
+          git config user.email "bot@faroldoleilao.com.br"
+          git add coletor/fontes coletor/catalogo/leiloeiros.csv
+          if git diff --cached --quiet; then
+            echo "Nenhuma fonte nova."
+          else
+            git commit -m "Gera fontes para leiloeiros validados"
+            git pull --rebase
+            git push
+          fi
+
+  # Monta a lista de grupos pra coleta paralela na hora, lendo quantos arquivos existem em fontes/
+  # (em vez de manter uma lista fixa aqui). Uma fonte nova = um arquivo novo em fontes/; nunca precisa
+  # editar este workflow por causa disso.
+  preparar-matriz:
+    needs: gerar-fontes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matriz: ${{ steps.grupos.outputs.matriz }}
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - id: grupos
+        run: |
+          python3 <<'PY'
+          import glob, json, os
+
+          TAM = 3  # fontes por grupo/job; menor = mais paralelismo, mais jobs
+          ids = sorted(
+              os.path.splitext(os.path.basename(f))[0]
+              for pasta in ("fontes/leiloeiros", "fontes/bancos")
+              for f in glob.glob(f"{pasta}/*.yaml")
+              if not os.path.basename(f).startswith("_")
+          )
+          grupos = [
+              {"nome": f"grupo{i // TAM + 1}", "fontes": " ".join(ids[i:i + TAM])}
+              for i in range(0, len(ids), TAM)
+          ]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"matriz={json.dumps(grupos)}\n")
+          print(f"{len(ids)} fontes em {len(grupos)} grupos de até {TAM}.")
+          PY
+
+  # As fontes "automatico" (IA lê cada site) e as de banco rodam em paralelo, um grupo pequeno por
+  # máquina, pra terminar o mais rápido possível dentro do limite de jobs simultâneos do GitHub.
+  leiloeiros:
+    needs: [migrar, preparar-matriz]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        grupo: ${{ fromJson(needs.preparar-matriz.outputs.matriz) }}
+    defaults:
+      run:
+        working-directory: coletor
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,6 +129,21 @@ jobs:
           python-version: "3.11"
       - run: pip install -e ".[navegador,listas]"
       - run: playwright install --with-deps chromium
-      - run: python -m coletor migrar
-      - run: python -m coletor coletar --todas
+      - name: Coletar ${{ matrix.grupo.nome }}
+        run: python -m coletor coletar ${{ matrix.grupo.fontes }}
+
+  geocodificar:
+    needs: [caixa, leiloeiros]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[navegador,listas]"
       - run: python -m coletor geocodificar
