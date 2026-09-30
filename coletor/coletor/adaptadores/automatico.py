@@ -133,7 +133,11 @@ class Automatico(Adaptador):
             return None
         with self.conn.cursor() as cur:
             cur.execute("select hash_texto, extraido from pagina_cache where url = %s", (url,))
-            return cur.fetchone()
+            r = cur.fetchone()
+        # fecha a transação de leitura: o que vem a seguir (baixar a página, chamar a IA) pode
+        # demorar, e o Postgres derruba uma conexão parada em transação aberta por muito tempo.
+        self.conn.rollback()
+        return r
 
     def _salvar_cache(self, url: str, h: str, extraido: dict) -> None:
         if not self.conn:
