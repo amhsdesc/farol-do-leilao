@@ -117,7 +117,8 @@ class Cliente:
     def post(self, url: str, **kwargs) -> httpx.Response:
         return self.requisitar("POST", url, **kwargs)
 
-    def html_navegador(self, url: str, esperar_seletor: str | None = None, espera_ms: int = 1500) -> str:
+    def html_navegador(self, url: str, esperar_seletor: str | None = None, espera_ms: int = 1500,
+                       timeout_ms: int = 60000) -> str:
         """Abre a página num Chromium headless (para sites que montam o conteúdo com JavaScript)."""
         if not self._pode(url):
             raise BloqueadoPorRobots(url)
@@ -129,7 +130,7 @@ class Cliente:
         with sync_playwright() as p:
             nav = p.chromium.launch()
             pagina = nav.new_page(user_agent=config.user_agent, locale="pt-BR")
-            pagina.goto(url, wait_until="domcontentloaded", timeout=60000)
+            pagina.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
             if esperar_seletor:
                 pagina.wait_for_selector(esperar_seletor, timeout=20000)
             else:
