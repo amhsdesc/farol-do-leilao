@@ -1,0 +1,11 @@
+# Lista oficial de imóveis da Caixa em RN (leilões SFI, licitação aberta, venda direta e venda online).
+# Uma fonte por UF (em vez de "uf: todas" numa fonte só) pra coletar em paralelo — ver fontes/plataformas/README.md
+# sobre o motivo de dividir; aqui o motivo é velocidade, não modelo de site.
+id: caixa-rn
+nome: Caixa Econômica Federal (RN)
+site: https://venda-imoveis.caixa.gov.br
+tipo: csv_caixa
+comitente: Caixa Econômica Federal
+uf: [RN]
+intervalo_segundos: 3
+salvar_brutos: true
