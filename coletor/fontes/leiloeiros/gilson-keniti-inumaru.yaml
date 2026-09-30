@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-30). Validação: validado por Junta Comercial (fonte oficial).
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: gilson-keniti-inumaru
+nome: Gilson Keniti Inumaru
+site: https://www.gilsonleiloes.com.br
+tipo: automatico
+uf: [SP]
+inicio:
+  - https://www.gilsonleiloes.com.br
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false

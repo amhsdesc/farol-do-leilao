@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-30). Validação: validado por Junta Comercial (fonte oficial).
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: rosimeire-alves-de-oliveira-maia
+nome: Rosimeire Alves de Oliveira Maia
+site: https://www.rosioliveiraleiloes.com.br
+tipo: automatico
+uf: [TO]
+inicio:
+  - https://www.rosioliveiraleiloes.com.br
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false
