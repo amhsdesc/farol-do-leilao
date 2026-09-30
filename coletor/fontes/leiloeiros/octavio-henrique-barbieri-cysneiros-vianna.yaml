@@ -1,0 +1,12 @@
+# Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
+# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+id: octavio-henrique-barbieri-cysneiros-vianna
+nome: Octavio Henrique Barbieri Cysneiros Vianna
+site: https://www.octaviovianna.lel.br
+tipo: automatico
+uf: [RJ]
+inicio:
+  - https://www.octaviovianna.lel.br
+max_paginas_lista: 10
+max_lotes: 200
+navegador: false
