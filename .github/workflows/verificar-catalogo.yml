@@ -35,7 +35,7 @@ jobs:
           python-version: "3.11"
       - run: pip install -e .
       - name: Instalar navegador (só quando "reforcar" está marcado)
-        if: inputs.reforcar == 'true'
+        if: inputs.reforcar
         run: |
           pip install -e .[navegador]
           playwright install --with-deps chromium
@@ -43,8 +43,8 @@ jobs:
         run: >
           python -m coletor catalogo verificar
           --limite ${{ inputs.limite }}
-          ${{ inputs.todos == 'true' && '--todos' || '' }}
-          ${{ inputs.reforcar == 'true' && '--reforcar' || '' }}
+          ${{ inputs.todos && '--todos' || '' }}
+          ${{ inputs.reforcar && '--reforcar' || '' }}
       - name: Salvar resultado no catálogo
         run: |
           cd ..
