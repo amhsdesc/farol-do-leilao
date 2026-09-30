@@ -10,6 +10,7 @@ import Mapa from "@/components/Mapa";
 import { acesso } from "@/lib/acesso";
 import { alertaDoImovel } from "@/lib/alertas/consultas";
 import { imovel, parecidos, type Lote } from "@/lib/consultas";
+import { buscarFotosCaixa, salvarFotosLote } from "@/lib/fotos/caixa";
 import { area, MODALIDADES, porcento, quando, reais, TIPOS } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +53,22 @@ const ANTES_DO_LANCE = [
   { t: "Cadastre-se no leiloeiro com antecedência", d: "A aprovação do cadastro pode levar alguns dias." },
   { t: "Faça a conta e decida seu lance máximo", d: "E não passe dele na hora da disputa." },
 ];
+
+// A lista da Caixa não vem com foto (só a página de detalhe tem); busca aqui, sob demanda, só na
+// primeira visita de um imóvel sem foto, e grava no banco pra valer pra sempre.
+async function completarFotosCaixa(lotes: Lote[]): Promise<void> {
+  const alvos = lotes.filter((l) => l.fonte_id.startsWith("caixa-") && l.url && l.fotos.length === 0);
+  if (!alvos.length) return;
+  await Promise.all(
+    alvos.map(async (l) => {
+      const fotos = await buscarFotosCaixa(l.url!);
+      if (fotos.length) {
+        l.fotos = fotos; // já mostra nesta própria visita, sem esperar recarregar a página
+        await salvarFotosLote(l.id, fotos);
+      }
+    }),
+  );
+}
 
 async function carregar(params: Promise<{ id: string }>) {
   const { id } = await params;
@@ -124,6 +141,7 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
   const [d, { assinante, usuario }] = await Promise.all([carregar(params), acesso()]);
   if (!d) notFound();
   const { imovel: im, lotes, historico } = d;
+  await completarFotosCaixa(lotes);
   const [vizinhos, alertaExistente] = await Promise.all([
     parecidos(im.id),
     assinante && usuario ? alertaDoImovel(usuario.id, im.id) : Promise.resolve(null),
