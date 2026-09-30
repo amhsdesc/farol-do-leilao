@@ -13,6 +13,10 @@ on:
         description: "Reverificar também os que já foram verificados antes?"
         type: boolean
         default: false
+      reforcar:
+        description: "Segunda passada: tentar de novo com navegador quem ainda não confirmou que está no ar"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -30,11 +34,17 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e .
+      - name: Instalar navegador (só quando "reforcar" está marcado)
+        if: inputs.reforcar == 'true'
+        run: |
+          pip install -e .[navegador]
+          playwright install --with-deps chromium
       - name: Verificar sites
         run: >
           python -m coletor catalogo verificar
           --limite ${{ inputs.limite }}
           ${{ inputs.todos == 'true' && '--todos' || '' }}
+          ${{ inputs.reforcar == 'true' && '--reforcar' || '' }}
       - name: Salvar resultado no catálogo
         run: |
           cd ..
