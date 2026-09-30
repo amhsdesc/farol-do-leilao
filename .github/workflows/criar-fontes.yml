@@ -1,0 +1,45 @@
+name: Criar fontes a partir do catálogo
+
+# Roda só quando você mandar (botão "Run workflow"). Para cada leiloeiro do catalogo/leiloeiros.csv que já foi
+# confirmado como "faz_imoveis: sim" e ainda não tem uma fonte, cria um arquivo YAML em fontes/leiloeiros/ (o
+# coletor vai usar esse arquivo depois para buscar os leilões daquele leiloeiro). Também atualiza o catálogo
+# (marca o fonte_id de quem ganhou fonte nova). Commit automático das duas coisas.
+on:
+  workflow_dispatch:
+    inputs:
+      incluir_pendentes:
+        description: "Incluir também leiloeiros ainda não validados em lista oficial (status pendente)?"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  criar-fontes:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Criar fontes
+        run: >
+          python -m coletor catalogo criar-fontes
+          ${{ inputs.incluir_pendentes && '--incluir-pendentes' || '' }}
+      - name: Salvar resultado (fontes novas + catálogo atualizado)
+        run: |
+          cd ..
+          git config user.name "farol-bot"
+          git config user.email "bot@faroldoleilao.com.br"
+          git add coletor/fontes/leiloeiros/ coletor/catalogo/leiloeiros.csv
+          if git diff --cached --quiet; then
+            echo "Nada mudou."
+          else
+            git commit -m "Cria fontes automaticamente a partir do catálogo"
+            git push
+          fi
