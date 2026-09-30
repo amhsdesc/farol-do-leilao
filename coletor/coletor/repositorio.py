@@ -99,7 +99,11 @@ class Repositorio:
     def ativos(self, fonte_id: str) -> int:
         with self.conn.cursor() as cur:
             cur.execute("select count(*) n from lote where fonte_id = %s and status in ('ativo','suspenso')", (fonte_id,))
-            return cur.fetchone()["n"]
+            n = cur.fetchone()["n"]
+        # fecha a transação de leitura aqui: o que vem depois (buscar os lotes no site) pode ser
+        # lento, e uma conexão parada em transação aberta é derrubada pelo Postgres por inatividade.
+        self.conn.commit()
+        return n
 
     def finalizar_execucao(
         self, execucao_id: int, fonte_id: str, c: Contadores, ativos_antes: int,
