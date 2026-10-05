@@ -17,6 +17,20 @@ export const PLANOS: Record<PlanoId, Plano> = {
   anual: { id: "anual", nome: "Anual", valor: 399.9, meses: 12, cicloAsaas: "YEARLY" },
 };
 
+// Quantos alertas (imóvel + busca salva, somados) cada plano pode ter ativos ao mesmo tempo.
+// null = sem limite. Durante o teste grátis (sem plano escolhido ainda) vale o limite do mensal.
+export const LIMITE_ALERTAS: Record<PlanoId, number | null> = {
+  mensal: 2,
+  trimestral: 5,
+  anual: null,
+};
+
+/** Quantos alertas a pessoa pode ter ativos ao mesmo tempo, dado o plano (ou null = sem assinatura/teste). */
+export function limiteAlertas(planoId: string | null): number | null {
+  if (planoId && planoId in LIMITE_ALERTAS) return LIMITE_ALERTAS[planoId as PlanoId];
+  return LIMITE_ALERTAS.mensal;
+}
+
 export const DIAS_TESTE = 7;
 /** Dias de tolerância depois do vencimento antes de travar (boleto/Pix que demora a compensar). */
 export const DIAS_TOLERANCIA = 3;
