@@ -51,7 +51,7 @@ export default function Privacidade() {
       <h2>Seus direitos</h2>
       <p>
         Você pode pedir para ver, corrigir, levar para outro serviço ou apagar seus dados, e retirar consentimentos. Escreva
-        para [E-MAIL]. Respondemos em até 15 dias.
+        para contato.faroldoleilao@gmail.com. Respondemos em até 15 dias.
       </p>
     </main>
   );
