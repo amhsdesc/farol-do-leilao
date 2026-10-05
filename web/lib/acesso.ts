@@ -27,6 +27,14 @@ export type Acesso = {
   assinatura: AssinaturaLinha | null;
 };
 
+// E-mails com acesso de assinante liberado sem pagar, pra testar o site (ex.: o seu). Configurar em
+// FAROL_EMAILS_ADMIN, separados por vírgula. Não cria conta nem precisa de senha: a pessoa entra
+// normalmente com o Google, e se o e-mail estiver nessa lista o acesso é liberado automaticamente.
+const emailsAdmin = (process.env.FAROL_EMAILS_ADMIN ?? "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 /** Quem está vendo a página e se tem acesso de assinante. Uma consulta por requisição. */
 export const acesso = cache(async (): Promise<Acesso> => {
   const s = await auth();
@@ -39,6 +47,22 @@ export const acesso = cache(async (): Promise<Acesso> => {
     [id],
   );
   if (!linha) return { assinante: false, modoTeste, usuario: null, assinatura: null };
+
+  if (linha.u.email && emailsAdmin.includes(linha.u.email.toLowerCase())) {
+    const assinaturaAdmin: AssinaturaLinha = {
+      usuario_id: linha.u.id,
+      status: "ativa",
+      plano: "anual",
+      teste_ate: null,
+      pago_ate: new Date(Date.now() + 10 * 365 * 86_400_000).toISOString(),
+      teste_telefone: null,
+      asaas_cliente_id: null,
+      asaas_assinatura_id: null,
+      cancelada_em: null,
+    };
+    return { assinante: true, modoTeste, usuario: linha.u, assinatura: assinaturaAdmin };
+  }
+
   return { assinante: temAcesso(linha.a), modoTeste, usuario: linha.u, assinatura: linha.a };
 });
 
