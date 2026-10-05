@@ -43,7 +43,7 @@ export default function Termos() {
         <li>Você pode cancelar quando quiser em Minha conta. O acesso continua até o fim do período já pago.</li>
         <li>
           Pelo Código de Defesa do Consumidor (art. 49), você pode desistir em até 7 dias depois do primeiro pagamento e
-          receber o valor de volta: escreva para [E-MAIL].
+          receber o valor de volta: escreva para contato.faroldoleilao@gmail.com.
         </li>
         <li>Se um pagamento atrasar mais de 3 dias, os recursos de assinante ficam travados até a regularização.</li>
       </ul>
@@ -63,7 +63,7 @@ export default function Termos() {
       <h2>8. Mudanças e contato</h2>
       <p>
         Podemos atualizar estes termos; avisaremos os assinantes por e-mail antes de mudanças importantes. Dúvidas:
-        [E-MAIL]. Fica eleito o foro de [CIDADE], sem prejuízo do foro do domicílio do consumidor.
+        contato.faroldoleilao@gmai.com. Fica eleito o foro de Brasília-DF, sem prejuízo do foro do domicílio do consumidor.
       </p>
     </main>
   );
