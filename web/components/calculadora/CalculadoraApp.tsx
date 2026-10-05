@@ -295,6 +295,11 @@ export default function CalculadoraApp({ prefill, pesquisaMercadoDisponivel }: {
 
         <fieldset className="painel">
           <legend><span className="passo-n">4</span> Até vender</legend>
+          <p className="muted nota">
+            Enquanto você não vende, condomínio, IPTU e outros custos continuam saindo do seu bolso todo mês — por
+            isso entram na conta. Em "meses até vender", conte da data do arremate até a venda: inclua o tempo de
+            registro, o tempo de reforma (se houver) e quanto tempo acha que vai levar para achar comprador.
+          </p>
           <div className="dupla">
             <Num rotulo="Meses até vender" valor={meses} set={setMeses} sufixo="meses" ajuda="Inclua o tempo de registro e reforma." />
             <Num rotulo="Condomínio por mês" valor={condominio} set={setCondominio} sufixo="R$" />
@@ -313,6 +318,11 @@ export default function CalculadoraApp({ prefill, pesquisaMercadoDisponivel }: {
 
         <fieldset className="painel">
           <legend><span className="passo-n">5</span> Na venda</legend>
+          <p className="muted nota">
+            Imposto de renda sobre o lucro da venda: 15% a 22,5%, por faixa de ganho. Duas situações isentam: vender
+            o seu único imóvel por até R$ 440 mil (sem ter vendido outro nos últimos 5 anos), ou reinvestir o
+            dinheiro recebido em outro imóvel residencial em até 180 dias (isenta só a parte reinvestida).
+          </p>
           <Num rotulo="Corretagem" valor={corretagem} set={setCorretagem} sufixo="%" />
           <label className="marcar">
             <input type="checkbox" checked={unico} onChange={(e) => setUnico(e.target.checked)} />
