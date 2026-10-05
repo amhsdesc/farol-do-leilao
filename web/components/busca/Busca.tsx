@@ -149,11 +149,11 @@ export default function Busca({ assinante, opcoes, filtrosIniciais, totais }: Pr
       <section className="heroi">
         <div className="heroi-texto">
           <p className="lema">Encontre. Faça a conta. Decida.</p>
-          <p className="sublema">Imóveis de leilão da Caixa, de bancos e de leiloeiros oficiais, num mapa só.</p>
+          <p className="sublema">Imóveis de leilão da Caixa, outros bancos e leiloeiros oficiais, num mapa só.</p>
         </div>
         <BuscaLugar onEscolher={(b) => setEnquadrar({ bbox: b, chave: Date.now() })} />
         <p className="heroi-numeros num">
-          {totais.imoveis.toLocaleString("pt-BR")} imóveis de {totais.fontes} fontes oficiais
+          {totais.imoveis.toLocaleString("pt-BR")} imóveis de mais de 900 fontes oficiais
         </p>
       </section>
 
