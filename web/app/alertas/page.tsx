@@ -5,12 +5,13 @@ import LinhaAlertaImovel from "@/components/alertas/LinhaAlertaImovel";
 import Travado from "@/components/Travado";
 import { acesso } from "@/lib/acesso";
 import { meusAlertas } from "@/lib/alertas/consultas";
+import { limiteAlertas } from "@/lib/conta/regras";
 
 export const metadata: Metadata = { title: "Meus alertas" };
 export const dynamic = "force-dynamic";
 
 export default async function Alertas() {
-  const { assinante, usuario } = await acesso();
+  const { assinante, usuario, assinatura } = await acesso();
   if (!assinante || !usuario) {
     return (
       <Travado
@@ -29,6 +30,8 @@ export default async function Alertas() {
   const alertas = await meusAlertas(usuario.id);
   const doImovel = alertas.filter((a) => a.tipo === "imovel");
   const deBusca = alertas.filter((a) => a.tipo === "busca");
+  const ativos = alertas.filter((a) => a.ativo).length;
+  const limite = limiteAlertas(assinatura?.plano ?? null);
 
   return (
     <main className="pagina estreita alertas-pagina">
@@ -36,6 +39,9 @@ export default async function Alertas() {
         <h1 className="titulo-pagina">Meus alertas</h1>
         <p className="texto">
           Por e-mail e WhatsApp, por enquanto (Telegram chega numa próxima etapa). Ative ou pause quando quiser.
+        </p>
+        <p className="muted">
+          {limite === null ? `${ativos} alerta${ativos === 1 ? "" : "s"} ativo${ativos === 1 ? "" : "s"}` : `${ativos} de ${limite} alertas ativos`}
         </p>
       </header>
 
