@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cpfValido, economia, normalizarCelular, novoPagoAte, PLANOS, porMes, situacao, temAcesso } from "./regras.ts";
+import { cpfValido, economia, limiteAlertas, normalizarCelular, novoPagoAte, PLANOS, porMes, situacao, temAcesso } from "./regras.ts";
 
 const d = (s: string) => new Date(s);
 
@@ -53,4 +53,12 @@ test("CPF", () => {
   assert.equal(cpfValido("529.982.247-25"), true);
   assert.equal(cpfValido("111.111.111-11"), false);
   assert.equal(cpfValido("529.982.247-24"), false);
+});
+
+test("limite de alertas por plano", () => {
+  assert.equal(limiteAlertas("mensal"), 2);
+  assert.equal(limiteAlertas("trimestral"), 5);
+  assert.equal(limiteAlertas("anual"), null);
+  assert.equal(limiteAlertas(null), 2); // sem plano (ex.: teste grátis) usa o limite do mensal
+  assert.equal(limiteAlertas("plano-inexistente"), 2);
 });
