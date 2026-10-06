@@ -1,0 +1,305 @@
+diff --git a/coletor/coletor/adaptadores/__init__.py b/coletor/coletor/adaptadores/__init__.py
+index dcca072..61d0e28 100644
+--- a/coletor/coletor/adaptadores/__init__.py
++++ b/coletor/coletor/adaptadores/__init__.py
+@@ -4,6 +4,7 @@ from .caixa_csv import CaixaCSV
+ from .json_api import JsonApi
+ from .post_html import PostHtml
+ from .seletores import Seletores
++from .suaplataforma import SuaPlataforma
+ from .wordpress_rest import WordpressRest
+ 
+ TIPOS: dict[str, type[Adaptador]] = {
+@@ -13,6 +14,7 @@ TIPOS: dict[str, type[Adaptador]] = {
+     Automatico.tipo: Automatico,
+     PostHtml.tipo: PostHtml,
+     WordpressRest.tipo: WordpressRest,
++    SuaPlataforma.tipo: SuaPlataforma,
+ }
+ 
+ __all__ = ["TIPOS", "Adaptador", "ErroDeFonte", "CaixaCSV", "JsonApi", "Seletores", "Automatico", "PostHtml", "WordpressRest"]
+diff --git a/coletor/coletor/adaptadores/automatico.py b/coletor/coletor/adaptadores/automatico.py
+index e456eb8..449ee21 100644
+--- a/coletor/coletor/adaptadores/automatico.py
++++ b/coletor/coletor/adaptadores/automatico.py
+@@ -236,7 +236,35 @@ class Automatico(Adaptador):
+ 
+     # ------------------------------------------------------------ coleta
+ 
++    def _tentar_preset(self) -> list[LoteBruto]:
++        """Sites de plataformas conhecidas (ex.: leilao.pro) são lidos por seletores, sem IA."""
++        from . import plataformas
++        from .seletores import Seletores
++        inicio = self.fonte.get("inicio") or []
++        url = inicio if isinstance(inicio, str) else (inicio[0] if inicio else None)
++        if not url or self.fonte.get("sem_preset"):
++            return []
++        try:
++            nome = plataformas.detectar(self._html(url))
++            if not nome:
++                return []
++            if nome in plataformas.ADAPTADORES:
++                from .suaplataforma import SuaPlataforma
++                sub = SuaPlataforma({**self.fonte, "site": url}, self.cliente, self.conn)
++            else:
++                sub = Seletores(plataformas.fonte_do_preset(self.fonte, nome, url), self.cliente, self.conn)
++            lotes = list(sub.coletar())
++            self.erros.extend(sub.erros)
++            return lotes
++        except Exception as e:
++            self.registrar_erro(f"Preset de plataforma falhou ({e}); usando leitura padrão.")
++            return []
++
+     def coletar(self) -> Iterator[LoteBruto]:
++        pre = self._tentar_preset()
++        if pre:
++            yield from pre
++            return
+         limite = config.llm_max_paginas_por_execucao
+         for url in self.descobrir_links():
+             try:
+diff --git a/coletor/coletor/adaptadores/plataformas.py b/coletor/coletor/adaptadores/plataformas.py
+new file mode 100644
+index 0000000..8758fab
+--- /dev/null
++++ b/coletor/coletor/adaptadores/plataformas.py
+@@ -0,0 +1,64 @@
++"""Presets de plataformas de leilão: um leitor sem IA para todos os sites que usam o mesmo software.
++
++Muitos leiloeiros usam a mesma plataforma (leilao.pro, por exemplo). Em vez de pagar a IA para ler cada
++página de lote, a fonte `automatico` abre a página inicial, reconhece a plataforma e passa a ler a listagem
++de imóveis por seletores CSS. Se o preset não achar nada, a fonte continua pelo caminho com IA.
++"""
++from __future__ import annotations
++
++import re
++from typing import Any
++from urllib.parse import urlparse
++
++# Cada preset: assinatura no HTML da página inicial + configuração `seletores` (sem a url base).
++PRESETS: dict[str, dict[str, Any]] = {
++    "leilao_pro": {
++        "assinatura": r"leilao\.pro|/leilao/lotes/|lote_id/\d+",
++        "listagem": {
++            "caminho": "/leilao/lotes/imoveis",
++            "item": ".card-vertical",
++            "campos": {
++                "url": {"css": ".card-title a", "attr": "href"},
++                "id_externo": {"css": ".card-title a", "attr": "href", "regex": "lote_id/(\\d+)"},
++                "titulo": {"css": ".card-image img", "attr": "alt"},
++                "descricao": {"css": ".card-image img", "attr": "alt"},
++                "cidade": {"css": ".card-image img", "attr": "alt",
++                           "regex": "([A-Za-zÀ-ÿ' ]{3,40}?)\\s*-\\s*[A-Z]{2}\\b"},
++                "uf": {"css": ".card-image img", "attr": "alt", "regex": "[A-Za-zÀ-ÿ' ]\\s*-\\s*([A-Z]{2})\\b"},
++                "comitente": {"css": ".info-title"},
++                "lance_minimo": {"css": ".bid-value"},
++                "data_praca1": {"css": ".meta-item", "regex": "(\\d{2}/\\d{2}/\\d{4}\\s*\\d{2}:\\d{2})"},
++            },
++        },
++    },
++}
++
++
++# Plataformas com API JSON própria: têm um adaptador dedicado (ver suaplataforma.py).
++ADAPTADORES = {"suaplataforma": r"suaplataformadeleilao|ApiEngine/"}
++
++
++def detectar(html: str) -> str | None:
++    for nome, padrao in ADAPTADORES.items():
++        if re.search(padrao, html, re.I):
++            return nome
++    for nome, p in PRESETS.items():
++        if re.search(p["assinatura"], html, re.I):
++            return nome
++    return None
++
++
++def fonte_do_preset(fonte: dict[str, Any], nome: str, url_inicio: str) -> dict[str, Any]:
++    """Monta a configuração `seletores` equivalente para a fonte, usando o domínio da URL inicial."""
++    u = urlparse(url_inicio)
++    base = f"{u.scheme}://{u.netloc}"
++    p = PRESETS[nome]["listagem"]
++    nova = {k: v for k, v in fonte.items() if k not in ("inicio", "navegador")}
++    nova["tipo"] = "seletores"
++    nova["navegador"] = False
++    nova["listagem"] = {
++        "url": base + p["caminho"],
++        "item": p["item"],
++        "campos": p["campos"],
++    }
++    return nova
+diff --git a/coletor/coletor/adaptadores/suaplataforma.py b/coletor/coletor/adaptadores/suaplataforma.py
+new file mode 100644
+index 0000000..4617612
+--- /dev/null
++++ b/coletor/coletor/adaptadores/suaplataforma.py
+@@ -0,0 +1,104 @@
++"""Plataforma "suaplataformadeleilao" (ACT Leilões e ~12 outros leiloeiros): lê a API JSON do próprio site.
++
++O site chama `POST /ApiEngine/GetBusca/{pagina}/1/0` com um JSON de filtros; sem filtros ele devolve todos os
++lotes, já com endereço, cidade, UF, avaliação, lance mínimo por praça e datas. Sem navegador e sem IA.
++"""
++from __future__ import annotations
++
++from typing import Any, Iterator
++
++from ..modelos import LoteBruto
++from ..normalizar import tipo as normalizar_tipo
++from .base import Adaptador, ErroDeFonte
++
++PARAMS = {
++    "Bairro": "", "Busca": "", "BuscaProcesso": "", "CFGs": "", "CodLeilao": "", "DataAbertura": "",
++    "DataEncerramento": "", "ID_Categoria": 0, "ID_Cidade": 0, "ID_Estado": 0, "ID_Leiloes_Status": [],
++    "ID_Regiao": 0, "IgnoreScopo": 0, "Mapa": "", "NomesPartes": "", "OrdSt": 0, "Ordem": 0,
++    "OrientacaoBusca": 1, "PaginaIndex": 1, "PracaAtual": 0, "RangeValores": 0, "Scopo": 0, "SubStatus": [],
++    "TiposLeiloes": [], "ValorMaxSelecionado": 0, "ValorMinSelecionado": 0, "sInL": "",
++}
++
++
++def _data(v: Any) -> str | None:
++    if not v or str(v).startswith(("1900", "0001")):
++        return None
++    return str(v).replace("T", " ")[:19]
++
++
++class SuaPlataforma(Adaptador):
++    tipo = "suaplataforma"
++
++    def _base(self) -> str:
++        site = self.fonte.get("api_base") or self.fonte.get("site") or ""
++        inicio = self.fonte.get("inicio") or []
++        if not site and inicio:
++            site = inicio if isinstance(inicio, str) else inicio[0]
++        from urllib.parse import urlparse
++        u = urlparse(site)
++        if not u.netloc:
++            raise ErroDeFonte("Informe 'site' no YAML.")
++        return f"{u.scheme}://{u.netloc}"
++
++    def converter(self, lote: dict[str, Any], base: str) -> dict[str, Any] | None:
++        rt = (lote.get("GetLoteRealTime") or [{}])[0]
++        if normalizar_tipo(lote.get("Categoria"), lote.get("IconeCategoria"), lote.get("Leilao"),
++                           lote.get("Lote_Complemento")) == "outros":
++            return None  # veículo, máquina, etc.
++        praca = int(rt.get("PracaAtual") or lote.get("PracaAtual") or 1)
++        lance = rt.get(["", "ValorMinimoLancePrimeiraPraca", "ValorMinimoLanceSegundaPraca",
++                        "ValorMinimoLanceTerceiraPraca"][min(max(praca, 1), 3)]) or rt.get("ProximoLance")
++        rua = " ".join(str(x) for x in (lote.get("Lote_Endereco"), lote.get("Lote_Numero")) if x)
++        fotos = [f"{base}/imagens-center/350x282/{f['Foto']}" for f in (lote.get("Fotos") or []) if f.get("Foto")]
++        return {
++            "id_externo": f"{lote.get('ID_Leilao')}-{lote.get('ID_Leiloes_Lote')}",
++            "url": f"{base}/{str(lote.get('URLlote') or '').lstrip('/')}",
++            "titulo": (lote.get("Leilao") or "").strip(),
++            "tipo": lote.get("Categoria"),
++            "modalidade": lote.get("LabelModalidade"),
++            "comitente": lote.get("Comitente") or None,
++            "endereco": rua or None,
++            "bairro": lote.get("Lote_Bairro") or None,
++            "cidade": lote.get("Cidade") or None,
++            "uf": lote.get("UF") or None,
++            "cep": lote.get("Lote_CEP") or None,
++            "valor_avaliacao": lote.get("ValorAvaliacao") or rt.get("ValorAvaliacao") or None,
++            "lance_minimo": lance or None,
++            "valor_praca1": rt.get("ValorMinimoLancePrimeiraPraca") or None,
++            "valor_praca2": rt.get("ValorMinimoLanceSegundaPraca") or None,
++            "data_praca1": _data(rt.get("DataHoraEncerramentoPrimeiraPraca") or rt.get("DataHoraAberturaPrimeiraPraca")),
++            "data_praca2": _data(rt.get("DataHoraEncerramentoSegundaPraca")),
++            "status": rt.get("StatusLote") or None,
++            "numero_processo": lote.get("NumeroProcesso") or None,
++            "fotos": fotos,
++        }
++
++    def coletar(self) -> Iterator[LoteBruto]:
++        base = self._base()
++        self.cliente.get(base + "/")  # cookie XSRF-TOKEN
++        token = self.cliente.http.cookies.get("XSRF-TOKEN")
++        headers = {"X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json; charset=utf-8"}
++        if token:
++            headers["__RVT"] = token
++        vistos: set[str] = set()
++        for pagina in range(1, int(self.fonte.get("paginas_max", 40)) + 1):
++            try:
++                r = self.cliente.post(f"{base}/ApiEngine/GetBusca/{pagina}/1/0", headers=headers,
++                                      json={**PARAMS, "Pagina": pagina, "QtdPorPagina": 50})
++                dados = r.json()
++            except Exception as e:
++                self.registrar_erro(f"Página {pagina}: {e}")
++                break
++            lotes = dados.get("Lotes") or []
++            novos = 0
++            for l in lotes:
++                campos = self.converter(l, base)
++                if not campos or campos["id_externo"] in vistos:
++                    continue
++                vistos.add(campos["id_externo"])
++                novos += 1
++                lote = self.montar({k: v for k, v in campos.items() if v not in (None, "", [])})
++                if lote:
++                    yield lote
++            if not lotes or pagina >= int(dados.get("PageIndexMax") or 1):
++                break
+diff --git a/coletor/tests/fixtures/leilaopro_lista.html b/coletor/tests/fixtures/leilaopro_lista.html
+new file mode 100644
+index 0000000..cc0c399
+--- /dev/null
++++ b/coletor/tests/fixtures/leilaopro_lista.html
+@@ -0,0 +1,8 @@
++<html><body><a href="https://leilao.pro">Powered By</a>
++<div class="grid-4-cols lotes-categoria">
++<div class="card-vertical"><div class="card-image"><a href="/leilao/tjmg-8a-vara/lote_id/533"><img alt="LOTE 001 - Imóvel situado, na Avenida Marciano de Avila, nº 409 Uberlândia-MG com 103,15m2"></a></div>
++<div class="card-content"><h5 class="card-title"><a href="/leilao/tjmg-8a-vara/lote_id/533">IMÓVEL SITUADO...</a></h5>
++<div class="info-box"><h6 class="info-title"><i></i> TJMG 8ª VARA CÍVEL DA COMARCA DE UBERLÂNDIA-MG</h6>
++<div class="info-meta"><span class="meta-item"><i></i> QUA. 07/10/2026 <i></i> 09:00</span></div></div>
++<div class="bid-info"><div class="bid-initial"><strong>Lance Inicial:</strong><div class="bid-value">R$&nbsp;454.907,52</div></div></div></div></div>
++</div></body></html>
+diff --git a/coletor/tests/test_plataformas.py b/coletor/tests/test_plataformas.py
+new file mode 100644
+index 0000000..e5ff0ed
+--- /dev/null
++++ b/coletor/tests/test_plataformas.py
+@@ -0,0 +1,45 @@
++"""Presets de plataformas: leilao.pro lido sem IA a partir do site de qualquer leiloeiro."""
++from decimal import Decimal
++
++from coletor.adaptadores import Automatico
++from coletor.normalizar import normalizar
++
++
++def test_leilao_pro_sem_ia(cliente_para):
++    fonte = {"id": "x", "nome": "X", "tipo": "automatico", "uf": ["MG"], "inicio": ["https://www.sitex.com.br"]}
++    cli = cliente_para({
++        "https://www.sitex.com.br": "leilaopro_lista.html",
++        "https://www.sitex.com.br/leilao/lotes/imoveis": "leilaopro_lista.html",
++    })
++    a = Automatico(fonte, cli)  # sem chave de IA: se tentasse usar a IA, falharia
++    lotes = list(a.coletar())
++    assert a.chamadas_llm == 0 and len(lotes) == 1
++    n = normalizar(lotes[0], {})
++    assert n.id_externo == "533"
++    assert n.url == "https://www.sitex.com.br/leilao/tjmg-8a-vara/lote_id/533"
++    assert n.lance_minimo == Decimal("454907.52") and n.uf == "MG" and "Uberl" in (n.cidade or "")
++    assert n.data_praca1.day == 7 and n.data_praca1.hour == 9
++
++
++def test_suaplataforma_api_sem_ia(cliente_para):
++    import httpx
++    from coletor.http import Cliente
++    from tests.conftest import transporte
++    lote = {"ID_Leilao": 9, "ID_Leiloes_Lote": 10, "Leilao": "Terreno 34 - Birigui (SP)", "Categoria": "Terrenos",
++            "LabelModalidade": "Extrajudicial", "Comitente": "FULANO", "Lote_Endereco": "Rodovia X", "Lote_Numero": "5555",
++            "Lote_Bairro": "Park", "Cidade": "Birigui", "UF": "SP", "ValorAvaliacao": 350000,
++            "URLlote": "lote/terreno-34/10/", "Fotos": [{"Foto": "a.jpeg"}],
++            "GetLoteRealTime": [{"PracaAtual": 2, "ValorMinimoLancePrimeiraPraca": 350000, "ValorMinimoLanceSegundaPraca": 143500,
++                                 "DataHoraEncerramentoPrimeiraPraca": "2026-06-30T12:15:00",
++                                 "DataHoraEncerramentoSegundaPraca": "2026-07-29T12:15:00", "StatusLote": "Aberto para proposta"}]}
++    carro = {"ID_Leilao": 1, "ID_Leiloes_Lote": 2, "Leilao": "Fiat Uno 2010", "Categoria": "Carros", "URLlote": "lote/x/2/",
++             "GetLoteRealTime": [{}]}
++    cli = cliente_para({"https://www.act.com.br/": "<html>suaplataformadeleilao</html>",
++                        "https://www.act.com.br/ApiEngine/GetBusca/1/1/0": {"Lotes": [lote, carro], "PageIndexMax": 1}})
++    from coletor.adaptadores import SuaPlataforma
++    lotes = list(SuaPlataforma({"id": "act", "site": "https://www.act.com.br"}, cli).coletar())
++    assert len(lotes) == 1  # o carro é ignorado
++    n = normalizar(lotes[0], {})
++    assert n.id_externo == "9-10" and n.tipo == "terreno" and n.uf == "SP" and n.cidade == "Birigui"
++    assert n.lance_minimo == Decimal("143500") and n.valor_avaliacao == Decimal("350000")
++    assert n.url == "https://www.act.com.br/lote/terreno-34/10/" and n.data_praca2.month == 7

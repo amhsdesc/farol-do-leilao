@@ -23,6 +23,7 @@ Configuração:
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Iterator
 
 from ..modelos import LoteBruto
@@ -38,6 +39,16 @@ def _substituir(obj: Any, pagina: int) -> Any:
     if isinstance(obj, list):
         return [_substituir(v, pagina) for v in obj]
     return obj
+
+
+def _url_modelo(modelo: str, item: Any) -> str:
+    """'https://x/{endereco.estado}/{endereco.cidade|slug}/{id}' preenchido com caminhos do JSON do item."""
+    def sub(m):
+        caminho, _, filtro = m.group(1).partition("|")
+        v = caminho_json(item, caminho)
+        v = "" if v is None else str(v).strip()
+        return re.sub(r"\s+", "-", v) if filtro == "slug" else v
+    return re.sub(r"\{([^}]+)\}", sub, modelo)
 
 
 class _Formatador(dict):
@@ -74,6 +85,8 @@ class JsonApi(Adaptador):
             novos = 0
             for item in itens:
                 campos = Extrator(item).campos(self.fonte.get("campos") or {})
+                if self.fonte.get("url_modelo"):
+                    campos.setdefault("url", _url_modelo(self.fonte["url_modelo"], item))
                 if self.fonte.get("url_lote") and isinstance(item, dict):
                     campos.setdefault("url", self.fonte["url_lote"].format_map(_Formatador(item)))
                 lote = self.montar(campos)

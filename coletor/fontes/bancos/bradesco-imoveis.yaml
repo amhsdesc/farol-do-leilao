@@ -1,0 +1,30 @@
+# Bradesco (Vitrine de Leilões, vitrinebradesco.com.br). Sem IA e sem navegador: API pública da vitrine.
+# Hoje a vitrine tem 0 imóveis (só veículos); a fonte passa a trazer lotes quando aparecerem.
+id: bradesco-imoveis
+nome: Imóveis do Bradesco (Vitrine)
+site: https://vitrinebradesco.com.br
+tipo: json_api
+comitente: Bradesco
+uf: todas
+intervalo_segundos: 1
+requisicao:
+  url: https://api.vitrinebradesco.com.br/v1/auctions
+  metodo: GET
+  params: {type: real_estate, page: "{pagina}"}
+  pagina_inicial: 1
+  paginas_max: 30
+itens: data
+total_paginas: total_pages
+url_lote: "https://vitrinebradesco.com.br/auctions/{slug}"
+campos:
+  id_externo: {json: guid}
+  titulo: {json: name}
+  descricao: {json: description}
+  tipo: {json: category}
+  cidade: {json: city}
+  uf: {json: state}
+  bairro: {json: neighborhood}
+  lance_minimo: {json: price}
+  data_praca1: {json: auction_date}
+  comitente: {json: "auctioneer.name"}
+  fotos: {json: "images[0]"}

@@ -1,12 +1,36 @@
-# Criado pelo catálogo (2026-09-28). Validação: pendente.
-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+# Superbid Exchange. Sem IA e sem navegador: API pública de ofertas que o próprio site usa (imóveis abertos,
+# 100 por página, de todos os comitentes: bancos, tribunais, empresas). Encerra quando a página vem vazia.
 id: superbid
 nome: Superbid Exchange
 site: https://www.superbid.net
-tipo: automatico
+tipo: json_api
 uf: [todas]
-inicio:
-  - https://www.superbid.net/categorias/imoveis
-max_paginas_lista: 10
-max_lotes: 400
-navegador: true   # listagem montada por JavaScript (confirmar com inspecionar)
+intervalo_segundos: 1
+requisicao:
+  url: https://offer-query.superbid.net/offers/
+  metodo: GET
+  params:
+    portalId: "[2,15]"
+    locale: pt_BR
+    timeZoneId: America/Sao_Paulo
+    searchType: opened
+    filter: "product.productType.description:imoveis;"
+    pageNumber: "{pagina}"
+    pageSize: 100
+    orderBy: "endDate:asc;price:desc"
+  pagina_inicial: 1
+  paginas_max: 30
+itens: offers
+url_lote: "https://www.superbid.net/oferta/{id}"
+campos:
+  id_externo: {json: id}
+  titulo: {json: "product.shortDesc"}
+  descricao: {json: "product.detailedDescription"}
+  tipo: {json: "product.shortDesc"}
+  cidade: {json: "product.location.city", regex: "^(.*?)\\s*-\\s*[A-Z]{2}$"}
+  uf: {json: "product.location.city", regex: "-\\s*([A-Z]{2})$"}
+  comitente: {json: "store.name"}
+  modalidade: {json: "auction.modalityDesc"}
+  lance_minimo: {json: "offerDetail.currentMinBid"}
+  data_praca1: {json: endDate}
+  fotos: {json: "product.galleryJson[0].link"}

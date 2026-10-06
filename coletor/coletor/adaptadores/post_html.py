@@ -59,17 +59,19 @@ class PostHtml(Adaptador):
     def _token(self, req: dict[str, Any]) -> str:
         pagina = BeautifulSoup(self.cliente.get(req["pagina_token"]).text, "lxml")
         el = pagina.select_one(req.get("token_css", "#token"))
-        token = el.get_text(strip=True) if el else ""
+        token = (el.get(req["token_attr"]) if req.get("token_attr") else el.get_text(strip=True)) if el else ""
+        token = token or ""
         if not token:
             raise ErroDeFonte(f"Token não encontrado em {req['pagina_token']} ({req.get('token_css')}).")
         return token
 
     @staticmethod
-    def _preencher(obj: Any, pagina: int, token: str) -> Any:
+    def _preencher(obj: Any, pagina: int, token: str, offset: int = 0) -> Any:
         if isinstance(obj, str):
-            return obj.replace("{pagina}", str(pagina)).replace("{token}", token)
+            return (obj.replace("{pagina}", str(pagina)).replace("{token}", token)
+                    .replace("{offset}", str(offset)))
         if isinstance(obj, dict):
-            return {k: PostHtml._preencher(v, pagina, token) for k, v in obj.items()}
+            return {k: PostHtml._preencher(v, pagina, token, offset) for k, v in obj.items()}
         return obj
 
     def coletar(self) -> Iterator[LoteBruto]:
@@ -83,10 +85,11 @@ class PostHtml(Adaptador):
         for pagina in range(1, int(req.get("paginas_max", 60)) + 1):
             try:
                 r = self.cliente.post(
-                    req["url"], data=self._preencher(req.get("params") or {}, pagina, token),
+                    req["url"], data=self._preencher(req.get("params") or {}, pagina, token,
+                                                     (pagina - 1) * int(req.get("por_pagina", 0))),
                     headers={"X-Requested-With": "XMLHttpRequest"},
                 )
-                dados = r.json()
+                dados = {req.get("campo_html", "lista"): r.text} if req.get("resposta") == "html" else r.json()
             except Exception as e:
                 self.registrar_erro(f"Página {pagina}: {e}")
                 break

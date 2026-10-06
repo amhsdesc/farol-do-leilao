@@ -1,10 +1,35 @@
+# Imóveis do Sicoob (plataforma Resale). Sem IA e sem navegador: API JSON que o próprio site usa.
+# Atenção: a API exige a chave pública (x-api-key) que o site entrega a todo visitante no JavaScript; se o site
+# trocar a chave, a fonte passa a dar erro 403 e basta atualizar `cabecalhos` abaixo.
 id: sicoob-imoveis
 nome: Imóveis do Sicoob
-site: https://www.sicoob.com.br
-tipo: automatico
+site: https://www.leilaosicoob.com.br
+tipo: json_api
 comitente: Sicoob
 uf: todas
-inicio: [https://www.sicoob.com.br/web/sicoob/leilao]
-max_paginas_lista: 10
-max_lotes: 300
-navegador: true
+intervalo_segundos: 1
+requisicao:
+  url: https://yfvun6xbh1.execute-api.us-east-2.amazonaws.com/prod/leilaosicoob/property/
+  metodo: GET
+  params: {page: "{pagina}", limit: 50}
+  cabecalhos: {x-api-key: "leUPNwGjG943nWRGJyy6p2OboqBvdoqE9jSPCYqm"}
+  pagina_inicial: 1
+  paginas_max: 40
+itens: data
+total_paginas: pagination.max_pages
+url_modelo: "https://www.leilaosicoob.com.br/imovel/{endereco.estado}/{endereco.cidade|slug}/{id_banco}"
+campos:
+  id_externo: {json: id_do_imovel}
+  titulo: {json: nome_imovel}
+  descricao: {json: descricao}
+  tipo: {json: tipo_imovel}
+  endereco: {json: "endereco.endereco_completo"}
+  cidade: {json: "endereco.cidade"}
+  uf: {json: "endereco.estado"}
+  valor_avaliacao: {json: "valores.valor_avaliado"}
+  lance_minimo: {json: "valores.valor_venda"}
+  data_praca1: {json: data_melhor_proposta}
+  modalidade: {fixo: "Venda direta"}
+  status: {json: status_da_venda}
+  area_total: {json: "areas_total.value"}
+  fotos: {json: foto_capa}

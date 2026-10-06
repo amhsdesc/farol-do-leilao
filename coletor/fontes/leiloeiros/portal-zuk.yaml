@@ -1,12 +1,36 @@
-# Criado pelo catálogo (2026-09-28). Validação: pendente.
-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+# Portal Zuk. Sem IA e sem navegador: o botão "Carregar mais" do site faz um POST que devolve 30 cards em HTML
+# (preço, endereço, tipo e data). O token vem na própria página; o robots.txt permite esse caminho.
 id: portal-zuk
 nome: Portal Zuk (Zukerman)
 site: https://www.portalzuk.com.br
-tipo: automatico
-uf: [todas]
-inicio:
-  - https://www.portalzuk.com.br/leilao-de-imoveis
-max_paginas_lista: 10
-max_lotes: 400
-navegador: true   # listagem montada por JavaScript (confirmar com inspecionar)
+tipo: post_html
+uf: todas
+intervalo_segundos: 1
+requisicao:
+  pagina_token: https://www.portalzuk.com.br/leilao-de-imoveis
+  token_css: "input[name=_token]"
+  token_attr: value
+  url: https://www.portalzuk.com.br/leilao-de-imoveis/mais
+  resposta: html
+  por_pagina: 30
+  params:
+    limit: "{offset}"
+    count_imovel_zuk: "{offset}"
+    path: https://www.portalzuk.com.br/leilao-de-imoveis
+    order: data_leilao
+    div_parceiro_count: "0"
+    _token: "{token}"
+  paginas_max: 60
+item: ".card-property"
+campos:
+  link: {css: ".card-property-image-wrapper a", attr: href}
+  id_externo: {css: ".card-property-image-wrapper a", attr: href, regex: "/([\\d-]+)$"}
+  titulo: {css: ".card-property-image-wrapper a", attr: title}
+  comitente: {css: ".card-property-image-wrapper a", attr: title, regex: "-\\s*([^-|]+?)\\s*\\|\\s*Z\\d+"}
+  tipo: {css: ".card-property-price-lote"}
+  cidade: {css: ".card-property-address a", regex: "^(.*?)\\s*/"}
+  uf: {css: ".card-property-address a", regex: "/\\s*([A-Z]{2})$"}
+  endereco: {css: ".card-property-address span:last-child"}
+  ocupacao: {css: ".card-property-news"}
+  lance_minimo: {css: ".card-property-price-value", regex: "(R\\$\\s*[\\d.,]+)"}
+  data_praca1: {css: ".card-property-price-data"}

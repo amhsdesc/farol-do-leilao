@@ -1,0 +1,343 @@
+diff --git a/coletor/coletor/adaptadores/json_api.py b/coletor/coletor/adaptadores/json_api.py
+index 7dc7e06..c7f5875 100644
+--- a/coletor/coletor/adaptadores/json_api.py
++++ b/coletor/coletor/adaptadores/json_api.py
+@@ -23,6 +23,7 @@ Configuração:
+ from __future__ import annotations
+ 
+ import json
++import re
+ from typing import Any, Iterator
+ 
+ from ..modelos import LoteBruto
+@@ -40,6 +41,16 @@ def _substituir(obj: Any, pagina: int) -> Any:
+     return obj
+ 
+ 
++def _url_modelo(modelo: str, item: Any) -> str:
++    """'https://x/{endereco.estado}/{endereco.cidade|slug}/{id}' preenchido com caminhos do JSON do item."""
++    def sub(m):
++        caminho, _, filtro = m.group(1).partition("|")
++        v = caminho_json(item, caminho)
++        v = "" if v is None else str(v).strip()
++        return re.sub(r"\s+", "-", v) if filtro == "slug" else v
++    return re.sub(r"\{([^}]+)\}", sub, modelo)
++
++
+ class _Formatador(dict):
+     def __missing__(self, chave: str) -> str:
+         return ""
+@@ -74,6 +85,8 @@ class JsonApi(Adaptador):
+             novos = 0
+             for item in itens:
+                 campos = Extrator(item).campos(self.fonte.get("campos") or {})
++                if self.fonte.get("url_modelo"):
++                    campos.setdefault("url", _url_modelo(self.fonte["url_modelo"], item))
+                 if self.fonte.get("url_lote") and isinstance(item, dict):
+                     campos.setdefault("url", self.fonte["url_lote"].format_map(_Formatador(item)))
+                 lote = self.montar(campos)
+diff --git a/coletor/coletor/adaptadores/post_html.py b/coletor/coletor/adaptadores/post_html.py
+index a916410..1f2d591 100644
+--- a/coletor/coletor/adaptadores/post_html.py
++++ b/coletor/coletor/adaptadores/post_html.py
+@@ -59,17 +59,19 @@ class PostHtml(Adaptador):
+     def _token(self, req: dict[str, Any]) -> str:
+         pagina = BeautifulSoup(self.cliente.get(req["pagina_token"]).text, "lxml")
+         el = pagina.select_one(req.get("token_css", "#token"))
+-        token = el.get_text(strip=True) if el else ""
++        token = (el.get(req["token_attr"]) if req.get("token_attr") else el.get_text(strip=True)) if el else ""
++        token = token or ""
+         if not token:
+             raise ErroDeFonte(f"Token não encontrado em {req['pagina_token']} ({req.get('token_css')}).")
+         return token
+ 
+     @staticmethod
+-    def _preencher(obj: Any, pagina: int, token: str) -> Any:
++    def _preencher(obj: Any, pagina: int, token: str, offset: int = 0) -> Any:
+         if isinstance(obj, str):
+-            return obj.replace("{pagina}", str(pagina)).replace("{token}", token)
++            return (obj.replace("{pagina}", str(pagina)).replace("{token}", token)
++                    .replace("{offset}", str(offset)))
+         if isinstance(obj, dict):
+-            return {k: PostHtml._preencher(v, pagina, token) for k, v in obj.items()}
++            return {k: PostHtml._preencher(v, pagina, token, offset) for k, v in obj.items()}
+         return obj
+ 
+     def coletar(self) -> Iterator[LoteBruto]:
+@@ -83,10 +85,11 @@ class PostHtml(Adaptador):
+         for pagina in range(1, int(req.get("paginas_max", 60)) + 1):
+             try:
+                 r = self.cliente.post(
+-                    req["url"], data=self._preencher(req.get("params") or {}, pagina, token),
++                    req["url"], data=self._preencher(req.get("params") or {}, pagina, token,
++                                                     (pagina - 1) * int(req.get("por_pagina", 0))),
+                     headers={"X-Requested-With": "XMLHttpRequest"},
+                 )
+-                dados = r.json()
++                dados = {req.get("campo_html", "lista"): r.text} if req.get("resposta") == "html" else r.json()
+             except Exception as e:
+                 self.registrar_erro(f"Página {pagina}: {e}")
+                 break
+diff --git a/coletor/fontes/bancos/bradesco-imoveis.yaml b/coletor/fontes/bancos/bradesco-imoveis.yaml
+new file mode 100644
+index 0000000..26ae95e
+--- /dev/null
++++ b/coletor/fontes/bancos/bradesco-imoveis.yaml
+@@ -0,0 +1,30 @@
++# Bradesco (Vitrine de Leilões, vitrinebradesco.com.br). Sem IA e sem navegador: API pública da vitrine.
++# Hoje a vitrine tem 0 imóveis (só veículos); a fonte passa a trazer lotes quando aparecerem.
++id: bradesco-imoveis
++nome: Imóveis do Bradesco (Vitrine)
++site: https://vitrinebradesco.com.br
++tipo: json_api
++comitente: Bradesco
++uf: todas
++intervalo_segundos: 1
++requisicao:
++  url: https://api.vitrinebradesco.com.br/v1/auctions
++  metodo: GET
++  params: {type: real_estate, page: "{pagina}"}
++  pagina_inicial: 1
++  paginas_max: 30
++itens: data
++total_paginas: total_pages
++url_lote: "https://vitrinebradesco.com.br/auctions/{slug}"
++campos:
++  id_externo: {json: guid}
++  titulo: {json: name}
++  descricao: {json: description}
++  tipo: {json: category}
++  cidade: {json: city}
++  uf: {json: state}
++  bairro: {json: neighborhood}
++  lance_minimo: {json: price}
++  data_praca1: {json: auction_date}
++  comitente: {json: "auctioneer.name"}
++  fotos: {json: "images[0]"}
+diff --git a/coletor/fontes/bancos/sicoob-imoveis.yaml b/coletor/fontes/bancos/sicoob-imoveis.yaml
+index 7abc45d..fcd6bcf 100644
+--- a/coletor/fontes/bancos/sicoob-imoveis.yaml
++++ b/coletor/fontes/bancos/sicoob-imoveis.yaml
+@@ -1,10 +1,35 @@
++# Imóveis do Sicoob (plataforma Resale). Sem IA e sem navegador: API JSON que o próprio site usa.
++# Atenção: a API exige a chave pública (x-api-key) que o site entrega a todo visitante no JavaScript; se o site
++# trocar a chave, a fonte passa a dar erro 403 e basta atualizar `cabecalhos` abaixo.
+ id: sicoob-imoveis
+ nome: Imóveis do Sicoob
+-site: https://www.sicoob.com.br
+-tipo: automatico
++site: https://www.leilaosicoob.com.br
++tipo: json_api
+ comitente: Sicoob
+ uf: todas
+-inicio: [https://www.sicoob.com.br/web/sicoob/leilao]
+-max_paginas_lista: 10
+-max_lotes: 300
+-navegador: true
++intervalo_segundos: 1
++requisicao:
++  url: https://yfvun6xbh1.execute-api.us-east-2.amazonaws.com/prod/leilaosicoob/property/
++  metodo: GET
++  params: {page: "{pagina}", limit: 50}
++  cabecalhos: {x-api-key: "leUPNwGjG943nWRGJyy6p2OboqBvdoqE9jSPCYqm"}
++  pagina_inicial: 1
++  paginas_max: 40
++itens: data
++total_paginas: pagination.max_pages
++url_modelo: "https://www.leilaosicoob.com.br/imovel/{endereco.estado}/{endereco.cidade|slug}/{id_banco}"
++campos:
++  id_externo: {json: id_do_imovel}
++  titulo: {json: nome_imovel}
++  descricao: {json: descricao}
++  tipo: {json: tipo_imovel}
++  endereco: {json: "endereco.endereco_completo"}
++  cidade: {json: "endereco.cidade"}
++  uf: {json: "endereco.estado"}
++  valor_avaliacao: {json: "valores.valor_avaliado"}
++  lance_minimo: {json: "valores.valor_venda"}
++  data_praca1: {json: data_melhor_proposta}
++  modalidade: {fixo: "Venda direta"}
++  status: {json: status_da_venda}
++  area_total: {json: "areas_total.value"}
++  fotos: {json: foto_capa}
+diff --git a/coletor/fontes/leiloeiros/portal-zuk.yaml b/coletor/fontes/leiloeiros/portal-zuk.yaml
+index 3447c40..da77f05 100644
+--- a/coletor/fontes/leiloeiros/portal-zuk.yaml
++++ b/coletor/fontes/leiloeiros/portal-zuk.yaml
+@@ -1,12 +1,36 @@
+-# Criado pelo catálogo (2026-09-28). Validação: pendente.
+-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
++# Portal Zuk. Sem IA e sem navegador: o botão "Carregar mais" do site faz um POST que devolve 30 cards em HTML
++# (preço, endereço, tipo e data). O token vem na própria página; o robots.txt permite esse caminho.
+ id: portal-zuk
+ nome: Portal Zuk (Zukerman)
+ site: https://www.portalzuk.com.br
+-tipo: automatico
+-uf: [todas]
+-inicio:
+-  - https://www.portalzuk.com.br/leilao-de-imoveis
+-max_paginas_lista: 10
+-max_lotes: 400
+-navegador: true   # listagem montada por JavaScript (confirmar com inspecionar)
++tipo: post_html
++uf: todas
++intervalo_segundos: 1
++requisicao:
++  pagina_token: https://www.portalzuk.com.br/leilao-de-imoveis
++  token_css: "input[name=_token]"
++  token_attr: value
++  url: https://www.portalzuk.com.br/leilao-de-imoveis/mais
++  resposta: html
++  por_pagina: 30
++  params:
++    limit: "{offset}"
++    count_imovel_zuk: "{offset}"
++    path: https://www.portalzuk.com.br/leilao-de-imoveis
++    order: data_leilao
++    div_parceiro_count: "0"
++    _token: "{token}"
++  paginas_max: 60
++item: ".card-property"
++campos:
++  link: {css: ".card-property-image-wrapper a", attr: href}
++  id_externo: {css: ".card-property-image-wrapper a", attr: href, regex: "/([\\d-]+)$"}
++  titulo: {css: ".card-property-image-wrapper a", attr: title}
++  comitente: {css: ".card-property-image-wrapper a", attr: title, regex: "-\\s*([^-|]+?)\\s*\\|\\s*Z\\d+"}
++  tipo: {css: ".card-property-price-lote"}
++  cidade: {css: ".card-property-address a", regex: "^(.*?)\\s*/"}
++  uf: {css: ".card-property-address a", regex: "/\\s*([A-Z]{2})$"}
++  endereco: {css: ".card-property-address span:last-child"}
++  ocupacao: {css: ".card-property-news"}
++  lance_minimo: {css: ".card-property-price-value", regex: "(R\\$\\s*[\\d.,]+)"}
++  data_praca1: {css: ".card-property-price-data"}
+diff --git a/coletor/fontes/leiloeiros/superbid.yaml b/coletor/fontes/leiloeiros/superbid.yaml
+index 89ebe5f..109ca55 100644
+--- a/coletor/fontes/leiloeiros/superbid.yaml
++++ b/coletor/fontes/leiloeiros/superbid.yaml
+@@ -1,12 +1,36 @@
+-# Criado pelo catálogo (2026-09-28). Validação: pendente.
+-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
++# Superbid Exchange. Sem IA e sem navegador: API pública de ofertas que o próprio site usa (imóveis abertos,
++# 100 por página, de todos os comitentes: bancos, tribunais, empresas). Encerra quando a página vem vazia.
+ id: superbid
+ nome: Superbid Exchange
+ site: https://www.superbid.net
+-tipo: automatico
++tipo: json_api
+ uf: [todas]
+-inicio:
+-  - https://www.superbid.net/categorias/imoveis
+-max_paginas_lista: 10
+-max_lotes: 400
+-navegador: true   # listagem montada por JavaScript (confirmar com inspecionar)
++intervalo_segundos: 1
++requisicao:
++  url: https://offer-query.superbid.net/offers/
++  metodo: GET
++  params:
++    portalId: "[2,15]"
++    locale: pt_BR
++    timeZoneId: America/Sao_Paulo
++    searchType: opened
++    filter: "product.productType.description:imoveis;"
++    pageNumber: "{pagina}"
++    pageSize: 100
++    orderBy: "endDate:asc;price:desc"
++  pagina_inicial: 1
++  paginas_max: 30
++itens: offers
++url_lote: "https://www.superbid.net/oferta/{id}"
++campos:
++  id_externo: {json: id}
++  titulo: {json: "product.shortDesc"}
++  descricao: {json: "product.detailedDescription"}
++  tipo: {json: "product.shortDesc"}
++  cidade: {json: "product.location.city", regex: "^(.*?)\\s*-\\s*[A-Z]{2}$"}
++  uf: {json: "product.location.city", regex: "-\\s*([A-Z]{2})$"}
++  comitente: {json: "store.name"}
++  modalidade: {json: "auction.modalityDesc"}
++  lance_minimo: {json: "offerDetail.currentMinBid"}
++  data_praca1: {json: endDate}
++  fotos: {json: "product.galleryJson[0].link"}
+diff --git a/coletor/tests/test_fontes_grandes.py b/coletor/tests/test_fontes_grandes.py
+new file mode 100644
+index 0000000..1988156
+--- /dev/null
++++ b/coletor/tests/test_fontes_grandes.py
+@@ -0,0 +1,76 @@
++"""Superbid, Zuk, Sicoob (Resale) e Bradesco lidos por API/HTML, sem IA. Estruturas copiadas dos sites reais."""
++from decimal import Decimal
++
++from coletor.adaptadores import JsonApi, PostHtml
++from coletor.normalizar import normalizar
++from coletor.registro import carregar
++
++SB = "https://offer-query.superbid.net/offers/"
++
++
++def test_superbid_api(cliente_para):
++    fonte = carregar()["superbid"]
++    oferta = {"id": 5012922, "endDate": "2026-10-07 10:00:00", "store": {"name": "ANDRÉ LUIZ LEILÕES"},
++              "offerDetail": {"currentMinBid": 603395.41}, "auction": {"modalityDesc": "Leilão"},
++              "product": {"shortDesc": "Apartamento Cond. Trentino II, 44,15m², Joinville/SC",
++                          "location": {"city": "Joinville - SC"}, "galleryJson": [{"link": "https://ms.sbwebservices.net/photos/a.jpg"}]}}
++    cli = cliente_para({SB: {"offers": [oferta]}})
++    lotes = list(JsonApi(fonte, cli).coletar())
++    assert len(lotes) == 1
++    n = normalizar(lotes[0], {})
++    assert n.id_externo == "5012922" and n.url == "https://www.superbid.net/oferta/5012922"
++    assert n.cidade == "Joinville" and n.uf == "SC" and n.tipo == "apartamento" and n.lance_minimo == Decimal("603395.41")
++    assert n.comitente == "ANDRÉ LUIZ LEILÕES"
++
++
++def test_sicoob_resale_api(cliente_para):
++    fonte = carregar()["sicoob-imoveis"]
++    item = {"id_do_imovel": "IDR190571", "id_banco": "42532", "nome_imovel": "Lote, Residencial, Parque Flamboyant",
++            "tipo_imovel": "Lote", "descricao": "Lote desocupado", "status_da_venda": "ativo", "data_melhor_proposta": "14/10/2026 11:00",
++            "valores": {"valor_avaliado": 151300, "valor_venda": 145000},
++            "endereco": {"endereco_completo": "Rua X, 123", "cidade": "Campos dos Goytacazes", "estado": "RJ"},
++            "foto_capa": "https://d107brv7xtbumz.cloudfront.net/f14d"}
++    url = "https://yfvun6xbh1.execute-api.us-east-2.amazonaws.com/prod/leilaosicoob/property/"
++    cli = cliente_para({url: {"data": [item], "pagination": {"max_pages": 1}}})
++    lotes = list(JsonApi(fonte, cli).coletar())
++    n = normalizar(lotes[0], {})
++    assert n.id_externo == "IDR190571" and n.uf == "RJ" and n.cidade == "Campos dos Goytacazes"
++    assert n.url == "https://www.leilaosicoob.com.br/imovel/RJ/Campos-dos-Goytacazes/42532"
++    assert n.lance_minimo == Decimal("145000") and n.valor_avaliacao == Decimal("151300") and n.modalidade == "venda_direta"
++
++
++def test_bradesco_vitrine_sem_imoveis_e_com_imoveis(cliente_para):
++    fonte = carregar()["bradesco-imoveis"]
++    url = "https://api.vitrinebradesco.com.br/v1/auctions"
++    assert list(JsonApi(fonte, cliente_para({url: {"total_pages": 0, "data": []}})).coletar()) == []
++    item = {"guid": "g1", "name": "Casa em Barra do Garças", "slug": "casa-barra-1", "category": "Casa", "city": "Barra do Garças",
++            "state": "MT", "price": 300000, "auction_date": "2026-10-20T13:00:00.000Z", "auctioneer": {"name": "Grupo Vip"}}
++    lotes = list(JsonApi(fonte, cliente_para({url: {"total_pages": 1, "data": [item]}})).coletar())
++    n = normalizar(lotes[0], {})
++    assert n.uf == "MT" and n.tipo == "casa" and n.url.endswith("/auctions/casa-barra-1") and n.lance_minimo == Decimal("300000")
++
++
++CARD = """<div class="card-property card_lotes_div"><div class="card-property-image-wrapper">
++<a href="https://www.portalzuk.com.br/imovel/mg/itabirinha/moreira-sales/rua-jk-s-n/37613-234884" target="_blank"
++ title=" em leilão - Rua JK, s/n - Itabirinha/MG - Banco Cooperativo Sicoob S.A. | Z37522"><img src="x"></a>
++<span class="card-property-news"> Desocupado </span></div>
++<div class="card-property-content"><ul class="card-property-prices"><li class="card-property-price"><span class="card-property-price-lote">Terreno</span></li>
++<li><address class="card-property-address"><span style="font-weight: 600;"><a href="https://x/y">Itabirinha / MG</a> - Moreira Sales</span>
++<span style="flex-basis: 100%;">Rua JK, s/n</span></address></li></ul>
++<ul class="card-property-prices"><li class="card-property-price" data-pracas="1"><span class="card-property-price-label"> Valor </span>
++<span class="card-property-price-value">R$ 112.000,00 <span class="card-property-price-percent">36</span></span>
++<span class="card-property-price-data">09/10/2026 às 11:06</span></li></ul></div></div>"""
++
++
++def test_zuk_post_html(cliente_para):
++    fonte = carregar()["portal-zuk"]
++    cli = cliente_para({
++        "https://www.portalzuk.com.br/leilao-de-imoveis": '<html><form><input type="hidden" name="_token" value="tok9"></form></html>',
++        "https://www.portalzuk.com.br/leilao-de-imoveis/mais": CARD,
++    })
++    lotes = list(PostHtml(fonte, cli).coletar())  # a 2ª página repete o mesmo card: fim da paginação
++    assert len(lotes) == 1
++    n = normalizar(lotes[0], {})
++    assert n.id_externo == "37613-234884" and n.tipo == "terreno" and n.uf == "MG" and n.cidade == "Itabirinha"
++    assert n.lance_minimo == Decimal("112000.00") and n.data_praca1.day == 9 and n.data_praca1.hour == 11
++    assert "Sicoob" in (n.comitente or "")
