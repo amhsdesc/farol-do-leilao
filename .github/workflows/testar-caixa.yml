@@ -1,0 +1,20 @@
+# Teste avulso (só roda quando alguém clica em "Run workflow"): a Caixa deixa o GitHub Actions ler a página de detalhe de um imóvel?
+# Não usa banco, não usa IA e não gasta nada. Pode ser apagado depois.
+name: Testar acesso à Caixa
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Página de detalhe de um imóvel (com o nome do nosso robô)
+        run: |
+          curl -s -o pagina.html -w "HTTP %{http_code}, %{size_download} bytes, tipo %{content_type}\n" -m 30 \
+            -A "FarolDoLeilaoBot/1.0 (+https://faroldoleilao.com.br)" \
+            "https://venda-imoveis.caixa.gov.br/sistema/detalhe-imovel.asp?hdnimovel=8444407106520" || true
+          echo "--- começo da resposta ---"
+          head -c 600 pagina.html || true
+          echo
