@@ -1,0 +1,31 @@
+name: Testar fontes (sem gravar)
+
+# Manual. Roda o leitor das fontes escolhidas a partir do IP do GitHub, sem usar IA e sem gravar nada no banco,
+# e mostra quantos imóveis cada uma devolve. Serve para confirmar uma fonte nova antes de ligar a coleta.
+on:
+  workflow_dispatch:
+    inputs:
+      fontes:
+        description: "IDs separados por espaço"
+        default: "superbid portal-zuk sicoob-imoveis bradesco-imoveis mega-leiloes seu-imovel-bb sandro-rodrigues-pinto anderson-douglas-gali-falleiros"
+      max:
+        description: "Máximo de imóveis lidos por fonte"
+        default: "300"
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Testar
+        run: |
+          python -m coletor testar --max "${{ inputs.max }}" ${{ inputs.fontes }} | tee teste.txt
+          { echo '### Teste de fontes'; echo '```'; cat teste.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

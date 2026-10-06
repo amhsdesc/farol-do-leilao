@@ -181,6 +181,50 @@ def cmd_sondar(a):
             ["fonte", "veredito", "plataforma", "links", "texto", "http", "obs"])
 
 
+def cmd_testar(a):
+    """Roda o leitor de cada fonte SEM gravar nada no banco e mostra quantos imóveis ele encontra (sem IA)."""
+    from .adaptadores import TIPOS, Automatico
+    from .http import Cliente
+    from .normalizar import normalizar
+    from .registro import carregar
+    todas = carregar()
+    for fid in a.ids:
+        f = todas.get(fid)
+        if not f:
+            print(f"## {fid}: fonte não encontrada")
+            continue
+        print(f"## {fid} ({f['tipo']})")
+        cli = Cliente(intervalo=f.get("intervalo_segundos"), cabecalhos=f.get("cabecalhos"),
+                      verificar_tls=f.get("verificar_tls", True))
+        try:
+            ad = TIPOS[f["tipo"]](f, cli, conn=None)
+            if isinstance(ad, Automatico):  # só o caminho sem IA (preset de plataforma)
+                brutos = ad._tentar_preset()
+                if not brutos:
+                    print("   preset de plataforma não se aplica (ou não achou lotes); a fonte usaria IA")
+            else:
+                brutos = []
+                for b in ad.coletar():
+                    brutos.append(b)
+                    if len(brutos) >= a.max:
+                        break
+            n = 0
+            for b in brutos:
+                try:
+                    l = normalizar(b, ad.padroes)
+                except Exception as e:
+                    print(f"   lote inválido {b.id_externo}: {e}")
+                    continue
+                n += 1
+                if n <= 2:
+                    print(f"   ex.: {l.id_externo} | {l.tipo} | {l.cidade}/{l.uf} | R$ {l.lance_minimo} | {l.data_praca1} | {l.url}")
+            print(f"   => {n} imóvel(is) lido(s) (limite {a.max})" + (f"; avisos: {ad.erros[:3]}" if ad.erros else ""))
+        except Exception as e:
+            print(f"   ERRO: {type(e).__name__}: {str(e)[:200]}")
+        finally:
+            cli.fechar()
+
+
 def cmd_geocodificar(a):
     from .geocodificar import Geocodificador
     with conectar() as conn:
@@ -219,6 +263,10 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("sondar", help="diz por que as fontes sem lotes estão vazias (sem IA)")
     s.add_argument("ids", nargs="*")
     s.set_defaults(f=cmd_sondar)
+    s = sub.add_parser("testar", help="roda o leitor de fontes sem gravar no banco e conta os imóveis")
+    s.add_argument("ids", nargs="+")
+    s.add_argument("--max", type=int, default=300)
+    s.set_defaults(f=cmd_testar)
     s = sub.add_parser("nova-fonte", help="cria YAML automático para um site")
     s.add_argument("url")
     s.add_argument("--uf", nargs="+", default=["DF"])
