@@ -11,6 +11,10 @@ import { acesso } from "@/lib/acesso";
 import { alertaDoImovel } from "@/lib/alertas/consultas";
 import { imovel, parecidos, type Lote } from "@/lib/consultas";
 import { buscarFotosCaixa, salvarFotosLote } from "@/lib/fotos/caixa";
+import { Suspense } from "react";
+import EnriquecimentoLote, { EnriquecimentoCarregando, EnriquecimentoTravado } from "@/components/ficha/EnriquecimentoLote";
+import { enriquecimentoSalvo } from "@/lib/enriquecimento";
+import { aplicarEnriquecimento } from "@/lib/enriquecimento/regras";
 import { area, MODALIDADES, porcento, quando, reais, TIPOS } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
@@ -161,7 +165,19 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
     : base.some((l) => l.debitos_por_conta === "vendedor")
       ? "vendedor"
       : "nao_informado";
-  const lista = condicoes(ocupacao, debitos, consolidar(base, "aceita_fgts"), consolidar(base, "aceita_financiamento"), consolidar(base, "aceita_parcelamento"));
+   // O que já foi lido nas páginas do leiloeiro (só assinante) preenche o que as fontes deixaram em branco, sem trocar o que elas afirmam.
+  const salvo = assinante && melhor ? await enriquecimentoSalvo(melhor.id) : null;
+  const cond = aplicarEnriquecimento(
+    {
+      ocupacao,
+      debitos,
+      fgts: consolidar(base, "aceita_fgts"),
+      financiamento: consolidar(base, "aceita_financiamento"),
+      parcelamento: consolidar(base, "aceita_parcelamento"),
+    },
+    salvo?.dados,
+  );
+  const lista = condicoes(cond.ocupacao, cond.debitos, cond.fgts, cond.financiamento, cond.parcelamento);
   const descricao = base.map((l) => l.descricao).filter(Boolean).sort((a, b) => b!.length - a!.length)[0];
   const desconto = melhor?.valor_avaliacao && melhor?.lance_minimo ? 1 - melhor.lance_minimo / melhor.valor_avaliacao : null;
   const data = dataProxima(melhor);
@@ -275,7 +291,15 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
             </ul>
             <p className="muted nota">Copiamos o que as fontes dizem. Quem manda é o edital: confira antes do lance.</p>
           </section>
-
+          {melhor && !encerrado && (
+            assinante ? (
+              <Suspense fallback={<EnriquecimentoCarregando />}>
+                <EnriquecimentoLote lote={melhor} imovel={im} />
+              </Suspense>
+            ) : (
+              <EnriquecimentoTravado />
+            )
+          )}
           {descricao && (
             <section className="painel">
               <h2>O que a fonte diz</h2>

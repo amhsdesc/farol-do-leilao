@@ -72,3 +72,19 @@ manda nada e não dá erro).
 2. Se usar outro nome de modelo, ajuste `WHATSAPP_MODELO_ALERTA`.
 
 Ponha também `SITE_URL=https://SEU-DOMINIO` (sem isso o link nos avisos aponta para localhost).
+
+## 5. Mais informações do leiloeiro (IA na ficha, só para assinantes)
+
+Quando um **assinante** abre a ficha de um imóvel que veio com poucos dados (ex.: a lista da Caixa), o site lê a
+página de detalhe e a do leiloeiro e mostra dívidas, processo, forma de pagamento, comissão, pontos de atenção e os
+links do edital. Quem não assina não dispara nada (nem rede, nem IA). O resultado fica guardado
+(`lote_enriquecimento`, migração 006): a próxima pessoa já vê pronto, e página que não mudou não é paga de novo.
+
+No site (Vercel → *Settings → Environment Variables*), não no coletor:
+1. `ANTHROPIC_API_KEY_SITE` — chave só do site (assim o Console mostra o gasto dele à parte do coletor). Se ela não
+   existir, o site usa `ANTHROPIC_API_KEY`, caso essa esteja configurada.
+2. `ENRIQUECIMENTO_MAX_CHAMADAS_DIA` (opcional, padrão 300) — teto de chamadas de IA por dia. Passou do teto, o site
+   segue normal, só deixa de enriquecer fichas novas até o dia seguinte (fuso de São Paulo).
+3. `MODELO_LLM` (opcional) — padrão `claude-haiku-4-5-20251001`.
+
+Sem a chave, nada quebra: o bloco só fica sem conteúdo. O gasto do dia está em `llm_uso_dia`.

@@ -22,6 +22,9 @@ Todo texto do site segue a voz de lá: curto, sem juridiquês, termo explicado n
 Ver `docs/produto.md`. Resumo: mapa e ficha são livres; filtros, ordenação, calculadora, alertas e buscas salvas são
 de assinante. **A trava vale no servidor** (`web/lib/acesso.ts` + `aplicarAcesso` em `web/lib/busca/filtros.ts`):
 toda rota de API aplica `aplicarAcesso` antes de consultar. Nunca confie só na tela.
+Enriquecimento sob demanda (`web/lib/enriquecimento`): só quando um ASSINANTE abre a ficha, lê a página do lote e a do
+leiloeiro com IA e guarda em `lote_enriquecimento` (nunca em `lote`, que o coletor reescreve). Chave de cache própria
+(`enr:` + url) em `pagina_cache`, teto diário em `llm_uso_dia`. Detalhes em `docs/configurar-contas.md`.
 Link para o site do leiloeiro ou edital: sempre `/ir/<lote>` (confere a assinatura e redireciona); nunca pôr `lote.url`
 ou `edital_url` no HTML ou em resposta de API.
 
