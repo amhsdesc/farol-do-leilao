@@ -1,0 +1,841 @@
+diff --git a/.github/workflows/sondar-fontes.yml b/.github/workflows/sondar-fontes.yml
+new file mode 100644
+index 0000000..a5a1137
+--- /dev/null
++++ b/.github/workflows/sondar-fontes.yml
+@@ -0,0 +1,32 @@
++name: Sondar fontes vazias
++
++# Manual. Para cada fonte ativa que hoje não tem nenhum lote, abre a primeira página e diz por que está vazia
++# (sem IA, só HTTP). O resultado aparece no resumo do job e no arquivo sondagem.csv (aba "Artifacts").
++on:
++  workflow_dispatch: {}
++
++jobs:
++  sondar:
++    runs-on: ubuntu-latest
++    timeout-minutes: 60
++    defaults:
++      run:
++        working-directory: coletor
++    env:
++      DATABASE_URL: ${{ secrets.DATABASE_URL }}
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++      - run: pip install -e .
++      - name: Sondar
++        run: |
++          python -m coletor sondar | tee sondagem.txt
++          { echo '### Fontes vazias: por quê'; echo '```'; cat sondagem.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
++      - uses: actions/upload-artifact@v4
++        with:
++          name: sondagem
++          path: |
++            coletor/dados/sondagem.csv
++            coletor/sondagem.txt
+diff --git a/coletor/coletor/adaptadores/__init__.py b/coletor/coletor/adaptadores/__init__.py
+index 254b6cb..dcca072 100644
+--- a/coletor/coletor/adaptadores/__init__.py
++++ b/coletor/coletor/adaptadores/__init__.py
+@@ -2,13 +2,17 @@ from .automatico import Automatico
+ from .base import Adaptador, ErroDeFonte
+ from .caixa_csv import CaixaCSV
+ from .json_api import JsonApi
++from .post_html import PostHtml
+ from .seletores import Seletores
++from .wordpress_rest import WordpressRest
+ 
+ TIPOS: dict[str, type[Adaptador]] = {
+     CaixaCSV.tipo: CaixaCSV,
+     JsonApi.tipo: JsonApi,
+     Seletores.tipo: Seletores,
+     Automatico.tipo: Automatico,
++    PostHtml.tipo: PostHtml,
++    WordpressRest.tipo: WordpressRest,
+ }
+ 
+-__all__ = ["TIPOS", "Adaptador", "ErroDeFonte", "CaixaCSV", "JsonApi", "Seletores", "Automatico"]
++__all__ = ["TIPOS", "Adaptador", "ErroDeFonte", "CaixaCSV", "JsonApi", "Seletores", "Automatico", "PostHtml", "WordpressRest"]
+diff --git a/coletor/coletor/adaptadores/automatico.py b/coletor/coletor/adaptadores/automatico.py
+index e3fe6d1..e456eb8 100644
+--- a/coletor/coletor/adaptadores/automatico.py
++++ b/coletor/coletor/adaptadores/automatico.py
+@@ -147,6 +147,34 @@ class Automatico(Adaptador):
+             )
+         self.conn.commit()
+ 
++    def _cache_revisao(self, url: str) -> dict | None:
++        """Como _cache, mas devolve também `recente`: a página foi lida há menos de N dias E não é urgente.
++
++        Urgente (sempre confere o texto): lote com leilão nos próximos 7 dias (ou ocorrido há menos de 1 dia),
++        ou imóvel que alguém acompanha com alerta. Assim o site e os alertas de preço/data/suspensão não atrasam,
++        e só as páginas "tranquilas" esperam `cache_revisao_dias` antes de a IA reler (poupa o custo de páginas
++        que mudam por motivos irrelevantes: contador de visitas, tempo restante...).
++        """
++        if not self.conn:
++            return None
++        with self.conn.cursor() as cur:
++            cur.execute(
++                """select c.hash_texto, c.extraido,
++                          ((now() - c.atualizado_em) < make_interval(days => %s)
++                           and not exists (
++                               select 1 from lote l
++                               where l.url = c.url and l.status in ('ativo', 'suspenso')
++                                 and (l.data_praca1 between now() - interval '1 day' and now() + interval '7 days'
++                                   or l.data_praca2 between now() - interval '1 day' and now() + interval '7 days'
++                                   or exists (select 1 from alerta a where a.imovel_id = l.imovel_id and a.tipo = 'imovel' and a.ativo))
++                           )) as recente
++                   from pagina_cache c where c.url = %s""",
++                (config.cache_revisao_dias, url),
++            )
++            r = cur.fetchone()
++        self.conn.rollback()  # fecha a transação de leitura (a IA pode demorar e o Postgres derruba conexão parada)
++        return r
++
+     def _reservar_chamada_global(self) -> bool:
+         """Teto diário compartilhado por todas as fontes (cada fonte roda num processo próprio, então o contador fica no banco).
+ 
+@@ -170,6 +198,13 @@ class Automatico(Adaptador):
+                 (teto,),
+             )
+             ok = cur.fetchone() is not None
++            if ok:  # contabilidade por fonte: mostra de onde vem o gasto
++                cur.execute(
++                    """insert into llm_uso_fonte (dia, fonte_id, chamadas)
++                       values ((now() at time zone 'America/Sao_Paulo')::date, %s, 1)
++                       on conflict (dia, fonte_id) do update set chamadas = llm_uso_fonte.chamadas + 1""",
++                    (self.fonte["id"],),
++                )
+         self.conn.commit()
+         return ok
+ 
+@@ -210,8 +245,9 @@ class Automatico(Adaptador):
+                 self.registrar_erro(f"Lote {url}: {e}")
+                 continue
+             h = hashlib.sha1(texto.encode()).hexdigest()
+-            cache = self._cache(url)
+-            if cache and cache["hash_texto"] == h:
++            cache = self._cache_revisao(url)
++            # reaproveita se o texto é o mesmo OU se a página é "tranquila" e foi lida há pouco (ver _cache_revisao)
++            if cache and (cache["hash_texto"] == h or cache["recente"]):
+                 extraido = cache["extraido"] or {}
+             else:
+                 if self.chamadas_llm >= limite:
+diff --git a/coletor/coletor/adaptadores/post_html.py b/coletor/coletor/adaptadores/post_html.py
+new file mode 100644
+index 0000000..a916410
+--- /dev/null
++++ b/coletor/coletor/adaptadores/post_html.py
+@@ -0,0 +1,116 @@
++"""Adaptador para sites que respondem a uma consulta POST com um JSON que traz a lista de lotes em HTML (ex.: Seu Imóvel BB).
++
++Sem IA e sem navegador. Passos: abre a página do catálogo, pega o token que o site exige (um elemento da página),
++e pede cada página de resultados; os cards vêm em HTML dentro do JSON e são lidos por seletor CSS.
++
++Configuração:
++    tipo: post_html
++    requisicao:
++      pagina_token: https://site/catalogo/categoria/urbanos     # página que contém o token
++      token_css: "#_cppnp"                                       # onde está o token
++      url: https://site/catalogo                                 # onde as páginas são pedidas
++      params: {pagina: "{pagina}", cppnp: "{token}", ...}
++      campo_html: lista                                          # chave do JSON com o HTML dos cards
++      campo_total: imoveis                                       # chave do JSON com o total (opcional)
++      por_pagina: 50
++      paginas_max: 60
++    item: ".carta"
++    campos: {...}                                                # mini-linguagem de extracao.py, por card
++    # um campo "link" nos campos vira a URL do lote
++"""
++from __future__ import annotations
++
++import re
++from datetime import datetime
++from typing import Any, Iterator
++from zoneinfo import ZoneInfo
++
++from bs4 import BeautifulSoup
++
++from ..modelos import LoteBruto
++from .base import Adaptador, ErroDeFonte
++from .extracao import Extrator
++
++_DIA_MES = re.compile(r"(\d{1,2})/(\d{1,2})(?!/\d)\s*(?:às|as|a partir das)?\s*(\d{1,2})\s*h(?:(\d{2}))?", re.I)
++
++
++def completar_ano(texto: Any) -> Any:
++    """'13/10 às 10h' → '13/10/2026 10:00' (usa o próximo dia/mês que ainda vai acontecer). Outro formato passa igual."""
++    if not isinstance(texto, str):
++        return texto
++    m = _DIA_MES.search(texto)
++    if not m:
++        return texto
++    dia, mes, hora, minuto = int(m[1]), int(m[2]), int(m[3]), int(m[4] or 0)
++    agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
++    for ano in (agora.year, agora.year + 1):
++        try:
++            d = datetime(ano, mes, dia, hora, minuto, tzinfo=agora.tzinfo)
++        except ValueError:
++            return texto
++        if (d - agora).days >= -2:  # leilão de hoje/ontem ainda conta como deste ano
++            return f"{dia:02d}/{mes:02d}/{ano} {hora:02d}:{minuto:02d}"
++    return texto
++
++
++class PostHtml(Adaptador):
++    tipo = "post_html"
++
++    def _token(self, req: dict[str, Any]) -> str:
++        pagina = BeautifulSoup(self.cliente.get(req["pagina_token"]).text, "lxml")
++        el = pagina.select_one(req.get("token_css", "#token"))
++        token = el.get_text(strip=True) if el else ""
++        if not token:
++            raise ErroDeFonte(f"Token não encontrado em {req['pagina_token']} ({req.get('token_css')}).")
++        return token
++
++    @staticmethod
++    def _preencher(obj: Any, pagina: int, token: str) -> Any:
++        if isinstance(obj, str):
++            return obj.replace("{pagina}", str(pagina)).replace("{token}", token)
++        if isinstance(obj, dict):
++            return {k: PostHtml._preencher(v, pagina, token) for k, v in obj.items()}
++        return obj
++
++    def coletar(self) -> Iterator[LoteBruto]:
++        req = self.fonte.get("requisicao") or {}
++        for k in ("url", "pagina_token", "item"):
++            if not (req.get(k) or self.fonte.get(k)):
++                raise ErroDeFonte(f"Informe {k} no YAML.")
++        token = self._token(req)
++        vistos: set[str] = set()
++        total_esperado = None
++        for pagina in range(1, int(req.get("paginas_max", 60)) + 1):
++            try:
++                r = self.cliente.post(
++                    req["url"], data=self._preencher(req.get("params") or {}, pagina, token),
++                    headers={"X-Requested-With": "XMLHttpRequest"},
++                )
++                dados = r.json()
++            except Exception as e:
++                self.registrar_erro(f"Página {pagina}: {e}")
++                break
++            if total_esperado is None and req.get("campo_total"):
++                total_esperado = dados.get(req["campo_total"])
++            html = dados.get(req.get("campo_html", "lista")) or ""
++            sopa = BeautifulSoup(html, "lxml")
++            itens = sopa.select(self.fonte["item"])
++            novos = 0
++            for item in itens:
++                ex = Extrator(item, url=req["url"])
++                campos: dict[str, Any] = ex.campos(self.fonte.get("campos") or {})
++                for k in ("data_praca1", "data_praca2"):
++                    if k in campos:
++                        campos[k] = completar_ano(campos[k])
++                link = campos.pop("link", None)  # o Extrator já devolve o endereço completo
++                if link:
++                    campos["url"] = link
++                lote = self.montar(campos)
++                if lote and lote.id_externo not in vistos:
++                    vistos.add(lote.id_externo)
++                    novos += 1
++                    yield lote
++            if novos == 0:
++                break
++        if total_esperado and len(vistos) < int(str(total_esperado).replace(".", "")) * 0.9:
++            self.registrar_erro(f"Leu {len(vistos)} de {total_esperado} imóveis anunciados pelo site.")
+diff --git a/coletor/coletor/adaptadores/wordpress_rest.py b/coletor/coletor/adaptadores/wordpress_rest.py
+new file mode 100644
+index 0000000..4a0db66
+--- /dev/null
++++ b/coletor/coletor/adaptadores/wordpress_rest.py
+@@ -0,0 +1,130 @@
++"""Adaptador para sites WordPress que publicam os imóveis como um tipo de post (ex.: Santander Imóveis).
++
++Sem IA e sem navegador. Duas etapas:
++  1. Lista os imóveis pela API REST do WordPress (id, link, título e data de modificação), 100 por página.
++  2. Para cada imóvel NOVO ou MODIFICADO, lê a página de detalhe (HTML comum) e extrai os campos por regra.
++     Para o imóvel que não mudou desde a última coleta, reaproveita o que já foi lido (tabela pagina_cache,
++     chave "wp:" + link, guardando a data de modificação). Assim a coleta completa é rápida e barata,
++     e uma mudança de preço ou de data é pega na rodada seguinte.
++
++Configuração:
++    tipo: wordpress_rest
++    requisicao:
++      url: https://www.site.com.br/wp-json/wp/v2/estate_property
++      por_pagina: 100
++      paginas_max: 100
++    detalhe:
++      campos: {...}                 # mini-linguagem de extracao.py, aplicada à página do imóvel
++    titulo_remove: " | Santander Imóveis"    # sufixo a tirar do título (opcional)
++    max_detalhes_por_execucao: 3000          # páginas novas lidas por rodada (a carga inicial se espalha por várias)
++"""
++from __future__ import annotations
++
++import html
++import re
++from typing import Any, Iterator
++
++from bs4 import BeautifulSoup
++from psycopg.types.json import Jsonb
++
++from ..modelos import LoteBruto
++from .base import Adaptador, ErroDeFonte
++from .extracao import Extrator
++
++
++class WordpressRest(Adaptador):
++    tipo = "wordpress_rest"
++
++    # ---------------------------------------------------------------- cache por imóvel
++
++    def _ler_cache(self, chave: str) -> tuple[str, dict] | None:
++        if not self.conn:
++            return None
++        with self.conn.cursor() as cur:
++            cur.execute("select hash_texto, extraido from pagina_cache where url = %s", (chave,))
++            r = cur.fetchone()
++        self.conn.rollback()
++        return (r["hash_texto"], r["extraido"] or {}) if r else None
++
++    def _gravar_cache(self, chave: str, versao: str, campos: dict) -> None:
++        if not self.conn:
++            return
++        with self.conn.cursor() as cur:
++            cur.execute(
++                """insert into pagina_cache (url, hash_texto, extraido) values (%s, %s, %s)
++                   on conflict (url) do update set hash_texto = excluded.hash_texto,
++                   extraido = excluded.extraido, atualizado_em = now()""",
++                (chave, versao, Jsonb(campos)),
++            )
++        self.conn.commit()
++
++    # ---------------------------------------------------------------- listagem
++
++    def _itens(self) -> Iterator[dict[str, Any]]:
++        req = self.fonte.get("requisicao") or {}
++        if not req.get("url"):
++            raise ErroDeFonte("Informe requisicao.url no YAML.")
++        por_pagina = int(req.get("por_pagina", 100))
++        for pagina in range(1, int(req.get("paginas_max", 100)) + 1):
++            try:
++                r = self.cliente.get(req["url"], params={
++                    "per_page": por_pagina, "page": pagina, "orderby": "modified", "order": "desc",
++                    "_fields": "id,modified,link,title",
++                })
++                itens = r.json()
++            except Exception as e:
++                # o WordPress responde 400 quando a página passa da última: é o fim normal da lista
++                if pagina > 1 and "400" in str(e):
++                    return
++                raise ErroDeFonte(f"Lista REST página {pagina}: {e}") from e
++            if not isinstance(itens, list) or not itens:
++                return
++            yield from itens
++            if len(itens) < por_pagina:
++                return
++
++    # ---------------------------------------------------------------- detalhe
++
++    def _ler_detalhe(self, link: str, titulo: str) -> dict[str, Any]:
++        pagina = BeautifulSoup(self.cliente.get(link).text, "lxml")
++        campos = Extrator(pagina, url=link).campos((self.fonte.get("detalhe") or {}).get("campos") or {})
++        campos = {k: v for k, v in campos.items() if v not in (None, "", [])}
++        campos.setdefault("titulo", titulo)
++        return campos
++
++    def coletar(self) -> Iterator[LoteBruto]:
++        vistos: set[str] = set()
++        lidos = 0
++        limite = int(self.fonte.get("max_detalhes_por_execucao", 3000))
++        for item in self._itens():
++            link, versao = item.get("link"), str(item.get("modified") or "")
++            if not link or link in vistos:
++                continue
++            vistos.add(link)
++            titulo = html.unescape((item.get("title") or {}).get("rendered") or "")
++            sufixo = self.fonte.get("titulo_remove")
++            if sufixo and titulo.endswith(sufixo):
++                titulo = titulo[: -len(sufixo)]
++            chave = "wp:" + link
++            cache = self._ler_cache(chave)
++            if cache and cache[0] == versao and versao:
++                campos = cache[1]
++            elif lidos >= limite and not cache:
++                continue  # primeira carga grande: o resto entra nas próximas rodadas (sem esgotar o tempo da execução)
++            else:
++                try:
++                    campos = self._ler_detalhe(link, titulo)
++                except Exception as e:
++                    self.registrar_erro(f"Detalhe {link}: {e}")
++                    if cache:  # falhou agora: segue com o que já se sabia, para o lote não sumir
++                        campos = cache[1]
++                    else:
++                        continue
++                else:
++                    lidos += 1
++                    self._gravar_cache(chave, versao, campos)
++            campos = dict(campos)
++            campos.setdefault("id_externo", str(item.get("id")))
++            lote = self.montar(campos, url=link)
++            if lote:
++                yield lote
+diff --git a/coletor/coletor/cli.py b/coletor/coletor/cli.py
+index 46f533e..4a29344 100644
+--- a/coletor/coletor/cli.py
++++ b/coletor/coletor/cli.py
+@@ -155,6 +155,31 @@ def cmd_catalogo(a):
+                 ["uf", "leiloeiros", "fazem imóveis", "com fonte"])
+ 
+ 
++def cmd_sondar(a):
++    from collections import Counter
++
++    from .registro import carregar
++    from .sondagem import sondar
++    todas = carregar()
++    if a.ids:
++        escolhidas = [todas[i] for i in a.ids]
++    else:  # só as fontes ativas que hoje não têm nenhum lote ativo (a lista que importa)
++        with conectar() as conn, conn.cursor() as cur:
++            cur.execute("""select f.id from fonte f where f.ativa and f.id not like 'caixa%%'
++                           and not exists (select 1 from lote l where l.fonte_id = f.id and l.status = 'ativo')""")
++            ids = {r["id"] for r in cur.fetchall()}
++        escolhidas = [f for i, f in todas.items() if i in ids]
++    print(f"Sondando {len(escolhidas)} fonte(s)...")
++    res = sondar(escolhidas)
++    c = Counter(r["veredito"] for r in res)
++    print("Resumo:", ", ".join(f"{k}: {v}" for k, v in c.most_common()))
++    pl = Counter(r["plataforma"] or "(não reconhecida)" for r in res)
++    print("Plataformas:", ", ".join(f"{k}: {v}" for k, v in pl.most_common(12)))
++    _tabela([[r["fonte"][:38], r["veredito"], r["plataforma"], r["links_lote"], r["texto_util"], r["status_http"], r["detalhe"][:50]]
++             for r in sorted(res, key=lambda x: (x["veredito"], x["fonte"]))],
++            ["fonte", "veredito", "plataforma", "links", "texto", "http", "obs"])
++
++
+ def cmd_geocodificar(a):
+     from .geocodificar import Geocodificador
+     with conectar() as conn:
+@@ -190,6 +215,9 @@ def main(argv: list[str] | None = None) -> None:
+     s.add_argument("url")
+     s.add_argument("--sem-navegador", action="store_true")
+     s.set_defaults(f=cmd_inspecionar)
++    s = sub.add_parser("sondar", help="diz por que as fontes sem lotes estão vazias (sem IA)")
++    s.add_argument("ids", nargs="*")
++    s.set_defaults(f=cmd_sondar)
+     s = sub.add_parser("nova-fonte", help="cria YAML automático para um site")
+     s.add_argument("url")
+     s.add_argument("--uf", nargs="+", default=["DF"])
+diff --git a/coletor/coletor/config.py b/coletor/coletor/config.py
+index 4f67e08..7a9b6cf 100644
+--- a/coletor/coletor/config.py
++++ b/coletor/coletor/config.py
+@@ -25,6 +25,8 @@ class Config:
+     llm_max_paginas_por_execucao: int = int(os.getenv("LLM_MAX_PAGINAS_POR_EXECUCAO", "200"))
+     # Teto GLOBAL por dia (todas as fontes juntas). O valor em uso fica na tabela llm_orcamento (dá para mudar no banco);
+     # este é só o padrão, caso a tabela esteja vazia.
++    # Página "tranquila" já lida há menos de N dias não é relida pela IA só porque o texto mudou.
++    cache_revisao_dias: int = int(os.getenv("CACHE_REVISAO_DIAS") or "3")
+     llm_max_chamadas_dia: int = int(os.getenv("LLM_MAX_CHAMADAS_DIA") or "1000")
+ 
+     @property
+diff --git a/coletor/coletor/repositorio.py b/coletor/coletor/repositorio.py
+index 1097423..bd0cd5a 100644
+--- a/coletor/coletor/repositorio.py
++++ b/coletor/coletor/repositorio.py
+@@ -116,6 +116,9 @@ class Repositorio:
+             mensagem = (mensagem or "") + (
+                 f" Leu {c.lidos} de {ativos_antes} lotes ativos: remoções não aplicadas (possível coletor quebrado)."
+             )
++        if concluida and c.lidos == 0 and not ativos_antes:
++            # não é erro (o site pode não ter imóveis hoje), mas não pode passar em branco: fica escrito no log da execução
++            mensagem = ((mensagem or "") + " Nenhum lote encontrado (site sem imóveis hoje, ou o leitor não reconhece a página).").strip()
+         with self.conn.cursor() as cur:
+             if pode_remover:
+                 cur.execute(
+diff --git a/coletor/coletor/sondagem.py b/coletor/coletor/sondagem.py
+new file mode 100644
+index 0000000..43975c6
+--- /dev/null
++++ b/coletor/coletor/sondagem.py
+@@ -0,0 +1,92 @@
++"""Sonda as fontes que não trazem lotes e diz, para cada uma, POR QUE (sem IA, só HTTP simples).
++
++Para cada fonte: abre a primeira página (a de `inicio`, `listagem.url` ou `requisicao.url`) e classifica:
++  erro_http      o site não respondeu, bloqueou ou o robots.txt não deixa
++  lotes_no_html  há links que parecem de lote no HTML: o site TEM imóveis e a fonte deveria ler (configuração a consertar)
++  js             pouco texto e muito script: o site monta a lista por JavaScript (precisa de navegador ou da API dele)
++  sem_lotes      página normal sem links de lote: provavelmente sem imóveis hoje, ou o padrão de link está errado
++Também mostra a plataforma reconhecida (Soleon, Leilotech...), o que permite resolver várias fontes com um leitor só.
++"""
++from __future__ import annotations
++
++import csv
++import re
++from pathlib import Path
++from typing import Any
++from urllib.parse import urljoin, urlparse
++
++from bs4 import BeautifulSoup
++
++from .adaptadores.automatico import HEURISTICA_LOTE
++from .config import config
++from .http import Cliente
++from .inspecionar import identificar_plataforma
++
++
++def primeira_url(fonte: dict[str, Any]) -> str | None:
++    inicio = fonte.get("inicio")
++    if isinstance(inicio, str):
++        return inicio
++    if inicio:
++        return inicio[0]
++    for chave in ("listagem", "requisicao"):
++        u = (fonte.get(chave) or {}).get("url")
++        if u:
++            u = u[0] if isinstance(u, list) else u
++            return re.sub(r"\{pagina\}", "1", u)
++    return fonte.get("site")
++
++
++def sondar_fonte(fonte: dict[str, Any], cliente: Cliente) -> dict[str, Any]:
++    url = primeira_url(fonte)
++    r: dict[str, Any] = {"fonte": fonte["id"], "tipo": fonte.get("tipo"), "url": url, "veredito": "", "plataforma": "",
++                         "status_http": "", "texto_util": 0, "scripts": 0, "links_lote": 0, "exemplo": "", "detalhe": ""}
++    if not url:
++        r["veredito"], r["detalhe"] = "erro_http", "fonte sem URL"
++        return r
++    try:
++        resp = cliente.get(url)
++    except Exception as e:
++        r["veredito"], r["detalhe"] = "erro_http", f"{type(e).__name__}: {str(e)[:120]}"
++        return r
++    html = resp.text
++    r["status_http"] = resp.status_code
++    r["plataforma"] = ",".join(identificar_plataforma(html))
++    sopa = BeautifulSoup(html, "lxml")
++    r["scripts"] = len(sopa.find_all("script"))
++    padrao = re.compile(fonte["padrao_link_lote"], re.I) if fonte.get("padrao_link_lote") else HEURISTICA_LOTE
++    dominio = urlparse(url).netloc
++    links = []
++    for a in sopa.select("a[href]"):
++        href = urljoin(url, a["href"]).split("#")[0]
++        if urlparse(href).netloc == dominio and padrao.search(href) and href not in links:
++            links.append(href)
++    for t in sopa(["script", "style", "noscript", "svg"]):
++        t.decompose()
++    r["texto_util"] = len(sopa.get_text(" ", strip=True))
++    r["links_lote"] = len(links)
++    r["exemplo"] = links[0] if links else ""
++    if links:
++        r["veredito"] = "lotes_no_html"
++    elif r["texto_util"] < 500 and r["scripts"] >= 3:
++        r["veredito"] = "js"
++    else:
++        r["veredito"] = "sem_lotes"
++    if fonte.get("navegador"):
++        r["detalhe"] = "fonte usa navegador; a sondagem lê só o HTML bruto"
++    return r
++
++
++def sondar(fontes: list[dict[str, Any]], destino: Path | None = None) -> list[dict[str, Any]]:
++    destino = destino or (config.pasta_dados / "sondagem.csv")
++    destino.parent.mkdir(parents=True, exist_ok=True)
++    out = []
++    with Cliente(intervalo=0.5) as cliente:
++        for f in fontes:
++            out.append(sondar_fonte(f, cliente))
++    if out:
++        with destino.open("w", newline="", encoding="utf-8") as fh:
++            w = csv.DictWriter(fh, fieldnames=list(out[0]))
++            w.writeheader()
++            w.writerows(out)
++    return out
+diff --git a/coletor/fontes/bancos/santander-imoveis.yaml b/coletor/fontes/bancos/santander-imoveis.yaml
+index 3e1ec06..48e583c 100644
+--- a/coletor/fontes/bancos/santander-imoveis.yaml
++++ b/coletor/fontes/bancos/santander-imoveis.yaml
+@@ -1,11 +1,33 @@
+-# Outlet de imóveis do Santander (venda direta do banco). Leilões do Santander também chegam por leiloeiros.
++# Outlet de imóveis do Santander (venda direta e leilões do banco). Sem IA:
++# a lista vem da API do WordPress do próprio site (com a data de modificação de cada imóvel) e a página
++# de cada imóvel é lida por regra. Só imóvel novo ou modificado é relido (ver adaptadores/wordpress_rest.py).
+ id: santander-imoveis
+ nome: Santander Imóveis
+ site: https://www.santanderimoveis.com.br
+-tipo: automatico
++tipo: wordpress_rest
+ comitente: Santander
+ uf: todas
+-inicio: [https://www.santanderimoveis.com.br/]
+-max_paginas_lista: 15
+-max_lotes: 400
+-navegador: true      # site montado por JavaScript
++intervalo_segundos: 1
++requisicao:
++  url: https://www.santanderimoveis.com.br/wp-json/wp/v2/estate_property
++  por_pagina: 100
++  paginas_max: 100
++max_detalhes_por_execucao: 3000
++titulo_remove: " | Santander Imóveis"
++detalhe:
++  campos:
++    id_externo: {texto_regex: "Cód\\. ([\\d.]+)"}
++    tipo: {texto_regex: "Cód\\. [\\d.]+\\s+(\\w+)"}
++    endereco: {css: "p:-soup-contains('CEP:')", regex: "^(.*?)\\.? CEP"}
++    cidade: {css: "p:-soup-contains('CEP:')", regex: ", ([^,]+) - [A-Z]{2}\\.? CEP"}
++    uf: {css: "p:-soup-contains('CEP:')", regex: "- ([A-Z]{2})\\.? CEP"}
++    ocupacao: {texto_regex: "\\b(Desocupado|Ocupado)\\b"}
++    valor_avaliacao: {rotulo: "Valor avaliado"}
++    lance_minimo: {css: "strong.value", regex: "R\\$\\s*([\\d.,]+)"}
++    data_praca1: {texto_regex: "Data do leil[ãa]o:?\\s*(\\d{2}/\\d{2}/\\d{4}\\s*-\\s*\\d{2}:\\d{2})"}
++    matricula: {rotulo: "Matrícula(s)"}
++    cartorio: {rotulo: "RGI"}
++    area_terreno: {texto_regex: "([\\d.,]+)\\s*m² de área terreno"}
++    area_privativa: {texto_regex: "([\\d.,]+)\\s*m² de área construída"}
++    leiloeiro: {css: ".main-atendimento strong"}
++    descricao: {texto_regex: "Considerações importantes\\s*(.{20,1500}?)\\s*Condições de Pagamento"}
+diff --git a/coletor/fontes/bancos/seu-imovel-bb.yaml b/coletor/fontes/bancos/seu-imovel-bb.yaml
+index a38264f..8a6278e 100644
+--- a/coletor/fontes/bancos/seu-imovel-bb.yaml
++++ b/coletor/fontes/bancos/seu-imovel-bb.yaml
+@@ -1,11 +1,28 @@
+-# Plataforma Seu Imóvel BB (venda direta do Banco do Brasil). Leilões do BB também chegam por leiloeiros.
++# Seu Imóvel BB (venda direta e leilões do Banco do Brasil). Sem IA: o catálogo responde a uma consulta POST
++# com os cards em HTML dentro de um JSON (50 por página); ver adaptadores/post_html.py.
+ id: seu-imovel-bb
+ nome: Seu Imóvel BB
+ site: https://seuimovelbb.com.br
+-tipo: automatico
++tipo: post_html
+ comitente: Banco do Brasil
+ uf: todas
+-inicio: [https://seuimovelbb.com.br/]
+-max_paginas_lista: 15
+-max_lotes: 400
+-navegador: true
++intervalo_segundos: 1
++requisicao:
++  pagina_token: https://seuimovelbb.com.br/catalogo/categoria/urbanos
++  token_css: "#_cppnp"
++  url: https://seuimovelbb.com.br/catalogo
++  params: {pagina: "{pagina}", categorias: "", tipoVenda: "", tipoPagamento: "", evolua: "", localidade: "", minimo: "", maximo: "", texto: "", ordem: "", contento: "", cppnp: "{token}"}
++  campo_html: lista
++  campo_total: imoveis
++  paginas_max: 60
++item: ".carta"
++campos:
++  link: {css: "a[href*='/imovel/id/']", attr: href}
++  id_externo: {css: "a[href*='/imovel/id/']", attr: href, regex: "/imovel/id/(\\d+)"}
++  tipo: {css: ".tipo"}
++  cidade: {css: ".localidade", regex: "^(.*?)\\s*-\\s*[A-Z]{2}$"}
++  uf: {css: ".localidade", regex: "-\\s*([A-Z]{2})$"}
++  modalidade: {texto_regex: "(Leil[ãa]o|Venda direta) - ID"}
++  lance_minimo: {css: ".valor", regex: "R\\$\\s*([\\d.,]+)"}
++  data_praca1: {texto_regex: "(\\d{1,2}/\\d{1,2} às \\d{1,2}h(?:\\d{2})?)"}
++  descricao: {css: "i.compartilhar", attr: onclick, regex: "_compartilhar\\('(.*?)', '"}
+diff --git a/coletor/fontes/leiloeiros/mega-leiloes.yaml b/coletor/fontes/leiloeiros/mega-leiloes.yaml
+index 74c7b8d..10fc8ff 100644
+--- a/coletor/fontes/leiloeiros/mega-leiloes.yaml
++++ b/coletor/fontes/leiloeiros/mega-leiloes.yaml
+@@ -1,12 +1,28 @@
+-# Criado pelo catálogo (2026-09-28). Validação: pendente.
+-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
++# Mega Leilões. Sem IA e sem navegador: a listagem é HTML comum (48 imóveis por página) e o card já traz
++# valor, tipo, cidade, UF, código, praça, situação e data. Cobre também os imóveis do Santander e de outros
++# comitentes que leiloam por aqui.
+ id: mega-leiloes
+ nome: Mega Leilões
+ site: https://www.megaleiloes.com.br
+-tipo: automatico
++tipo: seletores
+ uf: [todas]
+-inicio:
+-  - https://www.megaleiloes.com.br/imoveis
+-max_paginas_lista: 10
+-max_lotes: 400
+-navegador: true   # listagem montada por JavaScript (confirmar com inspecionar)
++intervalo_segundos: 1
++listagem:
++  url: https://www.megaleiloes.com.br/imoveis?pagina={pagina}
++  pagina_inicial: 1
++  paginas_max: 40
++  item: "div[data-key]"
++  campos:
++    id_externo: {css: ".card-number"}
++    url: {css: "a.card-title", attr: href, regex: "^([^?]+)"}
++    titulo: {css: "a.card-title"}
++    tipo: {css: "a.card-title", regex: "^([A-Za-zÀ-ÿ]+)"}
++    cidade: {css: ".card-locality", regex: "^(.*),"}
++    uf: {css: ".card-locality", regex: ",\\s*([A-Z]{2})$"}
++    modalidade: {css: ".card-instance-title a"}
++    status: {css: ".card-status"}
++    lance_minimo: {css: ".card-price"}
++    data_praca1: {css: ".card-first-instance-date", regex: "(\\d{2}/\\d{2}/\\d{4}[^\\n]*)"}
++    valor_praca1: {css: ".instance .card-instance-value"}
++    data_praca2: {css: ".card-second-instance-date", regex: "(\\d{2}/\\d{2}/\\d{4}[^\\n]*)"}
++    valor_praca2: {css: ".instance + .instance .card-instance-value"}
+diff --git a/coletor/tests/fixtures/mega_lista.html b/coletor/tests/fixtures/mega_lista.html
+new file mode 100644
+index 0000000..7d4ac6c
+--- /dev/null
++++ b/coletor/tests/fixtures/mega_lista.html
+@@ -0,0 +1,20 @@
++<html><body><div class="cards with-sorter"><div class="summary">Exibindo <b>1 - 2</b> de <b>2</b> itens. Página <b>1</b> de <b>1</b>.</div>
++<div class="row">
++<div class="col-sm-6 col-md-4 col-lg-3" data-key="129793"><div class="card open">
++<a class="card-image lazyload" href="https://www.megaleiloes.com.br/imoveis/casas/sp/aramina/casa-213-m2-santo-antonio-aramina-sp-x129793?utm_source=megaleiloes"></a>
++<div class="card-content"><div class="card-price">R$ 205.200,00</div><div class="card-views-bids "><span>6166</span><span>0</span></div>
++<div class="wrap"><a class="card-title" href="https://www.megaleiloes.com.br/imoveis/casas/sp/aramina/casa-213-m2-santo-antonio-aramina-sp-x129793?utm_source=megaleiloes">Casa 213 m² - Santo Antonio - Aramina - SP</a>
++<div class="card-number pull-left">X129793</div><a class="card-locality" href="https://www.megaleiloes.com.br/sp/aramina">Aramina, SP</a></div>
++<div class="card-instance"><div class="card-instance-title"><a href="https://www.megaleiloes.com.br/leiloes-extrajudiciais">Extrajudicial</a><div class="card-instances"> P. Única </div></div>
++<div class="card-instance-info"><div class="card-status">Aberto para lances</div>
++<div class="instance active"><span class="card-first-instance-date"><b>Data:</b> 07/10/2026 às 12:00</span><span class="card-instance-value">R$ 205.200,00</span></div></div></div></div></div></div>
++<div class="col-sm-6 col-md-4 col-lg-3" data-key="129900"><div class="card open">
++<a class="card-image lazyload" href="https://www.megaleiloes.com.br/imoveis/apartamentos/rj/rio-de-janeiro/apartamento-42-m2-x129900?utm_source=megaleiloes"></a>
++<div class="card-content"><div class="card-price">R$ 937.535,46</div>
++<div class="wrap"><a class="card-title" href="https://www.megaleiloes.com.br/imoveis/apartamentos/rj/rio-de-janeiro/apartamento-42-m2-x129900?utm_source=megaleiloes">Apartamento 42 m² (Unid. 206) - Centro - Rio de Janeiro - RJ</a>
++<div class="card-number pull-left">X129900</div><a class="card-locality" href="#">Rio de Janeiro, RJ</a></div>
++<div class="card-instance"><div class="card-instance-title"><a href="#">Judicial</a></div>
++<div class="card-instance-info"><div class="card-status">Aberto para lances</div>
++<div class="instance first active"><span class="card-first-instance-date"><b>1ª Praça:</b> 07/10/2026 às 10:00</span><span class="card-instance-value">R$ 937.535,46</span></div>
++<div class="instance active"><span class="card-second-instance-date"><b>2ª Praça:</b> 09/10/2026 às 10:00</span><span class="card-instance-value">R$ 852.151,57</span></div></div></div></div></div></div>
++</div></div></body></html>
+diff --git a/coletor/tests/fixtures/santander_imovel.html b/coletor/tests/fixtures/santander_imovel.html
+new file mode 100644
+index 0000000..5dc7aed
+--- /dev/null
++++ b/coletor/tests/fixtures/santander_imovel.html
+@@ -0,0 +1 @@
++<html><body><main><div><section class="main-top line"><span class="badge"> Cód. 02.25830</span><div><h1>Casa na Rua Benjamim Constant </h1><div class="social-group ocultar"></div></div><div><p>Rua Benjamin Constant, 1767, Jardim Leonor, Mongaguá - SP. CEP: 11730000</p><strong>Ocupado</strong></div></section><div class="mobile"><section class="main-values line"><div><p>Valor avaliado </p><strong>R$ 248.000</strong></div><div><p>Valor de venda</p><strong class="value"><small>A partir de </small> R$ 28.508 </strong></div><div><p>Deságio</p><strong>89%</strong></div></section><section class="main-values "><div class="p-icon "><p>Data do leilão: 06/10/2026 - 11:00 </p></div><div><strong>Financiamento bancário</strong></div><div><p>Entrada mínima *</p><strong>R$ 5.702</strong></div><div><p>Parcelas a partir de *</p><strong>R$ 311</strong></div></section><section class="main-atendimento box-shadow line"><div><strong>Biasi Leilões</strong><p> Telefone(s): (11) 4083-2575 </p><a class="btn">SAIBA MAIS</a></div><a>Ainda com dúvidas? Fale com o leiloeiro.</a><div></div></section></div><section class="main-value-line line"><h2>Valor do imóvel</h2><div class="values-line-values"><div><p>Valor de venda</p><strong> A partir de R$ 28.508</strong></div><div><p>Valor avaliado</p><strong>R$ 248.000</strong></div></div></section><section class="main-info line"><h2>Dados do imóvel</h2><p>Matrícula(s): <strong>12.520</strong></p><p>RGI: <strong>1° CRI DE MONGAGUÁ</strong></p><p>Inscrição Prefeitura: <strong>39000205802</strong></p><p>Área(s): <strong>126 m² de área terreno, 57 m² de área construída</strong></p></section><section class="main-info line"><h2>Despesas do imóvel</h2><p>Valor do condomínio (mês): <strong>R$ 0</strong></p><p>Valor do IPTU (ano): <strong>R$ 310</strong></p></section><section class="main-info line"><h2>Considerações importantes</h2><ul><li>A. OCUPADO B. FICARÃO A CARGO DO ARREMATANTE: TODAS AS PROVIDÊNCIAS, RISCOS, CUSTAS E DESPESAS NECESSÁRIAS À DESOCUPAÇÃO CONFORME CLAUSULA 4.12. DO EDITAL, C. OS DÉBITOS IPTU SERÃO QUITADOS PELO VENDEDOR ATÉ A DATA DO LEILÃO.</li></ul></section><section class="main-info line"><h2>Condições de Pagamento</h2><p>Somente à vista. </p></section><section class="main-info"><h2>Aviso legal</h2><p>As imagens foram obtidas a partir do laudo de avaliação do imóvel.</p></section></div></main></body></html>
+diff --git a/coletor/tests/test_fontes_sem_ia.py b/coletor/tests/test_fontes_sem_ia.py
+new file mode 100644
+index 0000000..55ce978
+--- /dev/null
++++ b/coletor/tests/test_fontes_sem_ia.py
+@@ -0,0 +1,109 @@
++"""Leitores sem IA (Mega Leilões, Seu Imóvel BB, Santander), sondagem de fontes vazias e cache com prazo de revisão."""
++import json
++from decimal import Decimal
++
++from coletor.adaptadores import Automatico, Seletores
++from coletor.normalizar import normalizar
++
++
++def test_mega_leiloes_por_seletores_sem_ia(cliente_para):
++    from coletor.registro import carregar
++    fonte = carregar()["mega-leiloes"]
++    assert fonte["tipo"] == "seletores"
++    url = "https://www.megaleiloes.com.br/imoveis?pagina={}"
++    cli = cliente_para({url.format(1): "mega_lista.html", url.format(2): "mega_lista.html"})  # 2ª repete: fim da paginação
++    lotes = list(Seletores(fonte, cli).coletar())
++    assert len(lotes) == 2
++    a, b = (normalizar(x, {}) for x in lotes)
++    assert a.id_externo == "X129793" and a.tipo == "casa" and a.uf == "SP" and a.cidade == "Aramina"
++    assert a.modalidade == "extrajudicial" and a.lance_minimo == Decimal("205200.00")
++    assert a.url == "https://www.megaleiloes.com.br/imoveis/casas/sp/aramina/casa-213-m2-santo-antonio-aramina-sp-x129793"
++    assert a.data_praca1.day == 7 and a.data_praca1.hour == 12 and a.valor_praca1 == Decimal("205200.00")
++    assert b.tipo == "apartamento" and b.modalidade == "judicial" and b.uf == "RJ"
++    assert b.valor_praca1 == Decimal("937535.46") and b.valor_praca2 == Decimal("852151.57") and b.data_praca2.day == 9
++
++
++def test_seu_imovel_bb_post_html(cliente_para):
++    from coletor.adaptadores import PostHtml
++    from coletor.registro import carregar
++    fonte = carregar()["seu-imovel-bb"]
++    card = """<div class="col-lg-3"><div class="card carta"><div class="foto-container"><a href="/imovel/id/12210">
++      <div class="tipo"><i></i> Casa</div></a></div><div class="card-body"><a href="/imovel/id/12210"><div class="valor">Aceita BB?</div></a>
++      <i class="compartilhar" onclick="_compartilhar('ID96670 ÁGUA BRANCA (PI)Descrição legal: Imóvel Urbano Residencial, Casa situada na Rua Projetada 08', 'http://seuimovelbb.com.br/imovel/id/12210');"></i>
++      <div class="localidade"><i></i> Água Branca - PI</div><div class="leilao"><i></i> Leilão - ID 96670</div><div class="leilao"><i></i> Terça, 13/10 às 10h</div></div></div></div>
++      <div class="col-lg-3"><div class="card carta"><a href="/imovel/id/12234"><div class="tipo">Prédio</div></a><a href="/imovel/id/12234"><div class="valor">R$ 127.000,00</div></a>
++      <div class="localidade">Venâncio Aires - RS</div><div class="leilao">Venda direta - ID 5</div></div></div>"""
++    cli = cliente_para({
++        "https://seuimovelbb.com.br/catalogo/categoria/urbanos": '<html><div id="_cppnp">tok123</div></html>',
++        "https://seuimovelbb.com.br/catalogo": {"lista": card, "imoveis": "2", "paginacao": ""},
++    })
++    lotes = list(PostHtml(fonte, cli).coletar())
++    assert len(lotes) == 2
++    a, b = (normalizar(x, {"comitente": "Banco do Brasil"}) for x in lotes)
++    assert a.id_externo == "12210" and a.url == "https://seuimovelbb.com.br/imovel/id/12210"
++    assert a.tipo == "casa" and a.uf == "PI" and a.cidade == "Água Branca" and a.modalidade == "outros"
++    assert a.data_praca1 is not None and a.data_praca1.day == 13 and a.data_praca1.month == 10 and a.data_praca1.hour == 10
++    assert "Imóvel Urbano Residencial" in a.descricao
++    assert b.lance_minimo == Decimal("127000.00") and b.modalidade == "venda_direta" and b.tipo == "comercial"
++
++
++def test_santander_wordpress_rest_sem_ia(cliente_para):
++    from coletor.adaptadores import WordpressRest
++    from coletor.registro import carregar
++    fonte = carregar()["santander-imoveis"]
++    link = "https://www.santanderimoveis.com.br/venda/imovel/casa-a-venda-na-rua-benjamim-constant-mongagua-sp-codigo-02-25830-santander-imoveis/"
++    lista = json.dumps([{"id": 334157, "modified": "2026-10-06T08:42:48", "link": link,
++                         "title": {"rendered": "Casa à venda na Rua Benjamim Constant &#8211; Mongaguá/SP Código: 02.25830 | Santander Imóveis"}}])
++    cli = cliente_para({"https://www.santanderimoveis.com.br/wp-json/wp/v2/estate_property": lista, link: "santander_imovel.html"})
++    lotes = list(WordpressRest(fonte, cli).coletar())
++    assert len(lotes) == 1
++    l = normalizar(lotes[0], {"comitente": "Santander"})
++    assert l.id_externo == "02.25830" and l.tipo == "casa" and l.uf == "SP" and l.cidade == "Mongaguá"
++    assert l.valor_avaliacao == Decimal("248000.00") and l.lance_minimo == Decimal("28508.00")
++    assert l.ocupacao == "ocupado" and l.matricula == "12.520"
++    assert l.data_praca1.year == 2026 and l.data_praca1.month == 10 and l.data_praca1.hour == 11
++    assert l.area_terreno == Decimal("126") and l.area_privativa == Decimal("57")
++    assert "Biasi" in (l.leiloeiro or "") and "DESOCUPAÇÃO" in l.descricao
++
++
++def test_wordpress_rest_reaproveita_imovel_nao_modificado(conn):
++    from coletor.adaptadores import WordpressRest
++    ad = WordpressRest({"id": "x", "tipo": "wordpress_rest"}, None, conn=conn)
++    assert ad._ler_cache("wp:u") is None
++    ad._gravar_cache("wp:u", "2026-10-06T08:00:00", {"titulo": "A", "id_externo": "1"})
++    assert ad._ler_cache("wp:u") == ("2026-10-06T08:00:00", {"titulo": "A", "id_externo": "1"})
++
++
++def test_sondagem_classifica_fontes_vazias(cliente_para):
++    from coletor.sondagem import sondar_fonte
++    com = '<html><body><a href="/leilao/imovel/5501">x</a></body></html>'
++    js = "<html><body><div id=root></div><script></script><script></script><script></script></body></html>"
++    sem = "<html><body>" + "Nenhum imóvel disponível. " * 3 + "</body></html>"
++    cli = cliente_para({"https://a.com.br/": com, "https://b.com.br/": js, "https://c.com.br/": sem})
++    assert sondar_fonte({"id": "a", "tipo": "automatico", "inicio": ["https://a.com.br/"], "padrao_link_lote": r"/leilao/imovel/\d+"}, cli)["veredito"] == "lotes_no_html"
++    assert sondar_fonte({"id": "b", "tipo": "automatico", "inicio": ["https://b.com.br/"]}, cli)["veredito"] == "js"
++    assert sondar_fonte({"id": "c", "tipo": "automatico", "inicio": ["https://c.com.br/"]}, cli)["veredito"] == "sem_lotes"
++    assert sondar_fonte({"id": "d", "tipo": "automatico", "inicio": ["https://d.com.br/"]}, cli)["veredito"] == "erro_http"
++
++
++def test_cache_prazo_de_revisao_respeita_urgencia_e_conta_uso_por_fonte(conn):
++    ad = Automatico({"id": "auto", "tipo": "automatico", "inicio": ["https://x.com.br"]}, None, conn=conn)
++    ad._reservar_chamada_global()
++    ad._reservar_chamada_global()
++    with conn.cursor() as cur:
++        cur.execute("select chamadas from llm_uso_fonte where fonte_id = 'auto'")
++        assert cur.fetchone()["chamadas"] == 2
++        cur.execute("insert into fonte (id, nome, tipo_adaptador) values ('auto', 'Auto', 'automatico') on conflict do nothing")
++        cur.execute("insert into pagina_cache (url, hash_texto, extraido) values ('u1', 'h', '{}')")
++        cur.execute("insert into lote (fonte_id, id_externo, url, status, hash_conteudo, data_praca1) values ('auto', '1', 'u1', 'ativo', 'x', now() + interval '60 days')")
++    conn.commit()
++    assert ad._cache_revisao("u1")["recente"] is True            # tranquila e lida há pouco: não relê
++    with conn.cursor() as cur:
++        cur.execute("update lote set data_praca1 = now() + interval '2 days'")
++    conn.commit()
++    assert ad._cache_revisao("u1")["recente"] is False           # leilão em 2 dias: urgente, confere sempre
++    with conn.cursor() as cur:
++        cur.execute("update lote set data_praca1 = now() + interval '60 days'")
++        cur.execute("update pagina_cache set atualizado_em = now() - interval '10 days'")
++    conn.commit()
++    assert ad._cache_revisao("u1")["recente"] is False           # lida há mais de 3 dias: confere
+diff --git a/db/migrations/008_uso_llm_por_fonte.sql b/db/migrations/008_uso_llm_por_fonte.sql
+new file mode 100644
+index 0000000..3959b76
+--- /dev/null
++++ b/db/migrations/008_uso_llm_por_fonte.sql
+@@ -0,0 +1,8 @@
++-- Quantas leituras de IA cada fonte fez por dia. Serve para descobrir de onde vem o gasto:
++--   select fonte_id, chamadas from llm_uso_fonte where dia = current_date order by chamadas desc;
++create table if not exists llm_uso_fonte (
++    dia       date not null,
++    fonte_id  text not null,
++    chamadas  integer not null default 0,
++    primary key (dia, fonte_id)
++);

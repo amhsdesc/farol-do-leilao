@@ -1,12 +1,28 @@
-# Criado pelo catálogo (2026-09-28). Validação: pendente.
-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+# Mega Leilões. Sem IA e sem navegador: a listagem é HTML comum (48 imóveis por página) e o card já traz
+# valor, tipo, cidade, UF, código, praça, situação e data. Cobre também os imóveis do Santander e de outros
+# comitentes que leiloam por aqui.
 id: mega-leiloes
 nome: Mega Leilões
 site: https://www.megaleiloes.com.br
-tipo: automatico
+tipo: seletores
 uf: [todas]
-inicio:
-  - https://www.megaleiloes.com.br/imoveis
-max_paginas_lista: 10
-max_lotes: 400
-navegador: true   # listagem montada por JavaScript (confirmar com inspecionar)
+intervalo_segundos: 1
+listagem:
+  url: https://www.megaleiloes.com.br/imoveis?pagina={pagina}
+  pagina_inicial: 1
+  paginas_max: 40
+  item: "div[data-key]"
+  campos:
+    id_externo: {css: ".card-number"}
+    url: {css: "a.card-title", attr: href, regex: "^([^?]+)"}
+    titulo: {css: "a.card-title"}
+    tipo: {css: "a.card-title", regex: "^([A-Za-zÀ-ÿ]+)"}
+    cidade: {css: ".card-locality", regex: "^(.*),"}
+    uf: {css: ".card-locality", regex: ",\\s*([A-Z]{2})$"}
+    modalidade: {css: ".card-instance-title a"}
+    status: {css: ".card-status"}
+    lance_minimo: {css: ".card-price"}
+    data_praca1: {css: ".card-first-instance-date", regex: "(\\d{2}/\\d{2}/\\d{4}[^\\n]*)"}
+    valor_praca1: {css: ".instance .card-instance-value"}
+    data_praca2: {css: ".card-second-instance-date", regex: "(\\d{2}/\\d{2}/\\d{4}[^\\n]*)"}
+    valor_praca2: {css: ".instance + .instance .card-instance-value"}

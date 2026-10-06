@@ -1,11 +1,33 @@
-# Outlet de imóveis do Santander (venda direta do banco). Leilões do Santander também chegam por leiloeiros.
+# Outlet de imóveis do Santander (venda direta e leilões do banco). Sem IA:
+# a lista vem da API do WordPress do próprio site (com a data de modificação de cada imóvel) e a página
+# de cada imóvel é lida por regra. Só imóvel novo ou modificado é relido (ver adaptadores/wordpress_rest.py).
 id: santander-imoveis
 nome: Santander Imóveis
 site: https://www.santanderimoveis.com.br
-tipo: automatico
+tipo: wordpress_rest
 comitente: Santander
 uf: todas
-inicio: [https://www.santanderimoveis.com.br/]
-max_paginas_lista: 15
-max_lotes: 400
-navegador: true      # site montado por JavaScript
+intervalo_segundos: 1
+requisicao:
+  url: https://www.santanderimoveis.com.br/wp-json/wp/v2/estate_property
+  por_pagina: 100
+  paginas_max: 100
+max_detalhes_por_execucao: 3000
+titulo_remove: " | Santander Imóveis"
+detalhe:
+  campos:
+    id_externo: {texto_regex: "Cód\\. ([\\d.]+)"}
+    tipo: {texto_regex: "Cód\\. [\\d.]+\\s+(\\w+)"}
+    endereco: {css: "p:-soup-contains('CEP:')", regex: "^(.*?)\\.? CEP"}
+    cidade: {css: "p:-soup-contains('CEP:')", regex: ", ([^,]+) - [A-Z]{2}\\.? CEP"}
+    uf: {css: "p:-soup-contains('CEP:')", regex: "- ([A-Z]{2})\\.? CEP"}
+    ocupacao: {texto_regex: "\\b(Desocupado|Ocupado)\\b"}
+    valor_avaliacao: {rotulo: "Valor avaliado"}
+    lance_minimo: {css: "strong.value", regex: "R\\$\\s*([\\d.,]+)"}
+    data_praca1: {texto_regex: "Data do leil[ãa]o:?\\s*(\\d{2}/\\d{2}/\\d{4}\\s*-\\s*\\d{2}:\\d{2})"}
+    matricula: {rotulo: "Matrícula(s)"}
+    cartorio: {rotulo: "RGI"}
+    area_terreno: {texto_regex: "([\\d.,]+)\\s*m² de área terreno"}
+    area_privativa: {texto_regex: "([\\d.,]+)\\s*m² de área construída"}
+    leiloeiro: {css: ".main-atendimento strong"}
+    descricao: {texto_regex: "Considerações importantes\\s*(.{20,1500}?)\\s*Condições de Pagamento"}

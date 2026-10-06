@@ -25,6 +25,8 @@ class Config:
     llm_max_paginas_por_execucao: int = int(os.getenv("LLM_MAX_PAGINAS_POR_EXECUCAO", "200"))
     # Teto GLOBAL por dia (todas as fontes juntas). O valor em uso fica na tabela llm_orcamento (dá para mudar no banco);
     # este é só o padrão, caso a tabela esteja vazia.
+    # Página "tranquila" já lida há menos de N dias não é relida pela IA só porque o texto mudou.
+    cache_revisao_dias: int = int(os.getenv("CACHE_REVISAO_DIAS") or "3")
     llm_max_chamadas_dia: int = int(os.getenv("LLM_MAX_CHAMADAS_DIA") or "1000")
 
     @property

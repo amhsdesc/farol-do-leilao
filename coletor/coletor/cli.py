@@ -156,6 +156,31 @@ def cmd_catalogo(a):
                 ["uf", "leiloeiros", "fazem imóveis", "com fonte"])
 
 
+def cmd_sondar(a):
+    from collections import Counter
+
+    from .registro import carregar
+    from .sondagem import sondar
+    todas = carregar()
+    if a.ids:
+        escolhidas = [todas[i] for i in a.ids]
+    else:  # só as fontes ativas que hoje não têm nenhum lote ativo (a lista que importa)
+        with conectar() as conn, conn.cursor() as cur:
+            cur.execute("""select f.id from fonte f where f.ativa and f.id not like 'caixa%%'
+                           and not exists (select 1 from lote l where l.fonte_id = f.id and l.status = 'ativo')""")
+            ids = {r["id"] for r in cur.fetchall()}
+        escolhidas = [f for i, f in todas.items() if i in ids]
+    print(f"Sondando {len(escolhidas)} fonte(s)...")
+    res = sondar(escolhidas)
+    c = Counter(r["veredito"] for r in res)
+    print("Resumo:", ", ".join(f"{k}: {v}" for k, v in c.most_common()))
+    pl = Counter(r["plataforma"] or "(não reconhecida)" for r in res)
+    print("Plataformas:", ", ".join(f"{k}: {v}" for k, v in pl.most_common(12)))
+    _tabela([[r["fonte"][:38], r["veredito"], r["plataforma"], r["links_lote"], r["texto_util"], r["status_http"], r["detalhe"][:50]]
+             for r in sorted(res, key=lambda x: (x["veredito"], x["fonte"]))],
+            ["fonte", "veredito", "plataforma", "links", "texto", "http", "obs"])
+
+
 def cmd_geocodificar(a):
     from .geocodificar import Geocodificador
     with conectar() as conn:
@@ -191,6 +216,9 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("url")
     s.add_argument("--sem-navegador", action="store_true")
     s.set_defaults(f=cmd_inspecionar)
+    s = sub.add_parser("sondar", help="diz por que as fontes sem lotes estão vazias (sem IA)")
+    s.add_argument("ids", nargs="*")
+    s.set_defaults(f=cmd_sondar)
     s = sub.add_parser("nova-fonte", help="cria YAML automático para um site")
     s.add_argument("url")
     s.add_argument("--uf", nargs="+", default=["DF"])

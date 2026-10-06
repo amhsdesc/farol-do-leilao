@@ -120,6 +120,9 @@ class Repositorio:
             mensagem = (mensagem or "") + (
                 f" Leu {c.lidos} de {ativos_antes} lotes ativos: remoções não aplicadas (possível coletor quebrado)."
             )
+        if concluida and c.lidos == 0 and not ativos_antes:
+            # não é erro (o site pode não ter imóveis hoje), mas não pode passar em branco: fica escrito no log da execução
+            mensagem = ((mensagem or "") + " Nenhum lote encontrado (site sem imóveis hoje, ou o leitor não reconhece a página).").strip()
         with self.conn.cursor() as cur:
             if pode_remover:
                 cur.execute(

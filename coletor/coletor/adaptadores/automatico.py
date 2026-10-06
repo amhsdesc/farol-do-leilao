@@ -151,6 +151,34 @@ class Automatico(Adaptador):
             )
         self.conn.commit()
 
+    def _cache_revisao(self, url: str) -> dict | None:
+        """Como _cache, mas devolve também `recente`: a página foi lida há menos de N dias E não é urgente.
+
+        Urgente (sempre confere o texto): lote com leilão nos próximos 7 dias (ou ocorrido há menos de 1 dia),
+        ou imóvel que alguém acompanha com alerta. Assim o site e os alertas de preço/data/suspensão não atrasam,
+        e só as páginas "tranquilas" esperam `cache_revisao_dias` antes de a IA reler (poupa o custo de páginas
+        que mudam por motivos irrelevantes: contador de visitas, tempo restante...).
+        """
+        if not self.conn:
+            return None
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """select c.hash_texto, c.extraido,
+                          ((now() - c.atualizado_em) < make_interval(days => %s)
+                           and not exists (
+                               select 1 from lote l
+                               where l.url = c.url and l.status in ('ativo', 'suspenso')
+                                 and (l.data_praca1 between now() - interval '1 day' and now() + interval '7 days'
+                                   or l.data_praca2 between now() - interval '1 day' and now() + interval '7 days'
+                                   or exists (select 1 from alerta a where a.imovel_id = l.imovel_id and a.tipo = 'imovel' and a.ativo))
+                           )) as recente
+                   from pagina_cache c where c.url = %s""",
+                (config.cache_revisao_dias, url),
+            )
+            r = cur.fetchone()
+        self.conn.rollback()  # fecha a transação de leitura (a IA pode demorar e o Postgres derruba conexão parada)
+        return r
+
     def _reservar_chamada_global(self) -> bool:
         """Teto diário compartilhado por todas as fontes (cada fonte roda num processo próprio, então o contador fica no banco).
 
@@ -174,6 +202,13 @@ class Automatico(Adaptador):
                 (teto,),
             )
             ok = cur.fetchone() is not None
+            if ok:  # contabilidade por fonte: mostra de onde vem o gasto
+                cur.execute(
+                    """insert into llm_uso_fonte (dia, fonte_id, chamadas)
+                       values ((now() at time zone 'America/Sao_Paulo')::date, %s, 1)
+                       on conflict (dia, fonte_id) do update set chamadas = llm_uso_fonte.chamadas + 1""",
+                    (self.fonte["id"],),
+                )
         self.conn.commit()
         return ok
 
@@ -214,8 +249,9 @@ class Automatico(Adaptador):
                 self.registrar_erro(f"Lote {url}: {e}")
                 continue
             h = hashlib.sha1(texto.encode()).hexdigest()
-            cache = self._cache(url)
-            if cache and cache["hash_texto"] == h:
+            cache = self._cache_revisao(url)
+            # reaproveita se o texto é o mesmo OU se a página é "tranquila" e foi lida há pouco (ver _cache_revisao)
+            if cache and (cache["hash_texto"] == h or cache["recente"]):
                 extraido = cache["extraido"] or {}
             else:
                 if self.chamadas_llm >= limite:

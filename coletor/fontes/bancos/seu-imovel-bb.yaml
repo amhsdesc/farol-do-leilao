@@ -1,11 +1,28 @@
-# Plataforma Seu Imóvel BB (venda direta do Banco do Brasil). Leilões do BB também chegam por leiloeiros.
+# Seu Imóvel BB (venda direta e leilões do Banco do Brasil). Sem IA: o catálogo responde a uma consulta POST
+# com os cards em HTML dentro de um JSON (50 por página); ver adaptadores/post_html.py.
 id: seu-imovel-bb
 nome: Seu Imóvel BB
 site: https://seuimovelbb.com.br
-tipo: automatico
+tipo: post_html
 comitente: Banco do Brasil
 uf: todas
-inicio: [https://seuimovelbb.com.br/]
-max_paginas_lista: 15
-max_lotes: 400
-navegador: true
+intervalo_segundos: 1
+requisicao:
+  pagina_token: https://seuimovelbb.com.br/catalogo/categoria/urbanos
+  token_css: "#_cppnp"
+  url: https://seuimovelbb.com.br/catalogo
+  params: {pagina: "{pagina}", categorias: "", tipoVenda: "", tipoPagamento: "", evolua: "", localidade: "", minimo: "", maximo: "", texto: "", ordem: "", contento: "", cppnp: "{token}"}
+  campo_html: lista
+  campo_total: imoveis
+  paginas_max: 60
+item: ".carta"
+campos:
+  link: {css: "a[href*='/imovel/id/']", attr: href}
+  id_externo: {css: "a[href*='/imovel/id/']", attr: href, regex: "/imovel/id/(\\d+)"}
+  tipo: {css: ".tipo"}
+  cidade: {css: ".localidade", regex: "^(.*?)\\s*-\\s*[A-Z]{2}$"}
+  uf: {css: ".localidade", regex: "-\\s*([A-Z]{2})$"}
+  modalidade: {texto_regex: "(Leil[ãa]o|Venda direta) - ID"}
+  lance_minimo: {css: ".valor", regex: "R\\$\\s*([\\d.,]+)"}
+  data_praca1: {texto_regex: "(\\d{1,2}/\\d{1,2} às \\d{1,2}h(?:\\d{2})?)"}
+  descricao: {css: "i.compartilhar", attr: onclick, regex: "_compartilhar\\('(.*?)', '"}
