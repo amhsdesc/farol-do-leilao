@@ -240,7 +240,35 @@ class Automatico(Adaptador):
 
     # ------------------------------------------------------------ coleta
 
+    def _tentar_preset(self) -> list[LoteBruto]:
+        """Sites de plataformas conhecidas (ex.: leilao.pro) são lidos por seletores, sem IA."""
+        from . import plataformas
+        from .seletores import Seletores
+        inicio = self.fonte.get("inicio") or []
+        url = inicio if isinstance(inicio, str) else (inicio[0] if inicio else None)
+        if not url or self.fonte.get("sem_preset"):
+            return []
+        try:
+            nome = plataformas.detectar(self._html(url))
+            if not nome:
+                return []
+            if nome in plataformas.ADAPTADORES:
+                from .suaplataforma import SuaPlataforma
+                sub = SuaPlataforma({**self.fonte, "site": url}, self.cliente, self.conn)
+            else:
+                sub = Seletores(plataformas.fonte_do_preset(self.fonte, nome, url), self.cliente, self.conn)
+            lotes = list(sub.coletar())
+            self.erros.extend(sub.erros)
+            return lotes
+        except Exception as e:
+            self.registrar_erro(f"Preset de plataforma falhou ({e}); usando leitura padrão.")
+            return []
+
     def coletar(self) -> Iterator[LoteBruto]:
+        pre = self._tentar_preset()
+        if pre:
+            yield from pre
+            return
         limite = config.llm_max_paginas_por_execucao
         for url in self.descobrir_links():
             try:
