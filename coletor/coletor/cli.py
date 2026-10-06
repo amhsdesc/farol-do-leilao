@@ -181,6 +181,22 @@ def cmd_sondar(a):
             ["fonte", "veredito", "plataforma", "links", "texto", "http", "obs"])
 
 
+def _diagnosticar(fonte, cli):
+    """Quem está barrando? Faz UMA requisição simples à primeira URL da fonte e mostra os cabeçalhos da resposta."""
+    req = fonte.get("requisicao") or {}
+    url = req.get("pagina_token") or req.get("url") or (fonte.get("inicio") or [fonte.get("site")])[0]
+    if isinstance(url, list):
+        url = url[0]
+    params = {k: (1 if v == "{pagina}" else v) for k, v in (req.get("params") or {}).items()} if req.get("metodo", "GET").upper() == "GET" else None
+    try:
+        r = cli.http.get(url, params=params, headers=req.get("cabecalhos"))
+        h = {k: v for k, v in r.headers.items() if k.lower() in ("server", "via", "cf-ray", "x-amzn-errortype", "x-amz-apigw-id",
+                                                                   "x-cache", "x-akamai-request-id", "x-sucuri-id", "x-iinfo")}
+        print(f"   diagnóstico: HTTP {r.status_code} em {url[:90]} | cabeçalhos: {h} | corpo: {r.text[:160]!r}")
+    except Exception as e:
+        print(f"   diagnóstico: falhou ({type(e).__name__}: {str(e)[:120]})")
+
+
 def cmd_testar(a):
     """Roda o leitor de cada fonte SEM gravar nada no banco e mostra quantos imóveis ele encontra (sem IA)."""
     from .adaptadores import TIPOS, Automatico
@@ -198,6 +214,17 @@ def cmd_testar(a):
                       verificar_tls=f.get("verificar_tls", True))
         try:
             ad = TIPOS[f["tipo"]](f, cli, conn=None)
+            if f["tipo"] == "wordpress_rest":  # só a lista (os detalhes usam o cache do banco, que o teste não toca)
+                itens = []
+                for it in ad._itens():
+                    itens.append(it)
+                    if len(itens) >= a.max:
+                        break
+                print(f"   => lista lida: {len(itens)} item(ns) (limite {a.max}); ex.: {[i.get('link') for i in itens[:2]]}"
+                      + (f"; avisos: {ad.erros[:3]}" if ad.erros else ""))
+                if not itens:
+                    _diagnosticar(f, cli)
+                continue
             if isinstance(ad, Automatico):  # só o caminho sem IA (preset de plataforma)
                 brutos = ad._tentar_preset()
                 if not brutos:
@@ -219,8 +246,11 @@ def cmd_testar(a):
                 if n <= 2:
                     print(f"   ex.: {l.id_externo} | {l.tipo} | {l.cidade}/{l.uf} | R$ {l.lance_minimo} | {l.data_praca1} | {l.url}")
             print(f"   => {n} imóvel(is) lido(s) (limite {a.max})" + (f"; avisos: {ad.erros[:3]}" if ad.erros else ""))
+            if n == 0:
+                _diagnosticar(f, cli)
         except Exception as e:
             print(f"   ERRO: {type(e).__name__}: {str(e)[:200]}")
+            _diagnosticar(f, cli)
         finally:
             cli.fechar()
 

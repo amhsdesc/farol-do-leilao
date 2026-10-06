@@ -7,7 +7,7 @@ on:
     inputs:
       fontes:
         description: "IDs separados por espaço"
-        default: "superbid portal-zuk sicoob-imoveis bradesco-imoveis mega-leiloes seu-imovel-bb sandro-rodrigues-pinto anderson-douglas-gali-falleiros"
+        default: "superbid sicoob-imoveis bradesco-imoveis seu-imovel-bb santander-imoveis itau-imoveis"
       max:
         description: "Máximo de imóveis lidos por fonte"
         default: "300"
