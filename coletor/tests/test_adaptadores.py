@@ -155,3 +155,19 @@ def test_rotulo_em_formatos_comuns():
     assert ex.campo({"rotulo": "Área privativa"}) == "98,00 m²"
     assert ex.campo({"rotulo": "Avaliação"}) == "R$ 1.150.000,00"
     assert ex.campo({"rotulo": "Inexistente", "padrao": "x"}) == "x"
+
+
+def test_teto_global_diario_de_chamadas_llm(conn):
+    fonte = {"id": "auto", "tipo": "automatico", "inicio": ["https://x.com.br"]}
+    ad = Automatico(fonte, None, conn=conn)
+    with conn.cursor() as cur:
+        cur.execute("update llm_orcamento set max_chamadas_dia = 3 where nome = 'coletor'")
+    conn.commit()
+    assert [ad._reservar_chamada_global() for _ in range(5)] == [True, True, True, False, False]
+    with conn.cursor() as cur:
+        cur.execute("select chamadas from llm_uso_coletor")
+        assert [l["chamadas"] for l in cur.fetchall()] == [3]  # não passa do teto
+        cur.execute("update llm_orcamento set max_chamadas_dia = 0 where nome = 'coletor'")
+    conn.commit()
+    assert ad._reservar_chamada_global() is False  # zero bloqueia tudo
+    assert Automatico(fonte, None)._reservar_chamada_global() is True  # sem banco, sem teto global

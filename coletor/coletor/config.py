@@ -23,6 +23,9 @@ class Config:
     pasta_fontes: Path = Path(os.getenv("PASTA_FONTES", str(PASTA_COLETOR / "fontes")))
     pasta_dados: Path = Path(os.getenv("PASTA_DADOS", str(RAIZ / "dados")))
     llm_max_paginas_por_execucao: int = int(os.getenv("LLM_MAX_PAGINAS_POR_EXECUCAO", "200"))
+    # Teto GLOBAL por dia (todas as fontes juntas). O valor em uso fica na tabela llm_orcamento (dá para mudar no banco);
+    # este é só o padrão, caso a tabela esteja vazia.
+    llm_max_chamadas_dia: int = int(os.getenv("LLM_MAX_CHAMADAS_DIA") or "1000")
 
     @property
     def user_agent(self) -> str:

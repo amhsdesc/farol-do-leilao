@@ -1,0 +1,86 @@
+diff --git a/web/lib/enriquecimento/index.ts b/web/lib/enriquecimento/index.ts
+index 6596b05..abcfd6a 100644
+--- a/web/lib/enriquecimento/index.ts
++++ b/web/lib/enriquecimento/index.ts
+@@ -69,11 +69,15 @@ async function enderecoPublico(u: URL): Promise<boolean> {
+ /** Baixa uma página pública. Segue poucos redirecionamentos, conferindo cada destino (um site de terceiros não pode nos mandar para a rede interna).
+  * Limite conhecido: o DNS é conferido aqui e resolvido de novo dentro do fetch; um domínio hostil que troque de IP entre
+  * as duas consultas passaria. O risco é pequeno (só lemos HTML, com tamanho e tempo limitados) e fica registrado. */
+-async function baixarPagina(inicial: string): Promise<{ html: string; url: string } | null> {
++async function baixarPagina(inicial: string, diag?: { motivo?: string }): Promise<{ html: string; url: string } | null> {
++  const falha = (motivo: string) => {
++    if (diag) diag.motivo = motivo; // vai para a coluna `erro`: diz por que a página não foi lida
++    return null;
++  };
+   let atual = inicial;
+   for (let salto = 0; salto < 3; salto++) {
+     const u = urlPublicaSegura(atual);
+-    if (!u || !(await enderecoPublico(u))) return null;
++    if (!u || !(await enderecoPublico(u))) return falha("endereço não público ou inválido");
+     const controle = new AbortController();
+     const cronometro = setTimeout(() => controle.abort(), TIMEOUT_PAGINA_MS);
+     try {
+@@ -84,13 +88,13 @@ async function baixarPagina(inicial: string): Promise<{ html: string; url: strin
+       });
+       if (resp.status >= 300 && resp.status < 400) {
+         const destino = resp.headers.get("location");
+-        if (!destino) return null;
++        if (!destino) return falha(`redirecionamento ${resp.status} sem destino`);
+         atual = new URL(destino, u).toString();
+         continue;
+       }
+-      if (!resp.ok) return null;
++      if (!resp.ok) return falha(`o site respondeu HTTP ${resp.status}`);
+       const tipo = resp.headers.get("content-type");
+-      if (tipo && !/html|text/i.test(tipo)) return null; // PDF e afins ficam para uma etapa futura (resumo do edital)
++      if (tipo && !/html|text/i.test(tipo)) return falha(`tipo de conteúdo ${tipo.slice(0, 60)}`); // PDF e afins ficam para uma etapa futura (resumo do edital)
+       const bytes = new Uint8Array(await resp.arrayBuffer()).slice(0, MAX_BYTES_PAGINA);
+       const charset = detectarCharset(tipo, new TextDecoder("latin1").decode(bytes.slice(0, 2048)));
+       let html: string;
+@@ -100,13 +104,13 @@ async function baixarPagina(inicial: string): Promise<{ html: string; url: strin
+         html = new TextDecoder("utf-8").decode(bytes);
+       }
+       return { html, url: u.toString() };
+-    } catch {
+-      return null; // timeout, site fora do ar, certificado ruim...
++    } catch (e) {
++      return falha(`falha de rede: ${e instanceof Error ? e.message : String(e)}`.slice(0, 120)); // timeout, site fora do ar, certificado ruim...
+     } finally {
+       clearTimeout(cronometro);
+     }
+   }
+-  return null;
++  return falha("redirecionamentos demais");
+ }
+ 
+ // ───────────────────────────── IA, cache e teto ─────────────────────────────
+@@ -153,11 +157,14 @@ async function chamarIA(texto: string, url: string, links: Link[]): Promise<unkn
+ }
+ 
+ /** Lê uma página e devolve a extração. Texto igual ao já processado vem do cache, sem chamar a IA. */
+-async function extrairDaPagina(endereco: string): Promise<{ extracao: Extracao; url: string } | null> {
+-  const pagina = await baixarPagina(endereco);
++async function extrairDaPagina(endereco: string, diag?: { motivo?: string }): Promise<{ extracao: Extracao; url: string } | null> {
++  const pagina = await baixarPagina(endereco, diag);
+   if (!pagina) return null;
+   const texto = htmlParaTexto(pagina.html);
+-  if (texto.length < 80) return null; // página vazia (precisa de JavaScript, bloqueio etc.)
++  if (texto.length < 80) {
++    if (diag) diag.motivo = `página sem texto útil (${texto.length} caracteres, ${pagina.html.length} bytes de HTML)`;
++    return null;
++  } // página vazia (precisa de JavaScript, bloqueio etc.)
+   const links = extrairLinks(pagina.html, pagina.url);
+   const hash = createHash("sha1").update(texto).digest("hex");
+ 
+@@ -229,8 +236,9 @@ async function enriquecerLoteSemRede(lote: LoteBanco, imovel: ImovelParaEnriquec
+ 
+   const paginas: string[] = [];
+   try {
+-    const primeira = await extrairDaPagina(lote.url!);
+-    if (!primeira) throw new Error("não foi possível ler a página do lote");
++    const diag: { motivo?: string } = {};
++    const primeira = await extrairDaPagina(lote.url!, diag);
++    if (!primeira) throw new Error(`não foi possível ler a página do lote: ${diag.motivo ?? "motivo desconhecido"}`);
+     paginas.push(primeira.url);
+     let total = primeira.extracao;
+     let parcial: string | null = null;

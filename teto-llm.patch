@@ -1,0 +1,102 @@
+--- a/coletor/coletor/adaptadores/automatico.py
++++ b/coletor/coletor/adaptadores/automatico.py
+@@ -151,6 +151,32 @@
+             )
+         self.conn.commit()
+ 
++    def _reservar_chamada_global(self) -> bool:
++        """Teto diário compartilhado por todas as fontes (cada fonte roda num processo próprio, então o contador fica no banco).
++
++        Atômico: duas fontes ao mesmo tempo não passam do teto. Sem banco (testes, uso avulso), não há teto global.
++        O dia vale no fuso de São Paulo. O limite em uso é o da tabela llm_orcamento; se ela estiver vazia, o padrão da config.
++        """
++        if not self.conn:
++            return True
++        with self.conn.cursor() as cur:
++            cur.execute("select max_chamadas_dia from llm_orcamento where nome = 'coletor'")
++            linha = cur.fetchone()
++            teto = int(linha["max_chamadas_dia"]) if linha else config.llm_max_chamadas_dia
++            if teto <= 0:
++                self.conn.rollback()
++                return False
++            cur.execute(
++                """insert into llm_uso_coletor (dia, chamadas) values ((now() at time zone 'America/Sao_Paulo')::date, 1)
++                   on conflict (dia) do update set chamadas = llm_uso_coletor.chamadas + 1
++                   where llm_uso_coletor.chamadas < %s
++                   returning chamadas""",
++                (teto,),
++            )
++            ok = cur.fetchone() is not None
++        self.conn.commit()
++        return ok
++
+     def extrair_com_llm(self, texto: str, url: str) -> dict[str, Any]:
+         if not config.anthropic_api_key:
+             raise ErroDeFonte("Fonte automática precisa de ANTHROPIC_API_KEY no .env.")
+@@ -195,6 +221,9 @@
+                 if self.chamadas_llm >= limite:
+                     self.registrar_erro(f"Limite de {limite} páginas por execução atingido; restante fica para a próxima.")
+                     break
++                if not self._reservar_chamada_global():
++                    self.registrar_erro("Teto diário de chamadas de IA do coletor atingido; o restante fica para a próxima coleta.")
++                    break
+                 try:
+                     extraido = self.extrair_com_llm(texto, url)
+                 except ErroDeFonte:
+--- a/coletor/coletor/config.py
++++ b/coletor/coletor/config.py
+@@ -23,6 +23,9 @@
+     pasta_fontes: Path = Path(os.getenv("PASTA_FONTES", str(PASTA_COLETOR / "fontes")))
+     pasta_dados: Path = Path(os.getenv("PASTA_DADOS", str(RAIZ / "dados")))
+     llm_max_paginas_por_execucao: int = int(os.getenv("LLM_MAX_PAGINAS_POR_EXECUCAO", "200"))
++    # Teto GLOBAL por dia (todas as fontes juntas). O valor em uso fica na tabela llm_orcamento (dá para mudar no banco);
++    # este é só o padrão, caso a tabela esteja vazia.
++    llm_max_chamadas_dia: int = int(os.getenv("LLM_MAX_CHAMADAS_DIA") or "1000")
+ 
+     @property
+     def user_agent(self) -> str:
+--- a/coletor/tests/test_adaptadores.py
++++ b/coletor/tests/test_adaptadores.py
+@@ -155,3 +155,19 @@
+     assert ex.campo({"rotulo": "Área privativa"}) == "98,00 m²"
+     assert ex.campo({"rotulo": "Avaliação"}) == "R$ 1.150.000,00"
+     assert ex.campo({"rotulo": "Inexistente", "padrao": "x"}) == "x"
++
++
++def test_teto_global_diario_de_chamadas_llm(conn):
++    fonte = {"id": "auto", "tipo": "automatico", "inicio": ["https://x.com.br"]}
++    ad = Automatico(fonte, None, conn=conn)
++    with conn.cursor() as cur:
++        cur.execute("update llm_orcamento set max_chamadas_dia = 3 where nome = 'coletor'")
++    conn.commit()
++    assert [ad._reservar_chamada_global() for _ in range(5)] == [True, True, True, False, False]
++    with conn.cursor() as cur:
++        cur.execute("select chamadas from llm_uso_coletor")
++        assert [l["chamadas"] for l in cur.fetchall()] == [3]  # não passa do teto
++        cur.execute("update llm_orcamento set max_chamadas_dia = 0 where nome = 'coletor'")
++    conn.commit()
++    assert ad._reservar_chamada_global() is False  # zero bloqueia tudo
++    assert Automatico(fonte, None)._reservar_chamada_global() is True  # sem banco, sem teto global
+diff --git a/db/migrations/007_orcamento_llm.sql b/db/migrations/007_orcamento_llm.sql
+new file mode 100644
+index 0000000..ecb1dc0
+--- /dev/null
++++ b/db/migrations/007_orcamento_llm.sql
+@@ -0,0 +1,17 @@
++-- Teto global de gasto com IA no coletor.
++-- Antes, o único limite era por fonte (LLM_MAX_PAGINAS_POR_EXECUCAO = 200): com mais de 200 fontes, o teto real era
++-- de dezenas de milhares de chamadas por coleta. Agora todas as fontes dividem um limite diário, contado no banco
++-- (cada fonte roda num processo diferente, então só o banco é compartilhado). Dia no fuso de São Paulo.
++create table if not exists llm_uso_coletor (
++    dia       date primary key,
++    chamadas  integer not null default 0
++);
++
++-- O limite fica aqui para poder ser mudado sem mexer em código:  update llm_orcamento set max_chamadas_dia = 600 where nome = 'coletor';
++-- Zero (ou negativo) trava toda leitura nova por IA; páginas que não mudaram (cache) continuam sendo lidas de graça.
++create table if not exists llm_orcamento (
++    nome             text primary key,
++    max_chamadas_dia integer not null
++);
++
++insert into llm_orcamento (nome, max_chamadas_dia) values ('coletor', 1000) on conflict (nome) do nothing;

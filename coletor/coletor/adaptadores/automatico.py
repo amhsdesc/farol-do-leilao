@@ -151,6 +151,32 @@ class Automatico(Adaptador):
             )
         self.conn.commit()
 
+    def _reservar_chamada_global(self) -> bool:
+        """Teto diário compartilhado por todas as fontes (cada fonte roda num processo próprio, então o contador fica no banco).
+
+        Atômico: duas fontes ao mesmo tempo não passam do teto. Sem banco (testes, uso avulso), não há teto global.
+        O dia vale no fuso de São Paulo. O limite em uso é o da tabela llm_orcamento; se ela estiver vazia, o padrão da config.
+        """
+        if not self.conn:
+            return True
+        with self.conn.cursor() as cur:
+            cur.execute("select max_chamadas_dia from llm_orcamento where nome = 'coletor'")
+            linha = cur.fetchone()
+            teto = int(linha["max_chamadas_dia"]) if linha else config.llm_max_chamadas_dia
+            if teto <= 0:
+                self.conn.rollback()
+                return False
+            cur.execute(
+                """insert into llm_uso_coletor (dia, chamadas) values ((now() at time zone 'America/Sao_Paulo')::date, 1)
+                   on conflict (dia) do update set chamadas = llm_uso_coletor.chamadas + 1
+                   where llm_uso_coletor.chamadas < %s
+                   returning chamadas""",
+                (teto,),
+            )
+            ok = cur.fetchone() is not None
+        self.conn.commit()
+        return ok
+
     def extrair_com_llm(self, texto: str, url: str) -> dict[str, Any]:
         if not config.anthropic_api_key:
             raise ErroDeFonte("Fonte automática precisa de ANTHROPIC_API_KEY no .env.")
@@ -194,6 +220,9 @@ class Automatico(Adaptador):
             else:
                 if self.chamadas_llm >= limite:
                     self.registrar_erro(f"Limite de {limite} páginas por execução atingido; restante fica para a próxima.")
+                    break
+                if not self._reservar_chamada_global():
+                    self.registrar_erro("Teto diário de chamadas de IA do coletor atingido; o restante fica para a próxima coleta.")
                     break
                 try:
                     extraido = self.extrair_com_llm(texto, url)
