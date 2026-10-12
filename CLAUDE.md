@@ -68,7 +68,7 @@ docs/              Guias: como adicionar fonte, arquitetura.
 
 | Tipo | Quando usar | Arquivo |
 |---|---|---|
-| `csv_caixa` | Lista oficial da Caixa por UF | `adaptadores/caixa_csv.py` |
+| `csv_caixa` | Lista oficial da Caixa por UF; lê também a página de detalhe de cada imóvel (FGTS, condomínio/tributos, praças), por regra fixa, sem IA | `adaptadores/caixa_csv.py`, `adaptadores/caixa_detalhe.py` |
 | `json_api` | Site carrega os lotes por uma API JSON (ver com `python -m coletor inspecionar`) | `adaptadores/json_api.py` |
 | `seletores` | HTML estável; campos por seletor CSS/regex no YAML | `adaptadores/seletores.py` |
 | `automatico` | Cauda longa: qualquer site, extração por LLM (Claude Haiku), com cache por hash | `adaptadores/automatico.py` |

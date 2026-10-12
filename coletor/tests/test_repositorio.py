@@ -6,7 +6,7 @@ from coletor.coleta import executar
 from .test_adaptadores import CAIXA, FONTE_SELETORES, mapa_leiloeiro
 
 FIX = Path(__file__).parent / "fixtures"
-FONTE_CAIXA = {"id": "caixa", "nome": "Caixa", "tipo": "csv_caixa", "uf": ["DF", "GO"]}
+FONTE_CAIXA = {"id": "caixa", "nome": "Caixa", "tipo": "csv_caixa", "uf": ["DF", "GO"], "detalhe": False}
 
 
 def _csv_df(linhas_remover=(), trocar=None) -> bytes:

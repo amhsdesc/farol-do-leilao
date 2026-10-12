@@ -26,6 +26,7 @@ class Adaptador:
         self.cliente = cliente
         self.conn = conn
         self.erros: list[str] = []
+        self.avisos: list[str] = []  # informações da rodada que não são erro (não impedem remoções); vão para o log
 
     @property
     def padroes(self) -> dict[str, Any]:

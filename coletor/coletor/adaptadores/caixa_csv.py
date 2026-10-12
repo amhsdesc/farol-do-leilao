@@ -10,20 +10,43 @@ Configuração (YAML):
     url_modelo: https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_{uf}.csv   # opcional
     arquivo_local: C:/Users/voce/Downloads/Lista_imoveis_{uf}.csv                   # opcional (download manual)
     navegador: false                                                                # true se o site bloquear o download direto
+    detalhe: true              # lê a página de detalhe de cada imóvel (FGTS, condomínio, praças...); padrão: ligado quando há banco
+    detalhe_max_por_rodada: 200     # teto de páginas lidas por coleta (padrão 200; env CAIXA_DETALHE_MAX)
+    detalhe_max_segundos: 420       # teto de tempo gasto nas páginas por coleta (padrão 420; env CAIXA_DETALHE_SEGUNDOS)
+
+A página de detalhe é lida por regra fixa, sem IA (ver caixa_detalhe.py). Cada lote é lido uma vez e revalidado só quando
+o preço ou a modalidade mudam, ou a cada 30 dias. O resultado fica em `lote.dados['caixa_detalhe']` e é repassado a
+cada coleta, porque o CSV não traz esses campos e a gravação sobrescreve o lote inteiro.
 """
 from __future__ import annotations
 
 import csv
 import io
+import logging
+import os
 import re
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from ..modelos import LoteBruto
 from ..normalizar import UFS, simplificar
 from .base import Adaptador, ErroDeFonte
+from .caixa_detalhe import ler_detalhe
+
+log = logging.getLogger(__name__)
 
 URL_PADRAO = "https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_{uf}.csv"
+URL_DETALHE = "https://venda-imoveis.caixa.gov.br/sistema/detalhe-imovel.asp?hdnimovel={id}"
+
+VALIDADE_DETALHE_DIAS = 30      # depois disso a página é lida de novo (FGTS e regras de despesa quase nunca mudam)
+RETENTAR_FALHA_HORAS = 24       # página que falhou não é tentada de novo antes disso
+MAX_FALHAS_SEGUIDAS = 8         # Caixa bloqueando ou fora do ar: para de insistir nesta rodada
+CAMPOS_DO_DETALHE = (
+    "aceita_fgts", "aceita_financiamento", "aceita_parcelamento", "debitos_por_conta", "ocupacao",
+    "matricula", "cartorio", "data_praca1", "valor_praca1", "data_praca2", "valor_praca2",
+)
 
 ALIASES = {
     "id_externo": ["n do imovel", "no do imovel", "numero do imovel", "n imovel", "imovel"],
@@ -129,11 +152,112 @@ class CaixaCSV(Adaptador):
                 "use 'navegador: true' ou 'arquivo_local' no YAML."
             ) from e
 
+    # ------------------------------------------------------------ página de detalhe
+
+    def _detalhe_ligado(self) -> bool:
+        cfg = self.fonte.get("detalhe")
+        return bool(cfg) if cfg is not None else self.conn is not None
+
+    def _carregar_cache(self) -> dict[str, dict[str, Any]]:
+        """O que já foi lido de cada lote (guardado em lote.dados). Sem banco, não há cache."""
+        if self.conn is None:
+            return {}
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "select id_externo, dados->'caixa_detalhe' as d from lote "
+                "where fonte_id = %s and dados->'caixa_detalhe' is not null",
+                (self.fonte["id"],),
+            )
+            linhas = cur.fetchall()
+        self.conn.commit()  # não deixa a conexão parada em transação aberta durante as leituras no site
+        return {r["id_externo"]: r["d"] for r in linhas if isinstance(r["d"], dict)}
+
+    @staticmethod
+    def _chave_lista(lote: LoteBruto) -> str:
+        return f"{lote.lance_minimo}|{lote.modalidade}"
+
+    @staticmethod
+    def _antes_de(iso: str | None, delta: timedelta, agora: datetime) -> bool:
+        try:
+            return bool(iso) and datetime.fromisoformat(iso) < agora - delta
+        except (TypeError, ValueError):
+            return True
+
+    def _prioridade(self, c: dict[str, Any] | None, lote: LoteBruto, agora: datetime) -> int | None:
+        """0 = nunca lido, 1 = preço/modalidade mudou desde a leitura, 2 = leitura vencida, None = não precisa."""
+        if c and c.get("falhou_em") and not self._antes_de(c["falhou_em"], timedelta(hours=RETENTAR_FALHA_HORAS), agora):
+            return None
+        if not c or not c.get("lido_em"):
+            return 0
+        if c.get("chave_lista") != self._chave_lista(lote):
+            return 1
+        if self._antes_de(c["lido_em"], timedelta(days=VALIDADE_DETALHE_DIAS), agora):
+            return 2
+        return None
+
+    @staticmethod
+    def _aplicar(lote: LoteBruto, c: dict[str, Any]) -> None:
+        campos = c.get("campos") or {}
+        for k in CAMPOS_DO_DETALHE:
+            if campos.get(k) is not None:
+                setattr(lote, k, campos[k])
+        if campos.get("leiloeiro"):  # quem conduz o leilão; o comitente continua sendo a Caixa
+            lote.leiloeiro = campos["leiloeiro"]
+        lote.dados = {**lote.dados, "caixa_detalhe": c}
+
+    def _enriquecer_com_detalhe(self, lotes: list[LoteBruto]) -> None:
+        cache = self._carregar_cache()
+        agora = datetime.now(timezone.utc)
+        fila = []
+        for lote in lotes:
+            p = self._prioridade(cache.get(lote.id_externo), lote, agora)
+            if p is not None:
+                fila.append((p, lote))
+        fila.sort(key=lambda x: x[0])  # estável: novos primeiro, depois mudados, depois vencidos
+
+        max_n = int(self.fonte.get("detalhe_max_por_rodada") or os.getenv("CAIXA_DETALHE_MAX") or 200)
+        max_s = float(self.fonte.get("detalhe_max_segundos") or os.getenv("CAIXA_DETALHE_SEGUNDOS") or 420)
+        inicio = time.monotonic()
+        lidos = falhas = seguidas = 0
+        for _, lote in fila[:max_n]:
+            if time.monotonic() - inicio > max_s:
+                break
+            anterior = cache.get(lote.id_externo) or {}
+            agora_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            try:
+                r = self.cliente.get(URL_DETALHE.format(id=lote.id_externo))
+                campos = ler_detalhe(decodificar(r.content))
+                if not campos:
+                    raise ValueError("página sem nenhum dado reconhecido (layout mudou ou imóvel indisponível)")
+            except Exception as e:
+                falhas += 1
+                seguidas += 1
+                # guarda a falha (e o que já se sabia) para não tentar o mesmo lote toda rodada
+                cache[lote.id_externo] = {**anterior, "falhou_em": agora_iso, "motivo": str(e)[:200]}
+                log.warning("[%s] detalhe %s: %s", self.fonte.get("id"), lote.id_externo, e)
+                if seguidas >= MAX_FALHAS_SEGUIDAS:
+                    self.avisos.append(f"detalhe da Caixa: {seguidas} falhas seguidas ({str(e)[:120]}); leitura interrompida nesta rodada")
+                    break
+                continue
+            seguidas = 0
+            lidos += 1
+            cache[lote.id_externo] = {"lido_em": agora_iso, "chave_lista": self._chave_lista(lote), "campos": campos}
+
+        for lote in lotes:
+            c = cache.get(lote.id_externo)
+            if c:
+                self._aplicar(lote, c)
+        pendentes = max(0, len(fila) - lidos - falhas)
+        self.avisos.append(f"detalhe da Caixa: {lidos} lidos, {falhas} falhas, {pendentes} ainda na fila")
+
+    # ------------------------------------------------------------ coleta
+
     def coletar(self) -> Iterator[LoteBruto]:
         ufs = self.fonte.get("uf") or ["todas"]
         if ufs in (["todas"], ["TODAS"], "todas"):
             ufs = sorted(UFS)
         falhas = []
+        lotes: list[LoteBruto] = []
         for uf in ufs:
             try:
                 texto = decodificar(self._baixar(uf))
@@ -146,6 +270,13 @@ class CaixaCSV(Adaptador):
             for r in registros:
                 lote = para_lote(r)
                 if lote:
-                    yield lote
+                    lotes.append(lote)
         if falhas and len(falhas) == len(ufs):
             raise ErroDeFonte(f"Nenhuma UF baixada ({', '.join(falhas)}).")
+        if lotes and self._detalhe_ligado():
+            try:
+                self._enriquecer_com_detalhe(lotes)
+            except Exception as e:  # o detalhe é um complemento: nunca impede a lista de ser gravada
+                log.exception("detalhe da Caixa")
+                self.avisos.append(f"detalhe da Caixa não aplicado: {type(e).__name__}: {e}"[:200])
+        yield from lotes

@@ -76,5 +76,7 @@ def executar(fonte: dict[str, Any], conn, cliente: Cliente | None = None, **kw_a
     if adaptador.erros:
         amostra = "; ".join(adaptador.erros[:5])
         mensagem = f"{mensagem + ' | ' if mensagem else ''}{len(adaptador.erros)} aviso(s): {amostra}"
+    if adaptador.avisos:  # só informação: não conta como erro, então não bloqueia a remoção de lotes
+        mensagem = f"{mensagem + ' | ' if mensagem else ''}{'; '.join(adaptador.avisos)}"
     status = repo.finalizar_execucao(execucao_id, fonte_id, c, ativos_antes, concluida, mensagem)
     return Resultado(fonte_id, status, c, time.monotonic() - inicio, mensagem)

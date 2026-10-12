@@ -1,0 +1,70 @@
+# Carga inicial dos dados da página de detalhe da Caixa (FGTS, condomínio/tributos, praças, leiloeiro, matrícula).
+# Sem IA e sem custo: só lê o HTML da Caixa. A coleta normal (a cada 8h) já lê 200 páginas por UF por rodada;
+# este botão serve para adiantar o estoque que ainda não foi lido, de uma vez, com um teto de tempo maior.
+# Pode ser rodado de novo sem problema: lote já lido (e com o mesmo preço) não é lido outra vez.
+name: Caixa - carga do detalhe
+
+on:
+  workflow_dispatch:
+    inputs:
+      ufs:
+        description: "UFs separadas por espaço (minúsculas)"
+        default: "ac al am ap ba ce df es go ma mg ms mt pa pb pe pi pr rj rn ro rr rs sc se sp to"
+      minutos:
+        description: "Minutos por UF gastos lendo páginas (o job para sozinho nesse prazo)"
+        default: "90"
+
+concurrency:
+  group: coleta # não roda junto com a coleta normal
+  cancel-in-progress: false
+
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  CONTATO_EMAIL: ${{ vars.CONTATO_EMAIL }}
+  INTERVALO_MINIMO_SEGUNDOS: "3"
+  RESPEITAR_ROBOTS: "1"
+
+jobs:
+  preparar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matriz: ${{ steps.m.outputs.matriz }}
+    steps:
+      - id: m
+        env:
+          UFS: ${{ inputs.ufs }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          ufs = [u for u in re.split(r"\s+", os.environ["UFS"].strip().lower()) if re.fullmatch(r"[a-z]{2}", u)]
+          open(os.environ["GITHUB_OUTPUT"], "a").write("matriz=" + json.dumps([{"uf": u} for u in ufs]) + "\n")
+          print("UFs:", ", ".join(ufs))
+          PY
+
+  carga:
+    needs: preparar
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(inputs.minutos) + 15 }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3 # a Caixa é a mesma para todos: poucos leitores ao mesmo tempo
+      matrix:
+        grupo: ${{ fromJson(needs.preparar.outputs.matriz) }}
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Ler o detalhe de caixa-${{ matrix.grupo.uf }}
+        env:
+          MINUTOS: ${{ inputs.minutos }}
+        run: |
+          export CAIXA_DETALHE_MAX=100000
+          export CAIXA_DETALHE_SEGUNDOS=$(( (MINUTOS - 10) * 60 ))
+          export FONTE_MAX_SEGUNDOS=$(( MINUTOS * 60 + 300 ))
+          python -m coletor coletar caixa-${{ matrix.grupo.uf }}
