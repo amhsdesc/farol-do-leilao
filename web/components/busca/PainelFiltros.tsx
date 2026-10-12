@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import SalvarBusca from "@/components/alertas/SalvarBusca";
-import { contarFiltros, type Filtros } from "@/lib/busca/filtros";
-import { MODALIDADES, TIPOS } from "@/lib/formato";
+import { contarFiltros, TAGS_INVESTIMENTO, type Filtros } from "@/lib/busca/filtros";
+import { MODALIDADES, TAGS, TIPOS } from "@/lib/formato";
 
 export type Opcoes = {
   ufs: { uf: string; n: number }[];
@@ -22,7 +22,7 @@ export function Cadeado({ tamanho = 13 }: { tamanho?: number }) {
 
 /** O que o visitante vê: os grupos de filtro, travados, e o convite para assinar. */
 export function FiltrosTravados() {
-  const grupos = ["Estado e cidade", "Banco ou vendedor", "Valor do lance", "Desconto mínimo", "Quando é o leilão", "Ocupação e dívidas"];
+  const grupos = ["Estado e cidade", "Banco ou vendedor", "Valor do lance", "Desconto mínimo", "Quando é o leilão", "Perfil: Airbnb, praia, turístico, universitário", "Ocupação e dívidas"];
   return (
     <div className="painel-filtros travado">
       <div className="painel-topo">
@@ -247,6 +247,19 @@ export default function PainelFiltros({ filtros: f, opcoes, centroMapa, mudar, l
           <Numero rotulo="Área de (m²)" valor={f.area_min} passo={10} onValor={(v) => mudar({ area_min: v })} />
           <Numero rotulo="até (m²)" valor={f.area_max} passo={10} onValor={(v) => mudar({ area_max: v })} />
         </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Perfil de investimento</legend>
+        <div className="pilulas" role="group" aria-label="Perfil de investimento">
+          {TAGS_INVESTIMENTO.map((t) => (
+            <button type="button" key={t} title={TAGS[t].ajuda} className={`pilula${f.tags?.includes(t) ? " ligada" : ""}`}
+              aria-pressed={!!f.tags?.includes(t)} onClick={() => mudar({ tags: alternar(f.tags, t) })}>
+              {TAGS[t].rotulo}
+            </button>
+          ))}
+        </div>
+        <small className="muted">Estimativa automática por localização e texto do anúncio. Confira antes de decidir.</small>
       </fieldset>
 
       <fieldset>

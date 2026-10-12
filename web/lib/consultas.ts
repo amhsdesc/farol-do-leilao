@@ -34,12 +34,13 @@ export type ItemBusca = {
   desconto_avaliacao: number | null;
   preco_m2: number | null;
   preco_caiu: boolean;
+  tags: string[];
 };
 
 const COLUNAS_ITEM = `imovel_id, tipo, uf, cidade, bairro, endereco, area::float8 area, quartos, vagas, lat, lon, fonte_nome,
   comitente, leiloeiro, titulo, modalidade, status, valor_avaliacao::float8 valor_avaliacao, lance_minimo::float8 lance_minimo,
   praca_atual, data_leilao, ocupacao, debitos_por_conta, aceita_financiamento, aceita_fgts, aceita_parcelamento, foto,
-  n_fontes::int n_fontes, desconto_avaliacao::float8 desconto_avaliacao, preco_m2::float8 preco_m2, preco_caiu`;
+  n_fontes::int n_fontes, desconto_avaliacao::float8 desconto_avaliacao, preco_m2::float8 preco_m2, preco_caiu, tags`;
 
 export const POR_PAGINA = 24;
 export const MAX_PONTOS = 20000;

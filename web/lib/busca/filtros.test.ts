@@ -54,3 +54,13 @@ test("rótulo de uma busca salva", () => {
   assert.match(rotulo, /^Goiânia, Apartamento, até R\$\s?300\.000, 40%\+ de desconto$/);
   assert.equal(rotuloFiltros({ pagina: 1, uf: "DF", tipo: ["casa", "terreno"] }), "DF, 2 tipos de imóvel");
 });
+
+test("tags de perfil: lê só as válidas, usa array e é filtro de assinante", () => {
+  const f = lerFiltros({ tags: "praia,xyz,airbnb" });
+  assert.deepEqual(f.tags, ["praia", "airbnb"]);
+  const { where, params } = montarWhere(f);
+  assert.match(where, /tags && \$1::text\[\]/);
+  assert.deepEqual(params[0], ["praia", "airbnb"]);
+  assert.deepEqual(aplicarAcesso(f, false).bloqueados, ["tags"]);
+  assert.deepEqual(lerFiltros(paraUrl(f)), f);
+});

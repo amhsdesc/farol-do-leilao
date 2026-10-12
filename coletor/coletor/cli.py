@@ -274,6 +274,15 @@ def cmd_geocodificar(a):
     print(f"No endereço: {r['endereco']} | no bairro: {r['bairro']} | na cidade: {r['cidade']} | sem resultado: {r['falhou']}")
 
 
+def cmd_classificar(a):
+    from .classificar import Classificador
+    with conectar() as conn:
+        migrar(conn)
+        r = Classificador(conn).executar(a.limite)
+    print(f"{r['imoveis']} imóveis lidos, {r['alterados']} com tags novas | airbnb: {r['airbnb']} | praia: {r['praia']} | "
+          f"turístico: {r['turistico']} | universitário: {r['universitario']}")
+
+
 def cmd_status(_):
     with conectar() as conn, conn.cursor() as cur:
         cur.execute("""select
@@ -339,6 +348,9 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("geocodificar", help="põe no mapa os imóveis sem coordenada")
     s.add_argument("--limite", type=int, default=500)
     s.set_defaults(f=cmd_geocodificar)
+    s = sub.add_parser("classificar", help="calcula as tags de investimento (airbnb, praia, turístico, universitário), sem IA")
+    s.add_argument("--limite", type=int, default=None, help="só os N primeiros imóveis (teste)")
+    s.set_defaults(f=cmd_classificar)
     sub.add_parser("status", help="números gerais da base").set_defaults(f=cmd_status)
     a = p.parse_args(argv)
     a.f(a)

@@ -210,3 +210,5 @@ jobs:
           python-version: "3.11"
       - run: pip install -e ".[navegador,listas]"
       - run: python -m coletor geocodificar
+      - name: Classificar (tags airbnb, praia, turístico, universitário; sem IA)
+        run: python -m coletor classificar

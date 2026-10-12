@@ -143,6 +143,7 @@ h1, h2, h3 { font-family: var(--display); line-height: 1.15; margin: 0; text-wra
 .chip-aviso { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
 .chip-ruim { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
 .chip-fontes { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.chip-tag { background: #eef2ff; color: #3730a3; border-color: transparent; font-weight: 600; }
 .chip-luz { background: var(--luz); color: #1f1b2e; border-color: transparent; }
 
 /* ---------- página inicial ---------- */

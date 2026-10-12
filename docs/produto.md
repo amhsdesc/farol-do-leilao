@@ -21,6 +21,7 @@ Decisão do Desc (set/2026). A busca é o centro da página inicial.
 - **Como pagar:** aceita FGTS, financiamento, parcelamento.
 - **Quando:** leilão nos próximos 7/15/30/60 dias, só 2ª praça, novos nesta semana.
 - **O imóvel:** tipo, quartos, vagas, área.
+- **Perfil de investimento:** Airbnb, Praia, Turístico, Universitário (tags calculadas pelo coletor, sem IA; ver `coletor/coletor/classificar.py`). A tag aparece no cartão para todos; o filtro é de assinante.
 - **Menos risco:** só desocupados, dívidas com o vendedor, preço caiu nos últimos 30 dias, anunciado em mais de um site, com fotos.
 
 Regra de dados: ocupação, dívidas e parcelamento só são afirmados quando a fonte afirma (`nao_informado` / `null` caso contrário).

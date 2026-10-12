@@ -33,6 +33,7 @@ export type Filtros = {
   desocupado?: boolean;
   sem_dividas?: boolean;
   preco_caiu?: boolean;
+  tags?: string[]; // perfil de investimento: qualquer uma das escolhidas
   varias_fontes?: boolean;
   com_fotos?: boolean;
   ordem?: string;
@@ -42,7 +43,7 @@ export const CAMPOS_ASSINANTE = [
   "uf", "cidade", "raio_km", "centro", "comitente", "modalidade", "leiloeiro", "lance_min", "lance_max",
   "desconto_min", "m2_max", "fgts", "financiamento", "parcelamento", "prazo_dias", "so_2a_praca", "novos",
   "tipo", "quartos_min", "vagas_min", "area_min", "area_max", "desocupado", "sem_dividas", "preco_caiu",
-  "varias_fontes", "com_fotos", "ordem",
+  "varias_fontes", "com_fotos", "tags", "ordem",
 ] as const satisfies readonly (keyof Filtros)[];
 
 export const ORDENS: Record<string, string> = {
@@ -56,6 +57,8 @@ export const ORDEM_PADRAO = "desconto";
 
 const UFS = new Set("AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" "));
 const TIPOS = new Set(["apartamento", "casa", "terreno", "comercial", "galpao", "rural", "vaga", "outros"]);
+export const TAGS_INVESTIMENTO = ["airbnb", "praia", "turistico", "universitario"] as const;
+const TAGS = new Set<string>(TAGS_INVESTIMENTO);
 const MODALIDADES = new Set(["judicial", "extrajudicial", "venda_direta", "licitacao", "outros"]);
 
 type Entrada = URLSearchParams | Record<string, string | string[] | undefined>;
@@ -119,6 +122,7 @@ export function lerFiltros(e: Entrada): Filtros {
   f.desocupado = sim(e, "desocupado");
   f.sem_dividas = sim(e, "sem_dividas");
   f.preco_caiu = sim(e, "preco_caiu");
+  f.tags = lista(e, "tags", TAGS);
   f.varias_fontes = sim(e, "varias_fontes");
   f.com_fotos = sim(e, "com_fotos");
   const ordem = pegar(e, "ordem");
@@ -196,6 +200,7 @@ export function montarWhere(f: Filtros, usarBbox = true): { where: string; param
   if (f.desocupado) cond.push("ocupacao = 'desocupado'");
   if (f.sem_dividas) cond.push("debitos_por_conta = 'vendedor'");
   if (f.preco_caiu) cond.push("preco_caiu");
+  if (f.tags) cond.push(`tags && ${p(f.tags)}::text[]`);
   if (f.varias_fontes) cond.push("n_fontes > 1");
   if (f.com_fotos) cond.push("n_fotos > 0");
   return { where: cond.length ? "where " + cond.join(" and ") : "", params };

@@ -28,6 +28,13 @@ export const TIPOS: Record<string, string> = {
   outros: "Outros",
 };
 
+export const TAGS: Record<string, { rotulo: string; ajuda: string }> = {
+  airbnb: { rotulo: "Airbnb", ajuda: "Apartamento ou casa compacta onde há procura por temporada" },
+  praia: { rotulo: "Praia", ajuda: "Cidade ou bairro de orla, ou texto de frente para o mar" },
+  turistico: { rotulo: "Turístico", ajuda: "Cidade de destino turístico" },
+  universitario: { rotulo: "Universitário", ajuda: "Até 2,5 km de um campus" },
+};
+
 export const MODALIDADES: Record<string, string> = {
   judicial: "Judicial",
   extrajudicial: "Extrajudicial",

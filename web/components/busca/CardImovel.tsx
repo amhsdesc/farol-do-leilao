@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ItemBusca } from "@/lib/consultas";
-import { area, diaMes, MODALIDADES, OCUPACAO, porcento, reais, TIPOS } from "@/lib/formato";
+import { area, diaMes, MODALIDADES, OCUPACAO, porcento, reais, TAGS, TIPOS } from "@/lib/formato";
 
 export function quandoLeilao(i: Pick<ItemBusca, "modalidade" | "praca_atual" | "data_leilao">) {
   if (i.modalidade === "venda_direta") return "Venda direta: compra a qualquer momento";
@@ -18,6 +18,7 @@ export function Chips({ i }: { i: ItemBusca }) {
   const ocup = OCUPACAO[i.ocupacao] ?? OCUPACAO.nao_informado;
   return (
     <div className="chips">
+      {(i.tags ?? []).map((t) => TAGS[t] && <span key={t} className="chip chip-tag" title={TAGS[t].ajuda}>{TAGS[t].rotulo}</span>)}
       {i.modalidade !== "outros" && <span className="chip">{MODALIDADES[i.modalidade] ?? i.modalidade}</span>}
       <span className={`chip ${ocup.classe}`}>{ocup.rotulo}</span>
       {i.debitos_por_conta === "vendedor" && <span className="chip chip-bom">Dívidas com o vendedor</span>}
