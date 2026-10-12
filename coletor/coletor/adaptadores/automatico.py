@@ -113,6 +113,10 @@ class Automatico(Adaptador):
         return fim in ("", "/") and urlparse(url).path not in ("", "/")
 
     def descobrir_links(self) -> list[str]:
+        if self.fonte.get("descoberta"):  # sites que listam por JavaScript: função própria (adaptadores/descobertas.py)
+            from .descobertas import DESCOBERTAS
+            achados = DESCOBERTAS[self.fonte["descoberta"]](self)
+            return achados[: int(self.fonte.get("max_lotes", 300))]
         inicio = self.fonte.get("inicio") or []
         if isinstance(inicio, str):
             inicio = [inicio]

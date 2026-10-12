@@ -220,3 +220,18 @@ def test_frazao_itau_duas_pracas():
     assert r["data_praca1"] == "2026-09-28T16:00" and r["valor_praca1"] == 296640.29
     assert r["data_praca2"] == "2026-10-13T16:00" and r["valor_praca2"] == 247169.39
     assert r["lance_minimo"] == 247169.39
+
+
+def test_leilaovip_sem_ia_e_descoberta():
+    from pathlib import Path
+    from coletor.adaptadores import descobertas, estruturado as e
+    pasta = Path(__file__).parent / "fixtures"
+    r, motivo = e.ler_com_motivo((pasta / "leilaovip_casa.html").read_text(encoding="utf-8"), "",
+                                 "https://www.leilaovip.com.br/evento/anuncio/casa-com-38718-m-parque-sao-quirino-02-22408")
+    assert isinstance(r, dict), motivo
+    assert r["cidade"] == "Campinas" and r["uf"] == "SP" and r["id_externo"] == "22408"
+    assert r["valor_praca1"] == 3783185.8 and r["valor_praca2"] == 2269911.48 and r["lance_minimo"] == 2269911.48
+    assert r["modalidade"] == "judicial"
+    assert len(descobertas.eventos_da_agenda((pasta / "leilaovip_agenda.html").read_text(encoding="utf-8"))) == 24
+    assert len(descobertas.anuncios_do_evento((pasta / "leilaovip_evento.html").read_text(encoding="utf-8"))) == 12
+    assert e.pagina_de_evento("https://www.leilaovip.com.br/evento/detalhes/131026af1pan")

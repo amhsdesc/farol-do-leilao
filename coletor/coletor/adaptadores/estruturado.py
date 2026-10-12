@@ -31,7 +31,7 @@ _EVENTO = re.compile(r"/(?:eventos/)?leilao/\d+(?:/[^/?#]+)?/?(?:[?#].*)?$")
 
 
 # Páginas de navegação que nunca são um lote (lista de lotes, planilha, sala online, login...).
-_NAVEGACAO = re.compile(r"/(?:lotes/lista|planilha|online|auditorio[^/?#]*|arrematante/[^/?#]+|login|cadastro)/?(?:[?#].*)?$", re.I)
+_NAVEGACAO = re.compile(r"/(?:evento/(?:detalhes|redirect[^/]*)/[^/?#]+|lotes/lista|planilha|online|auditorio[^/?#]*|arrematante/[^/?#]+|login|cadastro)/?(?:[?#].*)?$", re.I)
 
 
 def pagina_de_evento(url: str) -> bool:
@@ -145,6 +145,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return ler_lancevip(html, url)
     if not lote and "cdn.frazaoleiloes.com.br" in html and "Informações sobre o Lote" in html:
         return ler_frazao(html, url)
+    if not lote and "/evento/anuncio/" in (url or "") and "Comitente" in html:
+        return ler_leilaovip(html, url)
     if not lote and "borda-branca-produto" in html and "subtit-produto" in html:
         return ler_smart(html, url)
     if not lote:
@@ -478,6 +480,99 @@ def ler_frazao(html: str, url: str = "") -> tuple[dict | object | None, str]:
     if m:
         campos["id_externo"] = m.group(1)
     fotos = [i.get("src") for i in s.find_all("img") if "/images/lot/" in (i.get("src") or "")]
+    if fotos:
+        campos["fotos"] = list(dict.fromkeys(fotos))[:20]
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+# ---------------------------------------------------------------------------------------------
+# Leilão VIP (leilaovip.com.br/evento/anuncio/<slug>-<id>): rótulos em linhas ("Status:", "Cidade:"...).
+
+_DATA_HORA = re.compile(r"(\d{2})/(\d{2})/(\d{4})\s+(\d{1,2}:\d{2})")
+
+
+def ler_leilaovip(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    from datetime import datetime
+    from ..normalizar import FUSO
+
+    s = BeautifulSoup(html, "lxml")
+    for x in s(["script", "style"]):
+        x.decompose()
+    linhas = [l.strip() for l in s.get_text("\n", strip=True).split("\n") if l.strip()]
+
+    def depois(rotulo: str, n: int = 1) -> str | None:
+        for i, l in enumerate(linhas):
+            if l.rstrip(":").strip().lower() == rotulo.lower() and i + n < len(linhas):
+                return linhas[i + n]
+        return None
+
+    status = depois("Status") or ""
+    if not simplificar(status).startswith("aberto"):
+        return None, f"status do lote: {status!r}"
+    categoria = depois("Categoria") or ""
+    titulo = depois("LOTE 1") if False else next((linhas[i + 1] for i, l in enumerate(linhas) if re.fullmatch(r"LOTE\s+\d+:", l, re.I)), "")
+    ref = simplificar(f"{categoria} {titulo}")
+    if _NAO_IMOVEL.search(simplificar(categoria)):
+        return NAO_IMOVEL, f"categoria '{categoria}' não é imóvel"
+    if not _IMOVEL.search(ref):
+        return None, f"sem sinal claro de imóvel: {categoria!r} / {titulo[:60]!r}"
+    cidade, uf = (depois("Cidade") or "").strip().title(), normalizar_uf(depois("Estado"))
+    if not (cidade and uf):
+        return None, "sem cidade/UF"
+    endereco = depois("Endereço") or ""
+    partes = [p.strip() for p in endereco.split(",") if p.strip()]
+    campos: dict[str, Any] = {
+        "titulo": titulo, "tipo": categoria, "status": "aberto", "uf": uf, "cidade": cidade,
+        "endereco": endereco or None, "bairro": partes[-1].title() if len(partes) >= 3 else None,
+        "processo": depois("Processo"), "leiloeiro": depois("Leiloeiro"),
+        "dados": {"extraido_por": "html_leilaovip"},
+    }
+    tl = simplificar(depois("Tipo de Leilão") or "")
+    campos["modalidade"] = "extrajudicial" if "extra" in tl else "judicial" if "judicial" in tl else None
+    com = next((l for l in linhas if l.startswith("Comitente:")), "")
+    if com:
+        campos["dados"]["comitente"] = com.split(":", 1)[1].strip()
+    cep = depois("CEP")
+    if cep:
+        campos["dados"]["cep"] = cep
+    pracas: dict[str, tuple[str | None, float | None]] = {}
+    for i, l in enumerate(linhas):
+        m = re.fullmatch(r"([12])\s*[ºo°]\s*Leil[ãa]o", l, re.I)
+        if m and i + 2 < len(linhas):
+            d = _DATA_HORA.search(linhas[i + 1])
+            r = _REAIS.search(linhas[i + 2])
+            if d and r:
+                pracas[m.group(1)] = (f"{d.group(3)}-{d.group(2)}-{d.group(1)}T{d.group(4).zfill(5)}", _num(r.group(1)))
+    for n, (dt, val) in pracas.items():
+        campos[f"data_praca{n}"], campos[f"valor_praca{n}"] = dt, val
+    if len(pracas) == 2:
+        campos["valor_avaliacao"] = pracas["1"][1]
+    vigente = None
+    for i, l in enumerate(linhas):
+        if l == "Inicial":
+            for k in linhas[i + 1: i + 4]:
+                mm = re.fullmatch(r"(?:R\$\s*)?([\d.]+,\d{2})", k)
+                if mm:
+                    vigente = _num(mm.group(1))
+                    break
+            break
+    if vigente is None and pracas:
+        agora = datetime.now(FUSO)
+        futuras = [v for _, (dt, v) in sorted(pracas.items()) if dt and datetime.fromisoformat(dt).replace(tzinfo=FUSO) >= agora]
+        vigente = (futuras or [v for _, (_, v) in sorted(pracas.items())])[0 if futuras else -1]
+    if vigente:
+        campos["lance_minimo"] = vigente
+    if not (campos.get("lance_minimo") or campos.get("valor_avaliacao")):
+        return None, "sem nenhum valor"
+    try:
+        i0 = next(i for i, l in enumerate(linhas) if l == "Leiloeiro:" or l == "Leiloeiro") + 2
+        campos["descricao"] = " ".join(linhas[i0: i0 + 40])[:3000]
+    except StopIteration:
+        pass
+    m = re.search(r"-(\d+)/?$", (url or "").split("?")[0])
+    if m:
+        campos["id_externo"] = m.group(1)
+    fotos = [i.get("src") for i in s.find_all("img") if "blob.core.windows.net/uploads" in (i.get("src") or "")]
     if fotos:
         campos["fotos"] = list(dict.fromkeys(fotos))[:20]
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""

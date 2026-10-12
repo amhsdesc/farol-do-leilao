@@ -7,6 +7,7 @@ tipo: automatico
 uf: [SP]
 inicio:
   - https://www.leilaovip.com.br
-max_paginas_lista: 10
-max_lotes: 200
+# lista: agenda (IMÓVEIS) → eventos → lotes, por chamadas internas do site (ver adaptadores/descobertas.py)
+descoberta: leilaovip
+max_lotes: 800
 navegador: false
