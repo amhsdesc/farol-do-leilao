@@ -7,6 +7,9 @@ tipo: automatico
 uf: [MS]
 inicio:
   - https://www.casadeleiloes.com.br
-max_paginas_lista: 10
-max_lotes: 200
 navegador: false
+# Casa de Leilões (ASP.NET): home -> /leilao/<slug>/<id> -> /lote/lote-NN/<slug>/<id>
+padrao_link_lote: '/lote/lote-[^/]+/[^/]+/\d+'
+padrao_link_lista: '/leilao/[^/]+/\d+/?$'
+max_paginas_lista: 40
+max_lotes: 600

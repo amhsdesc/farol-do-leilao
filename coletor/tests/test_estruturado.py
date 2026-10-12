@@ -297,3 +297,16 @@ def test_sfrazao_endereco_com_cidade_e_uf_rotulados():
     h = (Path(__file__).parent / "fixtures" / "sfrazao_lote702.html").read_text(encoding="utf-8")
     r, motivo = ler_com_motivo(h, "", "https://www.sfrazao.com.br/lote.php?idLote=702")
     assert r and r["uf"] == "SP" and r["cidade"].lower() == "itapetininga", motivo
+
+
+def test_casadeleiloes_imovel_e_nao_imovel():
+    from pathlib import Path
+    from coletor.adaptadores.estruturado import ler_com_motivo, NAO_IMOVEL
+    base = Path(__file__).parent / "fixtures"
+    u = "https://www.casadeleiloes.com.br/lote/lote-001/x/"
+    r, _ = ler_com_motivo((base / "casadeleiloes_imovel66809.html").read_text(encoding="utf-8"), "", u + "66809")
+    assert r["uf"] == "MS" and r["cidade"].lower() == "corumbá" and r["valor_praca1"] == 150000.0 and r["data_praca1"] == "2026-10-31T17:00"
+    r, motivo = ler_com_motivo((base / "casadeleiloes_imovel66967.html").read_text(encoding="utf-8"), "", u + "66967")
+    assert r and r["uf"] == "MS" and "dourados" in r["cidade"].lower(), motivo
+    r, _ = ler_com_motivo((base / "casadeleiloes_veiculo.html").read_text(encoding="utf-8"), "", u + "66916")
+    assert r is NAO_IMOVEL

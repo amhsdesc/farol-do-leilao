@@ -147,6 +147,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return ler_frazao(html, url)
     if not lote and "/evento/anuncio/" in (url or "") and "Comitente" in html:
         return ler_leilaovip(html, url)
+    if not lote and "Mais detalhes do lote" in html and "/lote/lote-" in (url or ""):
+        return ler_casadeleiloes(html, url)
     if not lote and "Encerramento, valores e lances" in html and "idLote=" in (url or ""):
         return ler_sfrazao(html, url)
     if not lote and "borda-branca-produto" in html and "subtit-produto" in html:
@@ -681,4 +683,66 @@ def ler_sfrazao(html: str, url: str = "") -> tuple[dict | object | None, str]:
         campos["id_externo"] = mid.group(1)
     if imgs:
         campos["fotos"] = list(dict.fromkeys("https://www.sfrazao.com.br/" + i.lstrip("./") for i in imgs))[:20]
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+# ---------------------------------------------------------------------------------------------
+# Casa de Leilões (casadeleiloes.com.br, ASP.NET): /lote/lote-NN/<slug>/<id>, categoria em "- IMÓVEL URBANO » TERRENO".
+
+def ler_casadeleiloes(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    s = BeautifulSoup(html, "lxml")
+    for x in s(["script", "style"]):
+        x.decompose()
+    linhas = [l.strip() for l in s.get_text("\n", strip=True).split("\n") if l.strip()]
+    i_cat = next((i for i, l in enumerate(linhas) if re.match(r"^-\s*[A-ZÀ-Ú][A-ZÀ-Ú ]*»", l)), None)
+    if i_cat is None:
+        return None, "sem linha de categoria"
+    categoria = linhas[i_cat].lstrip("- ").strip()
+    cat = simplificar(categoria)
+    if "imove" not in cat:
+        return NAO_IMOVEL, f"categoria '{categoria}' não é imóvel"
+    titulo = _txt(linhas[i_cat - 2]) if i_cat >= 2 else ""
+    st_ln = next((l for l in linhas if l.startswith("Status:")), "")
+    if "em leilao" not in simplificar(st_ln):
+        return None, f"status do lote: {st_ln!r}"
+
+    def depois(rotulo: str) -> str | None:
+        for i, l in enumerate(linhas):
+            if l.rstrip(":").strip().lower() == rotulo.lower() and i + 1 < len(linhas):
+                return linhas[i + 1]
+        return None
+
+    uf_nome = simplificar(depois("Local") or "")
+    uf = normalizar_uf(uf_nome.upper()) if uf_nome else None
+    cidade, uf_t = _cidade_uf_texto(titulo)
+    if uf_t and (not uf or uf == uf_t):
+        uf = uf_t
+    else:
+        cidade = None
+    if uf and not cidade:  # título termina em "... EM <CIDADE>" (UF vem do campo Local)
+        mt = re.search(r"\bem\s+([^,.;/()\d]{3,40}?)\s*[.]?\s*$", titulo, re.I)
+        cidade = mt.group(1).strip() if mt else None
+    if not (cidade and uf):
+        return None, f"sem cidade/UF (título: {titulo[:70]!r}; local: {uf_nome!r})"
+    lance = _num((_REAIS.search(depois("Lance inicial") or "") or [None, None])[1])
+    if not lance:
+        return None, "sem valor (lance inicial)"
+    data = None
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4})\s+(\d{1,2}:\d{2})", depois("Encerramento") or "")
+    if m:
+        data = f"{m.group(3)}-{m.group(2)}-{m.group(1)}T{m.group(4).zfill(5)}"
+    i_det = next((i for i, l in enumerate(linhas) if l.startswith("Descrição")), None)
+    descricao = " ".join(linhas[i_det + 1:i_det + 40])[:4000] if i_det is not None else ""
+    campos: dict[str, Any] = {
+        "titulo": titulo, "descricao": descricao, "tipo": categoria.split("»")[-1].strip().lower() or None,
+        "status": "aberto", "uf": uf, "cidade": cidade,
+        "valor_praca1": lance, "data_praca1": data,
+        "dados": {"extraido_por": "html_casadeleiloes"},
+    }
+    ma = re.search(r"avalia[çc][ãa]o[^R]{0,80}R\$\s*([\d.]+,\d{2})", descricao, re.I)
+    if ma:
+        campos["valor_avaliacao"] = _num(ma.group(1))
+    mid = re.search(r"/(\d+)/?$", url or "")
+    if mid:
+        campos["id_externo"] = mid.group(1)
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""
