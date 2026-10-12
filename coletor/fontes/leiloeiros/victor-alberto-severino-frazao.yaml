@@ -7,6 +7,9 @@ tipo: automatico
 uf: [GO, MT, RJ, RO, RS, SP]
 inicio:
   - https://www.vincoleiloes.com.br
-max_paginas_lista: 10
-max_lotes: 200
 navegador: false
+# Mesma plataforma do sfrazao.com.br: home -> leilao.php?idLeilao=N -> lote.php?idLote=N.
+padrao_link_lote: 'lote\.php\?idLote=\d+'
+padrao_link_lista: 'leilao\.php\?idLeilao=\d+'
+max_paginas_lista: 80
+max_lotes: 1500

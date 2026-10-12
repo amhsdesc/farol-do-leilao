@@ -21,8 +21,8 @@ from ..normalizar import simplificar, uf as normalizar_uf
 
 NAO_IMOVEL = object()
 
-_NAO_IMOVEL = re.compile(r"\b(veiculo|carro|moto|caminhao|onibus|automovel|maquina|sucata|equipamento|movel|moveis|semovente|joia|eletronic|areia|brita|cascalho|entulho|gasolina|etanol|diesel|combustivel|compressor|litros|fiat|chevrolet|volkswagen|renault|toyota|hyundai|yamaha|vw|kombi|saveiro|pick|caminhonete|camioneta|astra)")
-_IMOVEL = re.compile(r"\b(imov|imoveis|terreno|apart|apto|casa|residen|suite|terras|box |garagem|vaga|comercial|rural|galpao|sala|loja|conjunto|fazenda|chacara|sitio|lote|gleba|cobertura|edificio|predio|hotel|barrac)")
+_NAO_IMOVEL = re.compile(r"\b(veiculo|carro|moto|caminhao|onibus|automovel|maquina|sucata|equipamento|movel|moveis|semovente|joia|eletronic|areia|brita|cascalho|entulho|gasolina|etanol|diesel|combustivel|compressor|litros|fiat|chevrolet|volkswagen|renault|toyota|hyundai|yamaha|vw|kombi|saveiro|pick|caminhonete|camioneta|astra|ford|honda|zafira|cadeira|cadeiras|ventilador|ventiladores|aspirador|aspiradores|aparelho|aparelhos|telhas)")
+_IMOVEL = re.compile(r"\b(imov|imoveis|terreno|apart|apto|casa|residen|suite|terras|chale|box |garagem|vaga|comercial|rural|galpao|sala|loja|conjunto|fazenda|chacara|sitio|lote|gleba|cobertura|edificio|predio|hotel|barrac)")
 _CIDADE_UF = re.compile(r"(?:^|[-–,]\s*)([A-ZÀ-Ú][\wÀ-ú'. ]{1,40}?)\s*[-/]\s*([A-Z]{2})\s*$")
 
 
