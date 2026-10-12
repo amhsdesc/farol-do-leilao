@@ -153,6 +153,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return ler_casadeleiloes(html, url)
     if not lote and "Encerramento, valores e lances" in html and "idLote=" in (url or ""):
         return ler_sfrazao(html, url)
+    if not lote and "/sale/detail" in (url or "") and "cdn-biasi" in html and "Informações sobre o Lote" in html:
+        return ler_biasi(html, url)
     if not lote and "borda-branca-produto" in html and "subtit-produto" in html:
         return ler_smart(html, url)
     if not lote:
@@ -813,3 +815,83 @@ def _num_br(txt: str) -> str | None:
     if "," in v:
         v = v.replace(".", "").replace(",", ".")
     return v
+
+
+# ---------------------------------------------------------------------------------------------
+# Biasi Leilões (biasileiloes.com.br, ASP.NET): /sale/detail?id=N. O site lista os lotes por AJAX (/Sale/LotList?id=<leilão>).
+# A página do lote traz título, endereço "Rua X, 380, Bairro, Cidade/UF", datas das praças, "Lance Inicial" e a situação.
+
+_DATA_BIASI = re.compile(r"(\d{2})/(\d{2})/(\d{4})\s+\S*s\s+(\d{1,2})h(\d{2})")
+
+
+def ler_biasi(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    s = BeautifulSoup(html, "lxml")
+    imgs = [i.get("src") for i in s.find_all("img") if "/images/lot/" in (i.get("src") or "")]
+    for x in s(["script", "style"]):
+        x.decompose()
+    linhas = [l.strip() for l in s.get_text("\n", strip=True).split("\n") if l.strip()]
+    idx = [i for i, l in enumerate(linhas) if re.fullmatch(r"Lote\s+\d+", l)]
+    if not idx or idx[-1] + 2 >= len(linhas):
+        return None, "sem cabeçalho 'Lote NNN'"
+    i0 = idx[-1]
+    titulo = _txt(linhas[i0 + 1])
+    endereco = _txt(linhas[i0 + 2])
+    ate = linhas[i0 + 3:i0 + 40]
+
+    def com(prefixo: str) -> str | None:
+        return next((l for l in ate if l.lower().startswith(prefixo.lower())), None)
+
+    status = next((l for l in ate if re.fullmatch(r"(?:Liberado para Lance|Vendido|Arrematado|Encerrado|Cancelado|Suspenso|Retirado|Não Vendido|Aguardando.*)", l, re.I)), "")
+    st = simplificar(status)
+    if st == "liberado para lance":
+        status_lote = "aberto"
+    elif st in ("vendido", "arrematado", "encerrado", "cancelado", "retirado"):
+        status_lote = "encerrado"
+    elif st == "suspenso":
+        status_lote = "suspenso"
+    else:
+        return None, f"status do lote: {status!r}"
+    sinal = simplificar(titulo)
+    if _NAO_IMOVEL.search(sinal):
+        return NAO_IMOVEL, "título não é imóvel"
+    if not _IMOVEL.search(sinal):
+        return None, f"sem sinal claro de imóvel no título: {titulo[:60]!r}"
+    cidade, uf = _cidade_uf_texto(endereco)
+    if not (cidade and uf):
+        cidade, uf = _cidade_uf_texto(titulo)
+    if not (cidade and uf):
+        return None, f"sem cidade/UF (endereço: {endereco[:60]!r}; título: {titulo[:60]!r})"
+    lance = _num((_REAIS.search(com("Lance Inicial") or "") or [None, None])[1])
+    if not lance:
+        return None, "sem valor (Lance Inicial)"
+
+    def data_da(prefixo: str) -> str | None:
+        m = _DATA_BIASI.search(com(prefixo) or "")
+        return f"{m.group(3)}-{m.group(2)}-{m.group(1)}T{m.group(4).zfill(2)}:{m.group(5)}" if m else None
+
+    campos: dict[str, Any] = {
+        "titulo": titulo, "status": status_lote, "uf": uf, "cidade": cidade, "endereco": endereco or None,
+        "valor_praca1": lance, "data_praca1": data_da("1º Leilão") or data_da("1° Leilão"),
+        "dados": {"extraido_por": "html_biasi"},
+    }
+    i_info = next((i for i, l in enumerate(linhas) if l == "Informações sobre o Lote"), None)
+    if i_info is not None:
+        ocup = next((l for l in linhas[i_info + 1:i_info + 3] if simplificar(l) in ("ocupado", "desocupado", "livre")), None)
+        if ocup:
+            campos["ocupacao"] = ocup.lower()
+        fim = next((i for i, l in enumerate(linhas) if i > i_info and l in ("Classificação de Lances", "Forma de pagamento")), len(linhas))
+        corpo = [l for l in linhas[i_info + 1:fim] if l not in ("Dê seu lance!", "Entrar no Auditório")]
+        campos["descricao"] = " ".join(corpo)[:4000]
+        for l in corpo:  # '2° Leilão | Quinta-feira, dia 15 de Outubro de 2026 às 15:00 horas | Lance Inicial R$ 385.709,87'
+            if re.match(r"2\s*[°º]\s*Leil", l):
+                v2 = _num((_REAIS.search(l.split("Lance Inicial")[-1]) or [None, None])[1])
+                if v2:
+                    campos["valor_praca2"] = v2
+                campos["data_praca2"] = data_da("2º Leilão") or data_da("2° Leilão")
+
+    mid = re.search(r"[?&]id=(\d+)", url or "")
+    if mid:
+        campos["id_externo"] = mid.group(1)
+    if imgs:
+        campos["fotos"] = list(dict.fromkeys(imgs))[:20]
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""

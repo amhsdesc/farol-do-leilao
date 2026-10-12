@@ -1,5 +1,6 @@
-# Criado pelo catálogo (2026-09-28). Validação: pendente.
-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+# Biasi Leilões (ASP.NET). Sem IA: a home lista os leilões (/leilao/<id>/<slug>); cada leilão carrega os lotes por AJAX em
+# /Sale/LotList (a mesma chamada do site); a página do lote (/sale/detail?id=N) é lida por estruturado.ler_biasi.
+# Leilões de venda direta (slug com "venda-direta") usam vendaDireta=True (o adaptador troca sozinho).
 id: biasi-leiloes
 nome: Biasi Leilões
 site: https://www.biasileiloes.com.br
@@ -7,6 +8,13 @@ tipo: automatico
 uf: [todas]
 inicio:
   - https://www.biasileiloes.com.br
-max_paginas_lista: 10
-max_lotes: 200
+padrao_link_lote: 'sale/detail\?id=\d+'
+expandir_eventos:
+  padrao: '/leilao/(\d+)/'
+  url: 'https://www.biasileiloes.com.br/Sale/LotList?id={id}&start={inicio}&limit=48&vendaDireta={venda_direta}'
+  padrao_lote: 'sale/detail\?id=\d+'
+  tamanho: 48
+  paginas_max: 20
+max_paginas_lista: 5
+max_lotes: 1500
 navegador: false

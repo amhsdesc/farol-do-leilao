@@ -214,7 +214,7 @@ class Automatico(Adaptador):
         guardado = self.url_final
         try:
             for pagina in range(int(exp.get("paginas_max", 30))):
-                url = exp["url"].format(id=m.group(1), inicio=pagina * tamanho, pagina=pagina)
+                url = exp["url"].format(id=m.group(1), inicio=pagina * tamanho, pagina=pagina, venda_direta="True" if "venda-direta" in evento.lower() else "False")
                 try:
                     sopa = BeautifulSoup(self._html(url), "lxml")
                 except Exception as e:

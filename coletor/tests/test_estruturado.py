@@ -320,3 +320,16 @@ def test_leilotech_snapshot_imovel_e_veiculo():
     assert r and r["uf"] == "SC" and r["cidade"] == "Barra Velha" and r["valor_avaliacao"] == 300000.0 and r["id_externo"] == "480", motivo
     r, _ = ler_com_motivo((base / "leilotech_fiat.html").read_text(encoding="utf-8"), "", "https://vasconcelosleiloes.com.br/lote/524/x")
     assert r is NAO_IMOVEL
+
+
+def test_biasi_lote_imovel_duas_pracas():
+    from pathlib import Path
+    from coletor.adaptadores.estruturado import ler_com_motivo
+    base = Path(__file__).parent / "fixtures"
+    r, motivo = ler_com_motivo((base / "biasi_lote62735.html").read_text(encoding="utf-8"), "", "https://www.biasileiloes.com.br/sale/detail?id=62735")
+    assert r, motivo
+    assert r["uf"] == "BA" and r["cidade"] == "Vitória da Conquista" and r["valor_praca1"] == 839120.55
+    assert r["valor_praca2"] == 385709.87 and r["data_praca1"] == "2026-10-13T15:00" and r["data_praca2"] == "2026-10-15T15:00"
+    assert r["status"] == "aberto" and r["id_externo"] == "62735"
+    r, motivo = ler_com_motivo((base / "biasi_lote63763.html").read_text(encoding="utf-8"), "", "https://www.biasileiloes.com.br/sale/detail?id=63763")
+    assert r and r["uf"] == "SP" and r["cidade"] == "Mauá" and r["valor_praca2"] == 194835.05, motivo
