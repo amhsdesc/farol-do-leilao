@@ -5,7 +5,7 @@
  * Limites conhecidos (testados em 12/10/2026):
  *  - o filtro de bairro do servidor é "frouxo" ("Asa Norte" traz também Samambaia Norte, Ceilândia Norte...),
  *    então o bairro é conferido AQUI, anúncio por anúncio, pelo nome exato;
- *  - 15 anúncios por página, até 20 páginas; limite de 60 requisições/min por IP (usamos poucas, em sequência);
+ *  - 15 anúncios por página, até 20 páginas (a resposta traz pagination.totalResults/totalPages); limite de 60 requisições/min por IP (usamos poucas, em sequência);
  *  - são preços de anúncio (pedidos), não de venda fechada.
  */
 
@@ -124,19 +124,25 @@ export async function buscarNoChaves(
       const lista = dados.results ?? [];
       if (!lista.length) break;
       vistos += lista.length;
+      let temOutroBairro = false;
       for (const x of lista) {
         const preco = Number(x.priceBRL);
         const area = Number(x.areaM2);
         const bairro = String((x.location as { neighborhood?: string } | undefined)?.neighborhood ?? "");
         if (!(preco > 0) || !(area > 0)) continue;
-        if (comBairro && !bairroConfere(e.bairro!, bairro)) continue;
+        if (comBairro && !bairroConfere(e.bairro!, bairro)) {
+          temOutroBairro = true;
+          continue;
+        }
         achados.push({
           titulo: String(x.title ?? "Anúncio"), preco, area, bairro,
           precoM2: Math.round((preco / area) * 100) / 100,
           url: typeof x.url === "string" ? x.url : undefined,
         });
       }
-      if (achados.length >= meta * 2 || lista.length < 15) break; // amostra boa ou acabaram as páginas
+      // O servidor lista primeiro os anúncios do bairro pedido e só depois os "vizinhos" (testado em 12/10/2026):
+      // quando aparece anúncio de outro bairro, as próximas páginas só trariam mais vizinhos, então paramos.
+      if (temOutroBairro || achados.length >= meta * 2 || lista.length < 15) break;
     }
 
     if (achados.length < meta) {
