@@ -120,7 +120,10 @@ class Automatico(Adaptador):
             raise ErroDeFonte("Informe 'inicio' (URLs da listagem de imóveis) no YAML.")
         dominio = urlparse(inicio[0]).netloc
         padrao = re.compile(self.fonte["padrao_link_lote"], re.I) if self.fonte.get("padrao_link_lote") else HEURISTICA_LOTE
-        fila, visitadas, lotes = list(inicio), set(), []
+        lista = re.compile(self.fonte["padrao_link_lista"], re.I) if self.fonte.get("padrao_link_lista") else None
+        exp = self.fonte.get("expandir_eventos") or {}
+        exp_padrao = re.compile(exp["padrao"], re.I) if exp.get("padrao") else None
+        fila, visitadas, lotes, expandidos = list(inicio), set(), [], set()
         while fila and len(visitadas) < int(self.fonte.get("max_paginas_lista", 10)):
             url = fila.pop(0)
             if url in visitadas:
@@ -134,15 +137,51 @@ class Automatico(Adaptador):
             # o site pode ter mudado de domínio (redirecionamento): os links valem a partir do endereço FINAL
             base = self.url_final or url
             dominios = {dominio, urlparse(base).netloc}
+            novos_eventos: list[str] = []
             for a in sopa.select("a[href]"):
                 href = urljoin(base, a["href"]).split("#")[0]
                 if urlparse(href).netloc not in dominios:
                     continue
-                if padrao.search(href) and href not in lotes:
+                if exp_padrao and exp_padrao.search(href):
+                    if href not in expandidos:
+                        expandidos.add(href)
+                        novos_eventos.append(href)
+                elif padrao.search(href) and href not in lotes:
                     lotes.append(href)
-                elif HEURISTICA_PAGINACAO.search(href) and href not in visitadas:
+                elif ((lista and lista.search(href)) or HEURISTICA_PAGINACAO.search(href)) and href not in visitadas and href not in fila:
                     fila.append(href)
+            for ev in novos_eventos:
+                for l in self._lotes_do_evento(ev, exp, base):
+                    if l not in lotes:
+                        lotes.append(l)
         return lotes[: int(self.fonte.get("max_lotes", 300))]
+
+    def _lotes_do_evento(self, evento: str, exp: dict, base: str) -> list[str]:
+        """Eventos cujos lotes são carregados por JavaScript: chama o endereço interno que devolve a lista (em páginas)."""
+        m = re.search(exp["padrao"], evento, re.I)
+        if not m or not m.groups():
+            return []
+        tamanho = int(exp.get("tamanho", 36))
+        achados: list[str] = []
+        guardado = self.url_final
+        try:
+            for pagina in range(int(exp.get("paginas_max", 30))):
+                url = exp["url"].format(id=m.group(1), inicio=pagina * tamanho, pagina=pagina)
+                try:
+                    sopa = BeautifulSoup(self._html(url), "lxml")
+                except Exception as e:
+                    self.registrar_erro(f"Evento {evento}: {e}")
+                    break
+                novos = [urljoin(base, a["href"]).split("#")[0] for a in sopa.select("a[href]") if re.search(exp["padrao_lote"], a["href"], re.I)]
+                novos = [n for n in dict.fromkeys(novos) if n not in achados]
+                if not novos:
+                    break
+                achados += novos
+                if len(novos) < tamanho and not exp.get("sempre_paginar"):
+                    break
+        finally:
+            self.url_final = guardado
+        return achados
 
     # ------------------------------------------------------------ cache e LLM
 

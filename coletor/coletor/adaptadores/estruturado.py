@@ -27,7 +27,7 @@ _CIDADE_UF = re.compile(r"(?:^|[-–,]\s*)([A-ZÀ-Ú][\wÀ-ú'. ]{1,40}?)\s*[-/]
 
 
 # Página de evento (lista de lotes): /eventos/leilao/<id>/<slug>, sem o trecho /lote.
-_EVENTO = re.compile(r"/eventos/leilao/\d+/[^/?#]+/?(?:[?#].*)?$")
+_EVENTO = re.compile(r"/(?:eventos/)?leilao/\d+(?:/[^/?#]+)?/?(?:[?#].*)?$")
 
 
 # Páginas de navegação que nunca são um lote (lista de lotes, planilha, sala online, login...).
@@ -143,6 +143,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
     lote = extrair_var_lote(html)
     if not lote and "lv-lote-pagina" in html:
         return ler_lancevip(html, url)
+    if not lote and "cdn.frazaoleiloes.com.br" in html and "Informações sobre o Lote" in html:
+        return ler_frazao(html, url)
     if not lote and "borda-branca-produto" in html and "subtit-produto" in html:
         return ler_smart(html, url)
     if not lote:
@@ -381,4 +383,101 @@ def ler_smart(html: str, url: str = "") -> tuple[dict | object | None, str]:
     fotos = [i["src"] for i in s.find_all("img") if "/_admin_/upload/" in (i.get("src") or "")]
     if fotos:
         campos["fotos"] = list(dict.fromkeys(fotos))
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+# ---------------------------------------------------------------------------------------------
+# Frazão Leilões (frazaoleiloes.com.br/lote/<id>-<slug>): texto livre, mas com linhas previsíveis.
+
+_MESES = {m: i + 1 for i, m in enumerate("janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro".split())}
+_END_UF = re.compile(r",\s*([^,]+?),\s*([A-Z]{2})\s*$")
+_CAB_LOCAL = re.compile(r"^([^/]+?)\s*/\s*([A-Z]{2})\s*-\s*(?:BAIRRO\s+|JARDIM\s+)?([^-]+?)\s*-\s", re.I)
+_LEILAO_FRAZAO = re.compile(r"Leil[ãa]o:\s*(\d{2})/(\d{2})/(\d{4})\s*(?:às|as)\s*(\d{1,2})h(\d{2})", re.I)
+
+
+def ler_frazao(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    from datetime import datetime
+    from ..normalizar import FUSO, tipo as normalizar_tipo
+
+    s = BeautifulSoup(html, "lxml")
+    for x in s(["script", "style"]):
+        x.decompose()
+    linhas = [l for l in s.get_text("\n", strip=True).split("\n") if l]
+    try:
+        i_lote = next(i for i, l in enumerate(linhas) if re.fullmatch(r"Lote\s+[\d-]+", l))
+        i_info = linhas.index("Informações sobre o Lote")
+    except (StopIteration, ValueError):
+        return None, "estrutura do lote não reconhecida"
+    evento = linhas[i_lote - 1] if i_lote >= 1 else ""
+    titulo = linhas[i_lote + 1] if i_lote + 1 < len(linhas) else ""
+    endereco = linhas[i_lote + 2] if i_lote + 2 < len(linhas) else ""
+    cabecalho = linhas[i_info + 1] if i_info + 1 < len(linhas) else ""
+    try:
+        fim = next(j for j in range(i_info + 1, len(linhas)) if linhas[j] in ("Envio de Proposta", "Consulte o edital e documentação"))
+    except StopIteration:
+        fim = min(len(linhas), i_info + 40)
+    corpo = " ".join(linhas[i_info + 1: fim])
+    base = simplificar(f"{titulo} {cabecalho} {corpo[:500]}")
+    if _NAO_IMOVEL.search(simplificar(titulo)) and not _IMOVEL.search(simplificar(titulo)):
+        return NAO_IMOVEL, f"título não é de imóvel: {titulo[:70]!r}"
+    if not _IMOVEL.search(base):
+        return None, f"sem sinal claro de imóvel: {titulo[:70]!r}"
+    cidade = uf = bairro = None
+    m = _CAB_LOCAL.match(cabecalho)
+    if m and normalizar_uf(m.group(2)):
+        cidade, uf, bairro = m.group(1).strip().title(), normalizar_uf(m.group(2)), m.group(3).strip().title()
+    m = _END_UF.search(endereco)
+    if m and normalizar_uf(m.group(2)):
+        cidade, uf = m.group(1).strip(), normalizar_uf(m.group(2))
+    if not (cidade and uf):
+        return None, f"sem cidade/UF (endereço: {endereco[:70]!r})"
+    if not bairro:  # linhas do tipo "Centro - Ituiutaba/MG - Sala comercial..."
+        mb = re.compile(r"^([^-/\n]{2,40}?)\s*-\s*" + re.escape(cidade) + r"\s*/\s*" + uf + r"\b", re.I)
+        bairro = next((m.group(1).strip() for l in linhas[i_info:fim] if (m := mb.match(l))), None)
+    campos: dict[str, Any] = {
+        "titulo": titulo, "descricao": corpo[:3000], "tipo": normalizar_tipo(None, re.sub(r"(?i)com\s+\d+\s+vagas?(?: de garagem)?", "", titulo), re.sub(r"(?i)com\s+\d+\s+vagas?(?: de garagem)?", "", cabecalho)),
+        "uf": uf, "cidade": cidade, "bairro": bairro, "endereco": endereco,
+        "status": "aberto", "dados": {"extraido_por": "html_frazao", "evento": evento},
+    }
+    ocup = simplificar(next((l for l in linhas[i_lote:i_lote + 8] if l.lower().startswith("imóvel ")), ""))
+    if "desocupado" in ocup or "livre" in ocup:
+        campos["ocupacao"] = "desocupado"
+    elif "ocupado" in ocup or "locado" in ocup:
+        campos["ocupacao"] = "ocupado"
+    texto = "\n".join(linhas)
+    n = "2" if re.match(r"\s*2\s*[ºo°]", evento) else "1"
+    datas: dict[str, "datetime"] = {}
+
+    def _marca(num: str, a: int, mes: int, d: int, hh: int, mm: str) -> None:
+        campos[f"data_praca{num}"] = f"{a}-{mes:02d}-{d:02d}T{hh:02d}:{mm}"
+        datas[num] = datetime(a, mes, d, hh, int(mm), tzinfo=FUSO)
+
+    for m in re.finditer(r"([12])\s*[ºo°]\s*leil[ãa]o:\s*(\d{1,2}) de (\w+) de (\d{4}),?\s*(?:às|as)\s*(\d{1,2})h(\d{2})(?:[^R\n]{0,40}R\$\s*([\d.]+,\d{2}))?", texto, re.I):
+        mes = _MESES.get(simplificar(m.group(3)))
+        if mes:
+            _marca(m.group(1), int(m.group(4)), mes, int(m.group(2)), int(m.group(5)), m.group(6))
+            if m.group(7):
+                campos[f"valor_praca{m.group(1)}"] = _num(m.group(7))
+    if not datas:
+        for m in re.finditer(r"(?:([12])\s*[ºo°]\s*)?leil[ãa]o:\s*(\d{2})/(\d{2})/(\d{4})\s*(?:às|as)\s*(\d{1,2})h(\d{2})", texto, re.I):
+            _marca(m.group(1) or n, int(m.group(4)), int(m.group(3)), int(m.group(2)), int(m.group(5)), m.group(6))
+    if datas and max(datas.values()) < datetime.now(FUSO):
+        campos["status"] = "encerrado"
+    for i, l in enumerate(linhas):
+        if l.rstrip(":").lower() == "lance inicial" and i + 1 < len(linhas):
+            r = _REAIS.search(linhas[i + 1])
+            if r:
+                campos["lance_minimo"] = campos[f"valor_praca{n}"] = _num(r.group(1))
+            break
+    a = re.search(r"avalia[çc][ãa]o[^R\n]{0,40}R\$\s*([\d.]+,\d{2})", texto, re.I)
+    if a:
+        campos["valor_avaliacao"] = _num(a.group(1))
+    if not (campos.get("lance_minimo") or campos.get("valor_avaliacao")):
+        return None, "sem nenhum valor"
+    m = re.search(r"/lote/(\d+)", url or "")
+    if m:
+        campos["id_externo"] = m.group(1)
+    fotos = [i.get("src") for i in s.find_all("img") if "/images/lot/" in (i.get("src") or "")]
+    if fotos:
+        campos["fotos"] = list(dict.fromkeys(fotos))[:20]
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""

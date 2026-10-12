@@ -195,3 +195,28 @@ def test_leiloariasmart_sem_ia():
     assert r["valor_praca1"] == 307902.03 and r["valor_praca2"] == 216330.69
     assert r["lance_minimo"] == 216330.69  # 1ª praça já encerrada
     assert r["modalidade"] == "extrajudicial" and r["ocupacao"] == "ocupado"
+
+
+def test_frazao_sem_ia():
+    from pathlib import Path
+    from coletor.adaptadores import estruturado as e
+    html = (Path(__file__).parent / "fixtures" / "frazao_lote.html").read_text(encoding="utf-8")
+    r, motivo = e.ler_com_motivo(html, "", "https://www.frazaoleiloes.com.br/lote/41361-x")
+    assert isinstance(r, dict), motivo
+    assert r["cidade"] == "São Paulo" and r["uf"] == "SP" and r["bairro"] == "Bela Vista"
+    assert r["lance_minimo"] == 6948800.0 and r["data_praca1"] == "2026-09-30T10:00"
+    assert r["id_externo"] == "41361" and r["ocupacao"] == "ocupado"
+    assert e.pagina_de_evento("https://www.frazaoleiloes.com.br/leilao/3706/leilao-x-3706")
+    assert not e.pagina_de_evento("https://lancevip.com.br/leilao/2734/lote/1")
+
+
+def test_frazao_itau_duas_pracas():
+    from pathlib import Path
+    from coletor.adaptadores import estruturado as e
+    html = (Path(__file__).parent / "fixtures" / "frazao_itau.html").read_text(encoding="utf-8")
+    r, motivo = e.ler_com_motivo(html, "", "https://www.frazaoleiloes.com.br/lote/41986-x")
+    assert isinstance(r, dict), motivo
+    assert r["cidade"] == "Ituiutaba" and r["uf"] == "MG" and r["bairro"] == "Centro"
+    assert r["data_praca1"] == "2026-09-28T16:00" and r["valor_praca1"] == 296640.29
+    assert r["data_praca2"] == "2026-10-13T16:00" and r["valor_praca2"] == 247169.39
+    assert r["lance_minimo"] == 247169.39

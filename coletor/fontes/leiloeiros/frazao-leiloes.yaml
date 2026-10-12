@@ -7,6 +7,16 @@ tipo: automatico
 uf: [todas]
 inicio:
   - https://www.frazaoleiloes.com.br
-max_paginas_lista: 10
-max_lotes: 200
+# lotes: /lote/<id>-<slug>; os eventos (/leilao/<id>/...) só servem de listagem para achar os lotes
+padrao_link_lote: '/lote/\d+-'
+padrao_link_lista: '/leilao/\d+/'
+# os lotes de cada evento chegam por JavaScript: pedimos a lista direto ao endereço interno do site
+expandir_eventos:
+  padrao: '/leilao/(\d+)/'
+  url: 'https://www.frazaoleiloes.com.br/Sale/SearchLotResult?bid={id}&start={inicio}&limit=36&page={pagina}&vendaDireta=false&FilterByNumber=true'
+  padrao_lote: '^/lote/\d+-'
+  tamanho: 36
+  paginas_max: 30
+max_paginas_lista: 30
+max_lotes: 600
 navegador: false
