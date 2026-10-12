@@ -5,8 +5,11 @@ nome: Luiz Egidio Cruz Medeiros
 site: https://www.medeirosleiloes.com.br
 tipo: automatico
 uf: [PR]
+# Em 2026-10-12 o site tinha 0 itens na categoria imóveis (só veículos/máquinas/sucata): nada a coletar, não é defeito do coletor.
+# Olhamos só as páginas de imóveis e de venda direta, para não gastar IA com veículos.
 inicio:
-  - https://www.medeirosleiloes.com.br
+  - https://www.medeirosleiloes.com.br/leilao/lotes/imoveis
+  - https://www.medeirosleiloes.com.br/venda-direta
 max_paginas_lista: 10
 max_lotes: 200
 navegador: false
