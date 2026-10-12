@@ -143,6 +143,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
     lote = extrair_var_lote(html)
     if not lote and "lv-lote-pagina" in html:
         return ler_lancevip(html, url)
+    if not lote and "borda-branca-produto" in html and "subtit-produto" in html:
+        return ler_smart(html, url)
     if not lote:
         return None, "sem JSON embutido (var lote)"
     if lote.get("status") != 1:  # só lote aberto é lido aqui; os demais seguem o caminho normal
@@ -285,4 +287,98 @@ def ler_lancevip(html: str, url: str = "") -> tuple[dict | object | None, str]:
         campos["fotos"] = [src]
     if not (campos.get("valor_avaliacao") or campos.get("lance_minimo")):
         return None, "sem nenhum valor"
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+# ---------------------------------------------------------------------------------------------
+# Leiloaria Smart (leiloariasmart.com.br/imovel/N): HTML do servidor com blocos "Primeira praça / Segunda praça".
+
+_PRACA_SMART = re.compile(r"^(primeira praca|segunda praca|praca unica)\s*:?$")
+_DATA_SMART = re.compile(r"(\d{2})/(\d{2})/(\d{4})\s*(?:às|as)?\s*(\d{1,2}:\d{2})", re.I)
+
+
+def ler_smart(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    s = BeautifulSoup(html, "lxml")
+    for x in s(["script", "style"]):
+        x.decompose()
+    linhas = [l for l in s.get_text("\n", strip=True).split("\n") if l]
+
+    def depois(rotulo: str) -> str | None:
+        for i, l in enumerate(linhas):
+            if simplificar(l).rstrip(":") == rotulo and i + 1 < len(linhas):
+                return linhas[i + 1]
+        return None
+
+    tipo = depois("tipo")
+    try:
+        i_desc = linhas.index("Descrição")
+    except ValueError:
+        return None, "sem bloco 'Descrição'"
+    titulo = linhas[i_desc - 1] if i_desc >= 1 else ""
+    cat_linha = linhas[i_desc - 2] if i_desc >= 2 else ""
+    ref = simplificar(f"{tipo or ''} {cat_linha}")
+    if ref.strip() and _NAO_IMOVEL.search(ref):
+        return NAO_IMOVEL, f"tipo '{tipo or cat_linha}' não é imóvel"
+    if not _IMOVEL.search(ref):
+        return None, f"tipo sem sinal claro de imóvel: {tipo!r}/{cat_linha!r}"
+    if "O LEILÃO TERMINA EM:" not in linhas:
+        return None, "sem contagem regressiva (lote possivelmente encerrado)"
+    campos: dict[str, Any] = {"titulo": titulo, "tipo": tipo or cat_linha.lower(), "status": "aberto",
+                              "dados": {"extraido_por": "html_smart", "comitente": depois("comitente")}}
+    vigente = None
+    for el in s.select(".subtit-produto"):
+        rot = simplificar(el.get_text(" ", strip=True))
+        if not _PRACA_SMART.match(rot):
+            continue
+        bloco = el.find_next_sibling("div")
+        if not bloco:
+            continue
+        n = "2" if "segunda" in rot else "1"
+        m = _DATA_SMART.search(bloco.get_text(" ", strip=True))
+        r = _REAIS.search(bloco.get_text(" ", strip=True))
+        if m:
+            campos[f"data_praca{n}"] = f"{m.group(3)}-{m.group(2)}-{m.group(1)}T{m.group(4).zfill(5)}"
+        if r:
+            campos[f"valor_praca{n}"] = _num(r.group(1))
+        encerrada = "through" in (el.get("class") or []) or "through" in (bloco.get("class") or [])
+        if r and not encerrada and vigente is None:
+            vigente = _num(r.group(1))
+    if vigente is None:
+        return None, "nenhuma praça em vigor"
+    campos["lance_minimo"] = vigente
+    loc = depois("localizacao")
+    if loc:
+        partes = [p.strip() for p in loc.split(",") if p.strip()]
+        for k, p in enumerate(partes):
+            if re.fullmatch(r"[A-Z]{2}", p) and normalizar_uf(p) and k >= 1:
+                campos["uf"], campos["cidade"] = normalizar_uf(p), partes[k - 1]
+                if k >= 3:
+                    campos["bairro"] = partes[k - 2]
+                campos["endereco"] = ", ".join(partes[:k - 1])
+                break
+    if not (campos.get("uf") and campos.get("cidade")):
+        return None, f"sem cidade/UF na localização: {loc!r}"
+    sit = simplificar(depois("situacao") or "")
+    if sit.startswith("desocupado") or sit.startswith("livre"):
+        campos["ocupacao"] = "desocupado"
+    elif sit.startswith("ocupado"):
+        campos["ocupacao"] = "ocupado"
+    mat = depois("matricula")
+    if mat and re.fullmatch(r"[\d.\-/ ]+", mat):
+        campos["dados"]["matricula"] = mat
+    ed = simplificar(next((linhas[j + 1] for j, l in enumerate(linhas) if l == "Edital do leilão" and j + 1 < len(linhas)), ""))
+    if "extrajudicial" in ed or "fiduciaria" in ed:
+        campos["modalidade"] = "extrajudicial"
+    elif "judicial" in ed:
+        campos["modalidade"] = "judicial"
+    desc = [l for l in linhas[i_desc + 1:] if l not in ("Detalhes do Imóvel",)]
+    fim = next((j for j, l in enumerate(desc) if l == "Detalhes do Imóvel"), None)
+    corpo = linhas[i_desc + 1: linhas.index("Detalhes do Imóvel")] if "Detalhes do Imóvel" in linhas else desc[:30]
+    campos["descricao"] = " ".join(corpo)
+    m = re.search(r"/imovel/(\d+)", url or "")
+    if m:
+        campos["id_externo"] = m.group(1)
+    fotos = [i["src"] for i in s.find_all("img") if "/_admin_/upload/" in (i.get("src") or "")]
+    if fotos:
+        campos["fotos"] = list(dict.fromkeys(fotos))
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""

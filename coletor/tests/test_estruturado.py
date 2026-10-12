@@ -183,3 +183,15 @@ def test_lancevip_sem_ia():
     assert casa["valor_avaliacao"] == 460000.0 and casa["lance_minimo"] == 276000.0
     assert casa["modalidade"] == "venda_direta" and casa["id_externo"] == "2719-2"
     assert "Matrícula" in casa["descricao"]
+
+
+def test_leiloariasmart_sem_ia():
+    from pathlib import Path
+    from coletor.adaptadores import estruturado as e
+    html = (Path(__file__).parent / "fixtures" / "smart_casa.html").read_text(encoding="utf-8")
+    r, motivo = e.ler_com_motivo(html, "", "https://leiloariasmart.com.br/imovel/1844")
+    assert isinstance(r, dict), motivo
+    assert r["cidade"] == "Miguel Pereira" and r["uf"] == "RJ" and r["id_externo"] == "1844"
+    assert r["valor_praca1"] == 307902.03 and r["valor_praca2"] == 216330.69
+    assert r["lance_minimo"] == 216330.69  # 1ª praça já encerrada
+    assert r["modalidade"] == "extrajudicial" and r["ocupacao"] == "ocupado"
