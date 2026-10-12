@@ -105,7 +105,7 @@ def _local(bem: dict, titulo: str, texto: str) -> tuple[str | None, str | None, 
     return None, None, None
 
 
-_CATEGORIA_URL = re.compile(r"/oferta/leilao/([^/?#]+)(?:/([^/?#]+))?/\d+/")
+_CATEGORIA_URL = re.compile(r"/oferta/(?:leilao|venda-direta)/([^/?#]+)(?:/([^/?#]+))?/\d+/")
 _LISTA = re.compile(r"/leiloes/\d+(?:[?#/]|$)")
 _DATA_TXT = r"(\d{1,2}/\d{1,2}/\d{4})(?:[^\n]*?(\d{1,2}:\d{2}))?"
 _LEILAO_TXT = re.compile(
@@ -151,7 +151,9 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return ler_smart(html, url)
     if not lote:
         return None, "sem JSON embutido (var lote)"
-    if lote.get("status") != 1:  # só lote aberto é lido aqui; os demais seguem o caminho normal
+    venda_direta = "/oferta/venda-direta/" in (url or "")
+    # 1 = aberto; 8 = venda direta ativa (recebe propostas), só aceito em URL de venda direta
+    if lote.get("status") != 1 and not (venda_direta and lote.get("status") == 8):
         return None, f"status do lote = {lote.get('status')!r} (só 1=aberto é lido sem IA)"
     categoria_url, sub_url = _categoria_da_url(url)
     if categoria_url and categoria_url != "imoveis":
@@ -201,6 +203,11 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
     for k, v in _datas_do_texto(texto).items():  # sites sem datas no JSON: lê "1º leilão / 2º leilão" do texto
         if not campos.get(k):
             campos[k] = v
+    if venda_direta:  # sem leilão/praças: o valor mínimo de proposta é o preço de entrada
+        campos["valor_praca1"] = _valor(lote.get("valorAtual")) or campos["valor_praca1"]
+        for k in ("valor_praca2", "data_praca1", "data_praca2"):
+            campos.pop(k, None)
+        campos["modalidade"] = "venda_direta"
     if not campos["valor_praca1"] and not campos["valor_avaliacao"]:
         return None, "sem nenhum valor"
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""
