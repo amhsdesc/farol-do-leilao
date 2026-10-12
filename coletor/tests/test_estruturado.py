@@ -235,3 +235,26 @@ def test_leilaovip_sem_ia_e_descoberta():
     assert len(descobertas.eventos_da_agenda((pasta / "leilaovip_agenda.html").read_text(encoding="utf-8"))) == 24
     assert len(descobertas.anuncios_do_evento((pasta / "leilaovip_evento.html").read_text(encoding="utf-8"))) == 12
     assert e.pagina_de_evento("https://www.leilaovip.com.br/evento/detalhes/131026af1pan")
+
+
+def test_texto_estavel_ignora_contadores():
+    from coletor.adaptadores.automatico import texto_estavel
+    a = "Casa em Campinas\nVisitas:\n1211\nLance inicial R$ 100.000,00\nFinalizando Em:\n1 dia, 18 h, 52 min e 19 seg\n"
+    b = "Casa em Campinas\nVisitas:\n1290\nLance inicial R$ 100.000,00\nFinalizando Em:\n1 dia, 17 h, 10 min e 02 seg\n"
+    assert texto_estavel(a) == texto_estavel(b)
+    c = a.replace("100.000,00", "90.000,00")
+    assert texto_estavel(a) != texto_estavel(c)
+    d = "3285 visualizações\nBOX NA PENHA\n"
+    assert "BOX NA PENHA" in texto_estavel(d) and "3285" not in texto_estavel(d)
+
+
+def test_texto_estavel_preserva_datas_e_precos():
+    from coletor.adaptadores.automatico import texto_estavel
+    a = "Encerra em: 20/10/2026 14:00\nLance inicial R$ 100.000,00\nVisitas:\n10\n"
+    b = a.replace("20/10/2026", "27/10/2026")
+    c = a.replace("100.000,00", "80.000,00")
+    assert texto_estavel(a) != texto_estavel(b)  # data mudou: precisa reler
+    assert texto_estavel(a) != texto_estavel(c)  # preço mudou: precisa reler
+    assert texto_estavel(a) == texto_estavel(a.replace("\n10\n", "\n99\n"))  # só visitas: não reler
+    d = "Termina em:\n20/10/2026 14:00\n"
+    assert texto_estavel(d) == d.rstrip("\n") or "20/10/2026" in texto_estavel(d)

@@ -78,6 +78,37 @@ INSTRUCAO = (
 )
 
 
+_CONTADOR = re.compile(
+    r"visualiza|\bvisitas?\b|visitantes|acessos|pessoas habilitadas|n[úu]mero de (?:visitas|lances)|"
+    r"finalizando em|termina em|encerra em|tempo restante|resta\(m\)|restam|faltam|"
+    r"\b(?:dia|hora|minuto|segundo)\(s\)|\d+\s*dias?,\s*\d+\s*h|\bsem lance\b|nenhum lance|maior lance atual|[úu]ltimo lance",
+    re.I,
+)
+_SO_NUMERO = re.compile(r"^[\d.,\sR$]*$")  # sem "/" nem ":" → nunca engole uma data ou hora
+_TEM_DATA = re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}")
+
+
+def texto_estavel(texto: str) -> str:
+    """Texto sem contadores que mudam sozinhos (visitas, tempo restante, lances), só para comparar com o cache.
+
+    Sem isso, o contador de visitas muda o texto a cada coleta e a IA releria a página à toa. Não afeta o que é enviado
+    à IA: serve apenas para o hash.
+    """
+    saida: list[str] = []
+    pular = False
+    for linha in texto.splitlines():
+        l = linha.strip()
+        if pular and l and _SO_NUMERO.match(l):  # valor na linha seguinte ao rótulo do contador
+            pular = False
+            continue
+        pular = False
+        if l and len(l) < 80 and _CONTADOR.search(l) and not _TEM_DATA.search(l):  # linha com data nunca é só contador
+            pular = True
+            continue
+        saida.append(linha)
+    return "\n".join(saida)
+
+
 def texto_principal(html: str) -> str:
     sopa = BeautifulSoup(html, "lxml")
     for t in sopa(["script", "style", "noscript", "svg", "header", "footer", "nav", "form", "iframe"]):
@@ -382,7 +413,7 @@ class Automatico(Adaptador):
                         self.lidos_sem_ia += 1
                         yield lote
                     continue
-            h = hashlib.sha1(texto.encode()).hexdigest()
+            h = hashlib.sha1(texto_estavel(texto).encode()).hexdigest()  # sem contadores de visita/tempo
             cache = self._cache_revisao(url)
             # reaproveita se o texto é o mesmo OU se a página é "tranquila" e foi lida há pouco (ver _cache_revisao)
             if cache and (cache["hash_texto"] == h or cache["recente"]):
