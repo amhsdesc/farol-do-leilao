@@ -8,6 +8,8 @@ import { TIPOS } from "@/lib/formato";
 
 export const metadata: Metadata = { title: "Calculadora" };
 export const dynamic = "force-dynamic";
+// A pesquisa de valor de mercado (Server Action desta página) usa busca na web e passa de 10 s com frequência.
+export const maxDuration = 60;
 
 export default async function Calculadora({ searchParams }: { searchParams: Promise<{ imovel?: string }> }) {
   const { assinante } = await acesso();

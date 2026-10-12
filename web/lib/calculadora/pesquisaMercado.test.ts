@@ -98,3 +98,34 @@ test("resposta HTTP não-ok vira mensagem amigável", async () => {
   const r = await pesquisarValorMercado({ uf: "GO", cidade: "Goiânia", tipo: "apartamento", area: 60 });
   assert.equal(r.ok, false);
 });
+
+test("resposta cortada na primeira tentativa: tenta de novo e aproveita a segunda", async () => {
+  let chamadas = 0;
+  globalThis.fetch = (async () => {
+    chamadas++;
+    return chamadas === 1
+      ? respostaAnthropic('```json\n{"amostras": [{"titulo": "A", "preco": 300000, "area": 50, "precoM2":')
+      : respostaAnthropic('```json\n{"amostras": [{"titulo": "A", "preco": 300000, "area": 50}], "precoM2Medio": 6000}\n```');
+  }) as typeof fetch;
+  const r = await pesquisarValorMercado({ uf: "GO", cidade: "Goiânia", tipo: "apartamento", area: 60 });
+  assert.equal(chamadas, 2);
+  assert.equal(r.ok, true);
+});
+
+test("texto com chaves antes do JSON final: usa o último bloco válido", async () => {
+  globalThis.fetch = (async () =>
+    respostaAnthropic('Vou buscar {em portais}.\n```json\n{"amostras": [{"titulo": "A", "preco": 240000, "area": 40}], "precoM2Medio": 6000}\n```')) as typeof fetch;
+  const r = await pesquisarValorMercado({ uf: "GO", cidade: "Goiânia", tipo: "apartamento", area: 60 });
+  assert.equal(r.ok, true);
+});
+
+test("erro 401 não é repetido", async () => {
+  let chamadas = 0;
+  globalThis.fetch = (async () => {
+    chamadas++;
+    return new Response("{}", { status: 401 });
+  }) as typeof fetch;
+  const r = await pesquisarValorMercado({ uf: "GO", cidade: "Goiânia", tipo: "apartamento", area: 60 });
+  assert.equal(chamadas, 1);
+  assert.equal(r.ok, false);
+});

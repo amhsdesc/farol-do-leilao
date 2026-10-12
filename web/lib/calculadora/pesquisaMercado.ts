@@ -44,9 +44,54 @@ export async function mercadoConfigurado() {
 }
 
 function extrairJson(texto: string): unknown {
-  const bloco = texto.match(/```json\s*([\s\S]*?)```/i)?.[1] ?? texto.match(/\{[\s\S]*\}/)?.[0];
-  if (!bloco) throw new Error("resposta sem JSON");
-  return JSON.parse(bloco);
+  const candidatos: string[] = [];
+  for (const m of texto.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)) candidatos.push(m[1]);
+  const ini = texto.indexOf("{");
+  const fim = texto.lastIndexOf("}");
+  if (ini >= 0 && fim > ini) candidatos.push(texto.slice(ini, fim + 1));
+  // o último bloco costuma ser o resultado final (antes dele o modelo pode ter "pensado em voz alta")
+  for (const c of candidatos.reverse()) {
+    try {
+      return JSON.parse(c);
+    } catch {
+      /* tenta o próximo */
+    }
+  }
+  throw new Error("resposta sem JSON válido");
+}
+
+type RespostaMercado = { amostras?: unknown[]; precoM2Medio?: number; observacao?: string };
+
+class FalhaDefinitiva extends Error {}
+
+async function perguntar(prompt: string): Promise<{ texto: string; parou: string | undefined }> {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: process.env.ANTHROPIC_MODELO_MERCADO || process.env.MODELO_LLM || "claude-haiku-4-5-20251001",
+      max_tokens: 4000,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
+      messages: [{ role: "user", content: prompt }],
+    }),
+    signal: AbortSignal.timeout(50_000),
+  });
+  if (!resp.ok) {
+    const corpo = (await resp.text().catch(() => "")).slice(0, 300);
+    console.error(`[mercado] Anthropic respondeu ${resp.status}: ${corpo}`);
+    if (resp.status === 429 || resp.status >= 500) throw new Error(`HTTP ${resp.status}`);
+    throw new FalhaDefinitiva(`HTTP ${resp.status}`);
+  }
+  const dados = await resp.json();
+  const texto = (dados.content ?? [])
+    .filter((b: { type: string }) => b.type === "text")
+    .map((b: { text: string }) => b.text)
+    .join("\n");
+  return { texto, parou: dados.stop_reason };
 }
 
 export async function pesquisarValorMercado(e: EntradaPesquisaMercado): Promise<ResultadoPesquisaMercado> {
@@ -77,33 +122,36 @@ Responda só com um bloco \`\`\`json com este formato exato, sem texto antes ou 
 }`;
 
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODELO_MERCADO || process.env.MODELO_LLM || "claude-haiku-4-5-20251001",
-        max_tokens: 2000,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 6 }],
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-    if (!resp.ok) {
-      return { ok: false, erro: `A busca falhou (código ${resp.status}). Tente de novo em instantes.` };
+    let texto = "";
+    let json: RespostaMercado | null = null;
+    let timeout = false;
+    // até 2 tentativas: a primeira pode falhar por sobrecarga da API, demora ou resposta fora do formato
+    for (let tentativa = 1; tentativa <= 2 && !json; tentativa++) {
+      try {
+        const r = await perguntar(prompt);
+        texto = r.texto;
+        if (!texto.trim()) {
+          console.error(`[mercado] tentativa ${tentativa}: resposta sem texto (stop_reason=${r.parou})`);
+          continue;
+        }
+        json = extrairJson(texto) as RespostaMercado;
+      } catch (err) {
+        timeout = err instanceof Error && err.name === "TimeoutError";
+        console.error(`[mercado] tentativa ${tentativa} falhou:`, err instanceof Error ? err.message : err, "| início da resposta:", texto.slice(0, 200));
+        if (err instanceof FalhaDefinitiva) break; // chave inválida, pedido malformado etc.: repetir não adianta
+      }
     }
-    const dados = await resp.json();
-    const blocosTexto = (dados.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text);
-    const texto = blocosTexto.join("\n");
-    if (!texto.trim()) return { ok: false, erro: "Não encontrei anúncios parecidos com esses dados. Tente ajustar cidade ou bairro." };
+    if (!json) {
+      return {
+        ok: false,
+        erro: timeout
+          ? "A pesquisa demorou demais. Tente de novo; costuma funcionar na segunda vez."
+          : texto.trim()
+            ? "A pesquisa voltou num formato que não consegui ler. Tente de novo."
+            : "Não consegui pesquisar agora. Tente de novo em instantes.",
+      };
+    }
 
-    const json = extrairJson(texto) as {
-      amostras?: unknown[];
-      precoM2Medio?: number;
-      observacao?: string;
-    };
     const amostras: AmostraMercado[] = (json.amostras ?? [])
       .map((a) => a as Record<string, unknown>)
       .filter((a) => typeof a.preco === "number" && typeof a.area === "number" && a.area > 0)
@@ -125,7 +173,8 @@ Responda só com um bloco \`\`\`json com este formato exato, sem texto antes ou 
       return { ok: false, erro: "Não encontrei anúncios parecidos o bastante para estimar um preço por m². Tente com outra cidade ou bairro." };
     }
     return { ok: true, precoM2Medio, amostras, observacao: typeof json.observacao === "string" ? json.observacao : undefined };
-  } catch {
+  } catch (err) {
+    console.error("[mercado] erro inesperado:", err);
     return { ok: false, erro: "Não consegui pesquisar agora. Tente de novo em instantes." };
   }
 }
