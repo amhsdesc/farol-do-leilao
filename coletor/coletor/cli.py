@@ -235,7 +235,12 @@ def cmd_testar(a):
             if isinstance(ad, Automatico):  # só o caminho sem IA (preset de plataforma)
                 brutos = ad._tentar_preset()
                 if not brutos:
-                    print("   preset de plataforma não se aplica (ou não achou lotes); a fonte usaria IA")
+                    print("   preset de plataforma não se aplica; testando a leitura sem IA (JSON embutido)...")
+                    brutos, st = ad.testar_sem_ia(a.max)
+                    print(f"   links de lote achados: {st['links']} | lidos sem IA: {st['lidos']} | "
+                          f"pulados (não é imóvel): {st['nao_imovel']} | eventos ignorados: {st.get('evento', 0)} | link caiu na home (lote fora do ar): {st.get('fora_do_ar', 0)} | precisariam de IA: {st['precisaria_ia']} | erros: {st['erro']}")
+                    for u, m in ad.motivos_ia[:8]:
+                        print(f"   precisaria de IA: {u[:110]} -> {m}")
             else:
                 brutos = []
                 for b in ad.coletar():

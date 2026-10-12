@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from typing import Any, Iterator
 from urllib.parse import urljoin, urlparse
@@ -31,6 +32,7 @@ from psycopg.types.json import Jsonb
 
 from ..config import config
 from ..modelos import LoteBruto
+from . import estruturado
 from .base import Adaptador, ErroDeFonte
 
 HEURISTICA_LOTE = re.compile(r"(lote|imovel|imoveis|leilao|item|produto|detalhe|bem)[^?#]*\d{2,}", re.I)
@@ -91,11 +93,24 @@ class Automatico(Adaptador):
         super().__init__(*a, **kw)
         self.llm = httpx.Client(timeout=90, transport=llm_transport)
         self.chamadas_llm = 0
+        self.lidos_sem_ia = 0
+        self.url_final = ""
+        self.motivos_ia: list[tuple[str, str]] = []
 
     # ------------------------------------------------------------ navegação
 
     def _html(self, url: str) -> str:
-        return self.cliente.html_navegador(url) if self.fonte.get("navegador") else self.cliente.get(url).text
+        if self.fonte.get("navegador"):
+            self.url_final = url
+            return self.cliente.html_navegador(url)
+        r = self.cliente.get(url)
+        self.url_final = str(r.url)  # depois dos redirecionamentos
+        return r.text
+
+    def _foi_para_home(self, url: str) -> bool:
+        """Link de lote que redireciona para a página inicial = lote que saiu do ar; não vale gastar IA lendo a home."""
+        fim = urlparse(self.url_final or url).path
+        return fim in ("", "/") and urlparse(url).path not in ("", "/")
 
     def descobrir_links(self) -> list[str]:
         inicio = self.fonte.get("inicio") or []
@@ -116,9 +131,12 @@ class Automatico(Adaptador):
             except Exception as e:
                 self.registrar_erro(f"Listagem {url}: {e}")
                 continue
+            # o site pode ter mudado de domínio (redirecionamento): os links valem a partir do endereço FINAL
+            base = self.url_final or url
+            dominios = {dominio, urlparse(base).netloc}
             for a in sopa.select("a[href]"):
-                href = urljoin(url, a["href"]).split("#")[0]
-                if urlparse(href).netloc != dominio:
+                href = urljoin(base, a["href"]).split("#")[0]
+                if urlparse(href).netloc not in dominios:
                     continue
                 if padrao.search(href) and href not in lotes:
                     lotes.append(href)
@@ -264,6 +282,36 @@ class Automatico(Adaptador):
             self.registrar_erro(f"Preset de plataforma falhou ({e}); usando leitura padrão.")
             return []
 
+    def testar_sem_ia(self, maximo: int = 10) -> tuple[list[LoteBruto], dict[str, int]]:
+        """Para o comando `testar`: acha os links de lote e tenta só a leitura sem IA (JSON embutido). Não grava nada."""
+        links = self.descobrir_links()
+        stats = {"links": len(links), "lidos": 0, "nao_imovel": 0, "precisaria_ia": 0, "erro": 0}
+        lotes: list[LoteBruto] = []
+        for url in links[:maximo]:
+            if estruturado.pagina_de_evento(url):
+                stats["evento"] = stats.get("evento", 0) + 1
+                continue
+            try:
+                html = self._html(url)
+                if self._foi_para_home(url):
+                    stats["fora_do_ar"] = stats.get("fora_do_ar", 0) + 1
+                    continue
+                lido, motivo = estruturado.ler_com_motivo(html, texto_principal(html), url)
+            except Exception:
+                stats["erro"] += 1
+                continue
+            if lido is estruturado.NAO_IMOVEL:
+                stats["nao_imovel"] += 1
+            elif lido:
+                lote = self.montar(lido, url=self.url_final or url)
+                if lote:
+                    lotes.append(lote)
+                    stats["lidos"] += 1
+            else:
+                stats["precisaria_ia"] += 1
+                self.motivos_ia.append((url, motivo))
+        return lotes, stats
+
     def coletar(self) -> Iterator[LoteBruto]:
         pre = self._tentar_preset()
         if pre:
@@ -271,11 +319,26 @@ class Automatico(Adaptador):
             return
         limite = config.llm_max_paginas_por_execucao
         for url in self.descobrir_links():
+            if not os.getenv("COLETOR_SEM_ESTRUTURADO") and estruturado.pagina_de_evento(url):
+                continue  # evento/redirecionamento: não é lote, não gasta IA
             try:
-                texto = texto_principal(self._html(url))
+                html = self._html(url)
+                texto = texto_principal(html)
             except Exception as e:
                 self.registrar_erro(f"Lote {url}: {e}")
                 continue
+            if self._foi_para_home(url):
+                continue  # o link cai na página inicial: o lote saiu do ar
+            if not os.getenv("COLETOR_SEM_ESTRUTURADO"):  # leitura sem IA (JSON embutido na página)
+                lido = estruturado.ler(html, texto, url)
+                if lido is estruturado.NAO_IMOVEL:
+                    continue
+                if lido:
+                    lote = self.montar(lido, url=self.url_final or url)
+                    if lote:
+                        self.lidos_sem_ia += 1
+                        yield lote
+                    continue
             h = hashlib.sha1(texto.encode()).hexdigest()
             cache = self._cache_revisao(url)
             # reaproveita se o texto é o mesmo OU se a página é "tranquila" e foi lida há pouco (ver _cache_revisao)
