@@ -5,8 +5,12 @@ nome: Gustavo De Oliveira Rossi
 site: https://rossileiloes.com.br
 tipo: automatico
 uf: [SP]
+# Só a categoria Imóveis: o resto do site (carros, máquinas, sucata) não interessa e gastava IA lendo páginas de evento.
+# Eventos (/leilao/detalhe/N) viram listagem; os lotes são /lote/detalhe/N.
 inicio:
-  - https://rossileiloes.com.br
-max_paginas_lista: 10
-max_lotes: 200
+  - https://rossileiloes.com.br/leilao/LeilaoPorCategoria/2/leilao-imoveis
+padrao_link_lote: '/lote/detalhe/\d+'
+padrao_link_lista: '/leilao/detalhe/\d+'
+max_paginas_lista: 20
+max_lotes: 300
 navegador: false
