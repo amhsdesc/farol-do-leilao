@@ -88,6 +88,19 @@ _SO_NUMERO = re.compile(r"^[\d.,\sR$]*$")  # sem "/" nem ":" → nunca engole um
 _TEM_DATA = re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}")
 
 
+_GOTO = re.compile(r"""goTo\(\s*['"]([^'"]+)['"]""")
+
+
+def _hrefs(sopa) -> list[str]:
+    """href dos <a> + destinos de onClick="goTo('pagina.php?...')" (sites que navegam por JavaScript)."""
+    out = [a["href"] for a in sopa.select("a[href]")]
+    for el in sopa.select("[onclick]"):
+        m = _GOTO.search(el.get("onclick") or "")
+        if m:
+            out.append(m.group(1))
+    return out
+
+
 def texto_estavel(texto: str) -> str:
     """Texto sem contadores que mudam sozinhos (visitas, tempo restante, lances), só para comparar com o cache.
 
@@ -173,8 +186,8 @@ class Automatico(Adaptador):
             base = self.url_final or url
             dominios = {dominio, urlparse(base).netloc}
             novos_eventos: list[str] = []
-            for a in sopa.select("a[href]"):
-                href = urljoin(base, a["href"]).split("#")[0]
+            for bruto in _hrefs(sopa):
+                href = urljoin(base, bruto).split("#")[0]
                 if urlparse(href).netloc not in dominios:
                     continue
                 if exp_padrao and exp_padrao.search(href):

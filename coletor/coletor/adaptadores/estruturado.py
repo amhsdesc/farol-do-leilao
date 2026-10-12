@@ -21,8 +21,8 @@ from ..normalizar import simplificar, uf as normalizar_uf
 
 NAO_IMOVEL = object()
 
-_NAO_IMOVEL = re.compile(r"\b(veiculo|carro|moto|caminhao|onibus|automovel|maquina|sucata|equipamento|movel|moveis|semovente|joia|eletronic)")
-_IMOVEL = re.compile(r"\b(imov|imoveis|terreno|apart|casa|comercial|rural|galpao|sala|loja|conjunto|fazenda|chacara|sitio|lote|gleba|cobertura|edificio|predio|hotel|barrac)")
+_NAO_IMOVEL = re.compile(r"\b(veiculo|carro|moto|caminhao|onibus|automovel|maquina|sucata|equipamento|movel|moveis|semovente|joia|eletronic|areia|brita|cascalho|entulho|gasolina|etanol|diesel|combustivel|compressor|litros|fiat|chevrolet|volkswagen|renault|toyota|hyundai|yamaha|vw|kombi|saveiro|pick|caminhonete|camioneta|astra)")
+_IMOVEL = re.compile(r"\b(imov|imoveis|terreno|apart|apto|casa|residen|suite|terras|box |garagem|vaga|comercial|rural|galpao|sala|loja|conjunto|fazenda|chacara|sitio|lote|gleba|cobertura|edificio|predio|hotel|barrac)")
 _CIDADE_UF = re.compile(r"(?:^|[-–,]\s*)([A-ZÀ-Ú][\wÀ-ú'. ]{1,40}?)\s*[-/]\s*([A-Z]{2})\s*$")
 
 
@@ -147,6 +147,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return ler_frazao(html, url)
     if not lote and "/evento/anuncio/" in (url or "") and "Comitente" in html:
         return ler_leilaovip(html, url)
+    if not lote and "Encerramento, valores e lances" in html and "idLote=" in (url or ""):
+        return ler_sfrazao(html, url)
     if not lote and "borda-branca-produto" in html and "subtit-produto" in html:
         return ler_smart(html, url)
     if not lote:
@@ -587,4 +589,96 @@ def ler_leilaovip(html: str, url: str = "") -> tuple[dict | object | None, str]:
     fotos = [i.get("src") for i in s.find_all("img") if "blob.core.windows.net/uploads" in (i.get("src") or "")]
     if fotos:
         campos["fotos"] = list(dict.fromkeys(fotos))[:20]
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+# ---------------------------------------------------------------------------------------------
+# SFrazão (sfrazao.com.br): site PHP próprio, página de lote (lote.php?idLote=N) com rótulos em texto.
+
+_CID_UF = re.compile(r"(?:,|\b(?i:em)\b|[-–])\s*([A-ZÀ-Úa-zà-ú][^,/\-–()]*?)\s*[/-]\s*([A-Z]{2})\b")
+
+
+def _cidade_uf_texto(txt: str) -> tuple[str | None, str | None]:
+    for m in reversed(list(_CID_UF.finditer(txt or ""))):
+        uf = normalizar_uf(m.group(2))
+        if uf:
+            return m.group(1).strip(), uf
+    return None, None
+
+
+def ler_sfrazao(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    s = BeautifulSoup(html, "lxml")
+    imgs = [i.get("src") for i in s.find_all("img") if "/fotos/" in (i.get("src") or "") and "snapshot" not in (i.get("src") or "")]
+    for x in s(["script", "style"]):
+        x.decompose()
+    linhas = [l.strip() for l in s.get_text("\n", strip=True).split("\n") if l.strip()]
+
+    def depois(rotulo: str, ini: int = 0) -> str | None:
+        for i in range(ini, len(linhas) - 1):
+            if linhas[i].rstrip(":").strip().lower() == rotulo.lower():
+                return linhas[i + 1]
+        return None
+
+    try:
+        i_desc = linhas.index("Descrição do lote")
+    except ValueError:
+        return None, "sem 'Descrição do lote'"
+    status = linhas[i_desc - 1] if i_desc else ""
+    st = simplificar(status)
+    if st in ("aberto para lances", "em leilao"):
+        status_lote = "aberto"
+    elif st in ("vendido", "retirado", "sem licitantes", "cancelado", "encerrado", "arrematado", "condicional"):
+        status_lote = "encerrado"  # lote já fechado: grava como encerrado sem gastar IA
+    elif st.startswith("suspens"):
+        status_lote = "suspenso"
+    else:
+        return None, f"status do lote: {status!r}"
+    titulo = _txt(linhas[i_desc + 1]) if i_desc + 1 < len(linhas) else ""
+    fim = linhas.index("Localização do bem") if "Localização do bem" in linhas else len(linhas)
+    descricao = " ".join(l for l in linhas[i_desc + 2:fim] if l not in ("Dados do processo",))
+    descricao = descricao.split("Dados do processo")[0].strip()
+    if (len(titulo) <= 3 or re.fullmatch(r"[\d.\s-]+", titulo)) and descricao:  # sublotes 'A', 'B', 'C': o que vale é o começo da descrição
+        titulo = f"{titulo} - {descricao[:110]}".strip(" -")
+    sinal = simplificar(titulo)
+    if _NAO_IMOVEL.search(sinal):
+        return NAO_IMOVEL, "título não é imóvel"
+    if not _IMOVEL.search(sinal):
+        return None, f"sem sinal claro de imóvel no título: {titulo[:60]!r}"
+    endereco = depois("Endereço", fim) or ""
+    bloco = " ".join(linhas[fim:fim + 6])  # 'Endereço: ..., Bairro: X Cidade: Y UF: SP CEP: ...'
+    cidade = uf = None
+    mc = re.search(r"Cidade:\s*(.+?)\s+UF:\s*([A-Za-z]{2})\b", bloco)
+    if mc and normalizar_uf(mc.group(2).upper()):
+        cidade, uf = mc.group(1).strip().title(), normalizar_uf(mc.group(2).upper())
+    if not (cidade and uf):
+        cidade, uf = _cidade_uf_texto(endereco)
+    if not (cidade and uf):
+        cidade, uf = _cidade_uf_texto(titulo)
+    if not (cidade and uf):
+        return None, f"sem cidade/UF (endereço: {endereco[:60]!r}; título: {titulo[:60]!r})"
+    ini_val = linhas.index("Encerramento, valores e lances") if "Encerramento, valores e lances" in linhas else 0
+    aval = _num((_REAIS.search(depois("Avaliação", ini_val) or "") or [None, None])[1])
+    minimo = _num((_REAIS.search(depois("Lance Mínimo", ini_val) or "") or [None, None])[1])
+    if not (aval or minimo):
+        return None, "sem nenhum valor"
+    data = None
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4})\s+a partir das\s+(\d{1,2}:\d{2})", depois("Encerramento", ini_val) or "")
+    if m:
+        data = f"{m.group(3)}-{m.group(2)}-{m.group(1)}T{m.group(4).zfill(5)}"
+    proc = depois("Processo", i_desc)
+    campos: dict[str, Any] = {
+        "titulo": titulo, "descricao": descricao[:4000], "tipo": None, "status": status_lote,
+        "uf": uf, "cidade": cidade,
+        "endereco": endereco.strip(" .") or None,
+        "processo": proc if proc and re.match(r"[\d.-]{10,}", proc) else None,
+        "valor_avaliacao": aval, "valor_praca1": minimo or aval, "data_praca1": data,
+        "dados": {"extraido_por": "html_sfrazao"},
+    }
+    if "judicial" in simplificar(depois("Tipo") or ""):
+        campos["modalidade"] = "judicial"
+    mid = re.search(r"idLote=(\d+)", url or "")
+    if mid:
+        campos["id_externo"] = mid.group(1)
+    if imgs:
+        campos["fotos"] = list(dict.fromkeys("https://www.sfrazao.com.br/" + i.lstrip("./") for i in imgs))[:20]
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""

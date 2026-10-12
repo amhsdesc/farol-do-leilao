@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="pt_BR">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="Leilão de imóveis, veículos, máquinas, equipamentos, sucatas e diversos outros. Mais de 40 anos de tradição em realizando leilões judicias, industriais e empresariais.">
+    <meta name="robots" content="index, follow">
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.css">
+    <link rel="stylesheet" href="hover/css/hover-min.css">
+    <link rel="stylesheet" href="fontawesome/css/all.css">
+    <link rel="stylesheet" href="fancybox/dist/css/jquery.fancybox.css">
+    <link rel="stylesheet" href="slick/slick.min.css">
+    <link rel="stylesheet" href="slick/slick-theme.min.css">
+    <link rel="stylesheet" href="css/style_v_202602041538.css">
+    <title>SFrazão &reg; | Leilões Judiciais e Extrajudiciais</title>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CWCBLEJHSW"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CWCBLEJHSW');
+    </script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17542736734"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-17542736734');
+    </script>
+    <!-- Meta Pixel Code -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '2034829253717698');
+    fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=2034829253717698&ev=PageView&noscript=1"/></noscript>
+    <!-- End Meta Pixel Code -->
+  </head>
+  <body>
+        <div class="container-fluid p-0 back-1 fixed-sticky container-nav-top mb-1">
+      <div class="container back-1">
+        <div class="row">
+          <!-- Logomarca -->
+          <div class="col-lg-4 col-sm-6 d-md-flex d-none flex-column justify-content-left text-left pl-0 py-2">
+            <a href="index.php" title="Início" class="d-block text-left text-md-left hvr-pop">
+              <img src="assets/logoPadrao.png" height="66" alt="Logotipo">
+            </a>
+          </div>
+          <!-- Menu principal -->
+          <div class="col-lg-4 d-flex flex-column justify-content-center order-lg-2 order-sm-3">
+            <nav class="navbar navbar-expand-lg navbar-light bg-transparent px-0">
+              <a class="navbar-brand d-md-none" href="index.php" title="Menu">
+                <img src="assets/logoPadrao.png" height="40" alt="Logotipo">
+              </a>
+              <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSite">
+                <span class="navbar-toggler-icon"></span>
+              </button>
+              <div class="collapse navbar-collapse justify-content-center align-items-xl-stretch flex-xl-column" id="navbarSite">
+                <ul class="navbar-nav justify-content-around align-items-center">
+                  <li class="class-item nav-color hvr-pop">
+                    <a class="nav-link text-white" href="./">HOME</a>
+                  </li>
+                  <li class="class-item nav-color hvr-pop">
+                    <a class="nav-link text-white" href="./quemSomos.php">SOBRE NÓS</a>
+                  </li>
+                  <li class="class-item nav-color hvr-pop">
+                    <a class="nav-link text-white" href="./faleConosco.php">DÚVIDAS</a>
+                  </li>
+                </ul>
+              </div>
+            </nav>
+          </div>
+          <!-- Pílula para acesso -->
+          <div class="col-lg-1 col-sm-1 d-flex flex-column align-items-stretch justify-content-center mb-3 mb-sm-0 order-lg-3 order-sm-2">
+          </div>
+          <div class="col-lg-3 col-sm-6 d-flex flex-column align-items-stretch justify-content-center mb-3 mb-sm-0 order-lg-3 order-sm-2">
+            <div class="row justify-content-center">
+                            <div class="container back-2 text-light rounded">
+                <div class="row justify-content-center pt-1">
+                  Seja bem vindo(a)
+                </div>
+                <div class="row justify-content-center">
+                  <button class="btn btn-link back-2 text-light text-nowrap text-decoration-none hvr-push mr-1 " type="button" onClick="goTo('cadastreSe.php');"><i class="fa fa-user-edit mr-1" aria-hidden="true"></i>Cadastre-se</button>
+                  <button class="btn btn-link back-2 text-light text-nowrap text-decoration-none hvr-push " type="button" onClick="efetuarLogin();"><i class="fa fa-user-check mr-1"></i>Logue-se</button>
+                </div>
+              </div>
+                          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="modalLogin" class="modal fade " tabindex="-1" role="dialog" aria-labelledby="modalCenterTitle" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+      <div class="modal-dialog modal-dialog-centered " role="document">
+        <div class="modal-content ">
+          <div class="modal-body pb-0 bg-light ">
+            <iframe src="about:blank" width="100%" height="100%" id="loginFrame" style="overflow:hidden; min-height: 480px; border: 0px;"></iframe>
+          </div>
+          <div class="modal-footer border-0  pt-0 pb-1 bg-light">
+            <button type="button" class="btn btn-link back-14 text-white text-nowrap text-decoration-none hvr-push " data-dismiss="modal"><i class="fa fa-times-circle mr-1" aria-hidden="true"></i>Fechar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="container-fluid p-0">
+      <div class="container-fluid container-next-auctions py-1">
+        <div class="container bg-white border-bottom mt-0">
+          <div class="container pt-3 pb-0">
+
+            <div class="row">
+              <div class="col">
+                <nav aria-label="breadcrumb">
+                  <ol class="breadcrumb  bg-transparent mt-0 px-0">
+                    <li class="breadcrumb-item"><a href="index.php" title="Home page" class="fore-1 mb-0">Página inicial</a></li>
+                    <li class="breadcrumb-item"><a href="leilao.php?idLeilao=76" class="fore-1 mb-0">LEILÃO DE IMÓVEIS VEÍCULOS E DIVERSOS - TRT15 SOROCABA/SP - 05/2022</a></li>
+                    <li class="breadcrumb-item active" aria-current="page"><a href="javascript:void(0);" class="fore-2 mb-0 text-decoration-none">Lote 003.01</a></li>
+                  </ol>
+                </nav>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-sm-6 col-lg-3 col-xl-2 d-flex align-items-start justify-content-center justify-content-md-end order-2 order-sm-1 offset-sm-3 offset-lg-0 pr-0">
+                <img src="./sishp/leilao/76/fotos/snapshot.jpg" alt="Destaque do leilão" alt="" class="img-fluid p-0 border">
+              </div>
+              <div class="col-lg-6 col-xl-7 order-1 order-sm-2">
+                <h1 class="h5 font-weight-bold mb-md-3 text-justify pl-1">LEILÃO DE IMÓVEIS VEÍCULOS E DIVERSOS - TRT15 SOROCABA/SP - 05/2022 (CÓDIGO 76)</h1>
+                <div class="row">
+                  <div class="col-xl-8">
+                    <div class="row mx-0 mb-1 mb-sm-0">
+                      <div class="col-sm-12 p-0 mb-1 mb-sm-0">
+                        <span class="d-block p-1"><strong class="mr-1">Endereço do leilão:</strong> Participação somente por meio virtual.</span>
+                      </div>
+                    </div>
+                    <div class="row mx-0">
+                      <div class="col-sm-8 p-0 mb-1 mb-sm-0">
+                        <span class="d-block p-1"><strong class="mr-1">Modalidade:</strong>On-line</span>
+                      </div>
+                      <div class="col-sm-4 p-0">
+                        <span class="d-block p-1"><strong class="mr-1">Tipo:</strong>Judicial</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6 col-xl-3 order-2 order-sm-3">
+                <div class="row mx-0 mb-1 mb-sm-0">
+                  <div class="col-12 p-0 mb-1 mb-sm-0 text-center">
+                    <span class="d-block p-1 text-nowrap"><strong>Data:</strong><br>Abertura: 19/Out/2022, 11h00<br>Encerramento: 22/Nov/2022, 12h30</span>
+                  </div>
+                </div>
+                              </div>
+            </div>
+          </div>
+
+          <div class="container">
+            <div id="carrosselSite" class="carousel slide" data-ride="carousel">
+              <div class="carousel-inner text-center" role="listbox" style="height: 390px !important;">
+                                <div class="carousel-item active">
+                  <a href="javascript:void(0);" class="" title="">
+                    <img src="sishp/imagens/semImagem1.png" class="img-fluid snapshot-shadow" alt="" width="500" height="375">
+                  </a>
+                </div>
+                              </div>
+              <a class="carousel-control-prev" href="#carrosselSite" role="button" data-slide="prev">
+                <span class="carousel-control-prev-icon p-3"></span>
+              </a>
+              <a class="carousel-control-next text-dark" href="#carrosselSite" role="button" data-slide="next">
+                <span class="carousel-control-next-icon p-3"></span>
+              </a>
+            </div>
+            <div class="text-center small font-weight-bold fore-1">IMAGEM MERAMENTE ILUSTRATIVA. NECESSÁRIA CONSTATAÇÃO E/OU VISITAÇÃO DOS BENS.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="container-fluid container-next-auctions py-1 px-0">
+        <div class="container bg-white border-bottom mt-0 px-0">
+          <div class="container mb-3 px-0">
+            <nav class="navbar navbar-expand-md navbar-light bg-transparent px-0 border-sm">
+              <button class="navbar-toggler border-0  p-0" type="button" data-toggle="collapse" data-target="#atalhos" aria-controls="atalhos" aria-expanded="false">
+                <span class="navbar-toggler-icon"></span>
+              </button>
+              <a class="navbar-brand d-md-none p-2" href="#">Acesso rápido</a>
+              <div class="collapse navbar-collapse back-2 align-items-stretch flex-column px-0" id="atalhos">
+                <ul class="navbar-nav nav-fill px-0">
+                  <li class="nav-item p-2 nav-divisor">
+                    <a href="javascript:void(0);" id="navEdital" class="btn btn-block back-2 text-light  p-1 d-flex align-items-center justify-content-md-center" title="Edital do leilão">
+                      <i class="fa fa-file mr-1" aria-hidden="true"></i> <span>Edital do leilão</span>
+                    </a>
+                  </li>
+                  <li class="nav-item p-2 nav-divisor">
+                    <a href="javascript:void(0);" id="navAnexo" class="btn btn-block back-2 text-light  p-1 d-flex align-items-center justify-content-md-center" title="Anexos do lote">
+                      <i class="fa fa-folder mr-1" aria-hidden="true"></i><span >Anexos do lote</span>
+                    </a>
+                  </li>
+                                    <li class="nav-item p-2 nav-divisor">
+                    <a href="javascript:void(0);" data-fancybox title="Logue-se para solicitar habilitação" onClick="showAlert('Ação necessária', 'Para habilitar-se em algum leilão é necessário estar logado.');" class="btn btn-block back-2 text-light  p-1 d-flex align-items-center justify-content-md-center">
+                      <i class="fa fa-check mr-1" aria-hidden="true"></i><span>Habilitação</span>
+                    </a>
+                  </li>
+                                                                                                            <li class="nav-item p-2 nav-divisor bg-success">
+                    <a href="javascript:void(0);" onClick="postToWindow('auditorio2.php', 'Auditorio', '', ['idLeilao'], ['76']);" class="btn bg-success back-2 text-light  p-1 d-flex align-items-center justify-content-md-center" title="Dê lance no auditório">
+                      <i class="fa fa-desktop mr-1" aria-hidden="true"></i><span>Lance no auditório</span>
+                    </a>
+                  </li>
+                                  </ul>
+              </div>
+            </nav>
+          </div>
+
+        <div class="container px-3">
+          <div class="row back-3 mx-0 py-1 mb-2 ">
+            <div class="col-6 d-flex align-items-center justify-content-start">
+              <div class="dropdown d-flex flex-column align-items-stretch mr-4 ">
+                <a class="btn btn-link  dropdown-toggle bg-light border-1 text-dark font-weight-bold" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Lote 003.01</a>
+                <div class="dropdown-menu dropdown-menu-lg-right p-1  overflow-auto w-100" style="max-height: 300px">
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=566" title="Lote 001">001</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=567" title="Lote 002">002</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=699" title="Lote 002.01">002.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=700" title="Lote 002.02">002.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=701" title="Lote 002.03">002.03</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=568" title="Lote 003">003</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=702" title="Lote 003.01">003.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=703" title="Lote 003.02">003.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=704" title="Lote 003.03">003.03</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=705" title="Lote 003.04">003.04</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=569" title="Lote 004">004</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=570" title="Lote 005">005</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=706" title="Lote 005.01">005.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=707" title="Lote 005.02">005.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=708" title="Lote 005.03">005.03</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=709" title="Lote 005.04">005.04</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=571" title="Lote 006">006</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=710" title="Lote 006.01">006.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=711" title="Lote 006.02">006.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=712" title="Lote 006.03">006.03</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=713" title="Lote 006.04">006.04</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=572" title="Lote 007">007</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=573" title="Lote 008">008</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=574" title="Lote 009">009</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=575" title="Lote 010">010</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=576" title="Lote 011">011</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=577" title="Lote 012">012</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=578" title="Lote 013">013</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=579" title="Lote 014">014</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=580" title="Lote 015">015</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=581" title="Lote 016">016</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=582" title="Lote 017">017</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=583" title="Lote 018">018</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=584" title="Lote 019">019</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=585" title="Lote 021">021</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=586" title="Lote 022">022</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=587" title="Lote 023">023</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=626" title="Lote 024">024</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=588" title="Lote 025">025</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=589" title="Lote 026">026</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=590" title="Lote 027">027</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=591" title="Lote 028">028</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=592" title="Lote 029">029</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=593" title="Lote 030">030</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=594" title="Lote 031">031</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=595" title="Lote 032">032</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=596" title="Lote 033">033</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=597" title="Lote 034">034</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=600" title="Lote 035">035</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=714" title="Lote 035.01">035.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=715" title="Lote 035.02">035.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=603" title="Lote 036">036</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=716" title="Lote 036.01">036.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=717" title="Lote 036.02">036.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=604" title="Lote 037">037</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=718" title="Lote 037.01">037.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=719" title="Lote 037.02">037.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=605" title="Lote 038">038</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=607" title="Lote 039">039</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=720" title="Lote 039.01">039.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=721" title="Lote 039.02">039.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=722" title="Lote 039.03">039.03</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=723" title="Lote 039.04">039.04</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=724" title="Lote 039.05">039.05</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=725" title="Lote 039.06">039.06</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=726" title="Lote 039.07">039.07</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=609" title="Lote 040">040</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=610" title="Lote 041">041</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=612" title="Lote 043">043</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=613" title="Lote 044">044</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=614" title="Lote 045">045</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=616" title="Lote 046">046</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=618" title="Lote 047">047</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=620" title="Lote 048">048</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=623" title="Lote 049">049</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=625" title="Lote 050">050</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=624" title="Lote 051">051</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=622" title="Lote 052">052</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=621" title="Lote 053">053</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=619" title="Lote 054">054</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=727" title="Lote 054.01">054.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=728" title="Lote 054.02">054.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=617" title="Lote 055">055</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=615" title="Lote 056">056</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=611" title="Lote 057">057</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=608" title="Lote 058">058</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=606" title="Lote 059">059</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=729" title="Lote 059.01">059.01</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=730" title="Lote 059.02">059.02</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=731" title="Lote 059.03">059.03</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=732" title="Lote 059.04">059.04</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=733" title="Lote 059.05">059.05</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=734" title="Lote 059.06">059.06</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=735" title="Lote 059.07">059.07</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=736" title="Lote 059.08">059.08</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=737" title="Lote 059.09">059.09</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=602" title="Lote 060">060</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=601" title="Lote 061">061</a>
+                                    <a class="dropdown-item bg-light text-dark " href="lote.php?idLote=599" title="Lote 062">062</a>
+                                  </div>
+              </div>
+              <div class="btn-group" role="group">
+                <a href="lote.php?idLote=568" class="btn bg-light border-1  mr-2 mr-md-1" title="Anterior">
+                  <i class="fa fa-chevron-left" aria-hidden="true"></i>
+                </a>
+                <a href="lote.php?idLote=703" class="btn bg-light border-1 " title="Seguinte">
+                  <i class="fa fa-chevron-right" aria-hidden="true"></i>
+                </a>
+              </div>
+            </div>
+            <div class="col-6 d-flex align-items-right justify-content-start">
+              <div class="p-2 rounded d-flex align-items-center justify-content-center text-white text-uppercase font-weight-bold w-100 back-11">Sem licitantes</div>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <div class="col-12 mb-md-2 mb-xl-0 pt-lg-2">
+              <span class="form-title py-1">Descrição do lote</span>
+              <div class="card form-border ">
+                <div class="card-body p-1 text-justify">
+                  <strong></strong>
+                  <b>3.1</b>) Um terreno representado pelo lote 07 da quadra 07 do loteamento Vila Barth, com área de 480,00 metros quadrados, com as divisas e confrontações descritas na matrícula 22.475 do Cartório de Registro de Imóveis local. Benfeitorias: - Uma caixa de água de melai da marca Hidrometal, sem capacidade aparente, uma área cimentada, onde havia uma quadra poliesportiva, uma cobertura de telhas de fibrocimento e um muro de aproximadamente 1,80 de altura.<br> OBS.: Consta à margem da matrícula do imóvel os seguintes gravames: - (Av.3) Processo nº 1036001-48.2016.8.26.0602 - Ação de Execução de Título Extrajudicial (4º Ofício Cível de Sorocaba); - (Av.4) Processo nº 1036001-48.2016.8.26.0602 - Ação de Execução de Título Extrajudicial (4º Ofício Cível de Sorocaba).Proprietário: FUNDACAO KARNIG BAZARIAN CNPJ: 50.790.823/0001-36Removido: Não<br><b>OBS</b>.: Consta à margem da matrícula do imóvel os seguintes gravames: - (Av.3) Processo nº 1036001-48.2016.8.26.0602 - Ação de Execução de Título Extrajudicial (4º Ofício Cível de Sorocaba); - (Av.4) Processo nº 1036001-48.2016.8.26.0602 - Ação de Execução de Título Extrajudicial (4º Ofício Cível de Sorocaba).Proprietário: FUNDACAO KARNIG BAZARIAN CNPJ: 50.790.823/0001-36Removido: Não                </div>
+              </div>
+
+                            <span class="form-title py-1 mt-4">Dados do processo</span>
+              <div class="card form-border ">
+                <div class="card-body p-1 text-justify">
+                                                      <div><strong>Processo:</strong> <span>0000007-41.2011.5.15.0041- VARA DO TRABALHO DE ITAPETININGA</span></div>
+                  <div><strong>Exequente:</strong> <span>LUIS FERNANDO RAGAZZI DE TOLEDO E OUTROS</span></div>                  <div><strong>Executado:</strong> <span>FUNDACAO KARNIG BAZARIAN</span></div>                                                                                        </div>
+              </div>
+              
+                            <span class="form-title py-1 mt-4">Observações</span>
+              <div class="card form-border ">
+                <div class="card-body p-1 text-justify">
+                  <div class="text-justify">
+                    <p></p>
+                    <p>Consta à margem da matrícula do imóvel os seguintes gravames: - (Av.3) Processo nº 1036001-48.2016.8.26.0602 - Ação de Execução de Título Extrajudicial (4º Ofício Cível de Sorocaba); - (Av.4) Processo nº 1036001-48.2016.8.26.0602 - Ação de Execução de Título Extrajudicial (4º Ofício Cível de Sorocaba).Proprietário: FUNDACAO KARNIG BAZARIAN CNPJ: 50.790.823/0001-36Removido: Não</p>
+                  </div>
+                </div>
+              </div>
+              
+              <span class="form-title py-1 mt-4">Encerramento, valores e lances</span>
+              <div class="card form-border ">
+                <div class="card-body p-1 text-justify">
+                  <div class="row">
+                    <div class="col-lg-5 col-sm-12">
+                      <div class="row">
+                        <div class="col-5 px-0">
+                          <span class="d-block py-1 px-3 font-weight-bold">Encerramento:</span>
+                        </div>
+                        <div class="col-7 px-0">
+                          <span class="d-block py-1 fore-1 px-3">22/11/2022 a partir das 16:42:11</span>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-5 px-0">
+                          <span class="d-block py-1 px-3 font-weight-bold">Avaliação:</span>
+                        </div>
+                        <div class="col-7 px-0">
+                          <span class="d-block py-1 fore-1 px-3">R$ 446.800,00</span>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-5 px-0">
+                          <span class="d-block py-1 px-3 font-weight-bold">Lance Mínimo:</span>
+                        </div>
+                        <div class="col-7 px-0">
+                          <span class="d-block py-1 fore-1 px-3">R$ 223.400,00</span>
+                        </div>
+                      </div>
+                                            <div class="row">
+                        <div class="col-5 px-0">
+                          <span class="d-block py-1 px-3 font-weight-bold">Incremento mínimo:</span>
+                        </div>
+                        <div class="col-7 px-0">
+                          <span class="d-block py-1 fore-1 px-3">R$ 11.170,00</span>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-5 px-0">
+                          <span class="d-block py-1 px-3 font-weight-bold">Nº de visitas:</span>
+                        </div>
+                        <div class="col-7 px-0">
+                          <span class="d-block py-1 fore-1 px-3">1754</span>
+                        </div>
+                      </div>
+                      <div class="row mb-3">
+                        <div class="col-5 px-0">
+                          <span class="d-block py-1 px-3 font-weight-bold">Nº de lances:</span>
+                        </div>
+                        <div class="col-7 px-0">
+                          <span class="d-block py-1 fore-1 px-3">0</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-lg-7 col-sm-12 border-left pl-1 text-center">
+                      <div class="row small">
+                        <div class="col-3 pr-0">
+                          <span class="font-weight-bold py-1">USUÁRIO</span>
+                        </div>
+                        <div class="col-3 px-0">
+                          <span class="font-weight-bold py-1">VALOR R$</span>
+                        </div>
+                        <div class="col-3 px-0">
+                          <span class="font-weight-bold py-1">DATA</span>
+                        </div>
+                        <div class="col-3 pl-0">
+                          <span class="font-weight-bold py-1">TIPO</span>
+                        </div>
+                      </div>
+                      <hr class="my-1">
+                                            <div class="row py-4">
+                        <div class="col py-4 text-center">
+                          <span class="py-4 text-secondary">Nenhum lance para o lote</span>
+                        </div>
+                      </div>
+                                          </div>
+                  </div>
+                </div>
+              </div>
+
+              
+              
+              <span class="form-title py-1 mt-4">Localização do bem</span>
+              <div class="card form-border ">
+                <div class="card-body p-1 text-justify">
+                  <div class="text-justify">
+                    <div id="loteMapa" style="min-height: 360px; width: 100%"></div>
+                    <div class="text-justify mt-2 small"><strong class="p-0">Endereço:</strong> <a href="https://maps.google.com/maps?q=RUA JAIR BARTH, 221, Bairro: VILA BARTH Cidade: ITAPETININGA UF: SP CEP: 18205510" target="_blank">RUA JAIR BARTH, 221, Bairro: VILA BARTH Cidade: ITAPETININGA UF: SP CEP: 18205510</a></div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        </div>
+      </div>
+      <div id="modalPopUp" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+          <div class="modal-content">
+            <div class="modal-header p-2">
+            <h5 class="modal-title font-weight-bold p-0 m-0" id="modalLongTitle">ATENÇÃO</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body p-2"><img src="" class="img-responsive w-100 h-100"></div>
+          </div>
+        </div>
+      </div>
+            <div class="container-fluid mt-0 pt-2 back-1">
+        <div class="container">
+          <div class="row">
+            <div class="col-sm-3 py-2 px-0">
+              <h6 class="font-weight-bold text-white">INSTITUCIONAL</h6>
+              <ul class="list-unstyled">
+                <li><a class="text-light" href="quemSomos.php">Sobre nós</a></li>
+                <li><a class="text-light" href="politicaPrivacidade.php">Política de privacidade</a></li>
+                <li><a class="text-light" href="termosUso.php">Termos de uso</a></li>
+              </ul>
+            </div>
+            <div class="col-sm-3 py-2 px-0">
+              <h6 class="font-weight-bold text-white">CLIENTE</h6>
+              <ul class="list-unstyled">
+                <li><a class="text-light" href="cadastreSe.php">Cadastre-se</a></li>
+                <li><a class="text-light" href="faleConosco.php">Fale conosco</a></li>
+                <li><a class="text-light" href="indiqueNos.php">Indique-nos</a></li>
+                <li><a class="text-light" href="queroVender.php">Quero vender</a></li>
+              </ul>
+            </div>
+            <div class="col-sm-6 py-2">
+              <h6 class="font-weight-bold text-white px-0 mx-0">NEWSLETTER</h6>
+              <form id="newsletterForm" action="processoNewsletter.php" method="post" enctype="application/x-www-form-urlencoded" class="row p-0 m-0">
+                <div class="row">
+                  <div class="col-md-6 col-lg-6 mb-1 mb-lg-0">
+                    <div class="input-group p-1 bg-white overflow-hidden input-group-sm rounded">
+                      <div class="input-group-prepend rounded">
+                        <span class="input-group-text bg-transparent border-0 rounded">
+                          <i class="fa fa-address-card text-secondary" aria-hidden="true"></i>
+                        </span>
+                      </div>
+                      <input type="text" class="form-control bg-transparent border-0" name="nome" placeholder="Seu nome" maxlength="50" required>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-6 mb-1 mb-lg-0">
+                    <div class="input-group p-1 bg-white overflow-hidden input-group-sm rounded">
+                      <div class="input-group-prepend rounded">
+                        <span class="input-group-text bg-transparent border-0">
+                          <i class="fa fa-envelope text-secondary" aria-hidden="true"></i>
+                        </span>
+                      </div>
+                      <input type="email" class="form-control bg-transparent border-0" name="email" placeholder="Seu e-mail" required>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-12 offset-md-3 offset-lg-0 d-flex align-items-stretch mt-2">
+                    <button class="btn btn-outline-light btn-sm btn-block hvr-push py-1 px-4"><i class="fa fa-envelope"></i> Enviar</button>
+                  </div>
+                </div>
+                <input type="hidden" name="midnl" value="NjgxOTgzNy9zZnV1Zk10eGZv">
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+            <div class="container-fluid mt-0 pt-2 pl-0 back-14">
+        <div class="container pt-2">
+          <div class="row">
+            <div class="col-sm-6 col-lg-4 pl-sm-2">
+              <ul class="list-unstyled">
+                <li class="font-weight-bold text-white">Sobre nós</li>
+                <li class="text-light">Com mais de 40 anos de mercado, a SFRAZÃO – Leiloeiros Oficiais tornou-se uma das mais tradicionais organizações de leilões judiciais, industriais e empresariais do Brasil.</li>
+              </ul>
+            </div>
+            <div class="col-sm-6 col-lg-4 d-flex justify-content-lg-center">
+              <ul class="list-unstyled">
+                <li class="font-weight-bold text-white">Informações de contato</li>
+                <li class="text-light">(11) 2424 8373</li>
+                <li class="text-light">(11) 94783-6112</li>
+                <li>
+                  <a href="/cdn-cgi/l/email-protection#a9cac6c7ddc8ddc6e9dacfdbc8d3c8c687cac6c487cbdb" class="text-light border-light" title="Envie-nos um e-mail"><span class="__cf_email__" data-cfemail="1c7f7372687d68735c6f7a6e7d667d73327f7371327e6e">[email&#160;protected]</span></a>
+                </li>
+              </ul>
+            </div>
+            <div class="col-lg-4 d-flex justify-content-lg-end">
+              <ul class="list-unstyled">
+                <li class="font-weight-bold text-white">Nosso escritório</li>
+                <li class="text-light">Alameda Araguaia, 2190 - T.1, Cj. 212 - Alphaville<br>Barueri/SP - CEP: 06455-000</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pb-2">
+            <nav class="nav flex-row align-items-center float-social justify-content-sm-center zindex-3">
+              <span class="text-white font-weight-bold mr-1">Siga-nos:</span>
+              <a class="nav-link back-1 text-white p-3 rounded-circle d-flex align-items-center justify-content-center m-1 hvr-glow" href="https://www.facebook.com/profile.php?id=61564921552165&locale=pt_BR" title="Facebook" target="_blank">
+                <i class="fab fa-facebook"></i>
+              </a>
+              <a class="nav-link back-1 text-white p-3 rounded-circle d-flex align-items-center justify-content-center m-1 hvr-glow" href="https://www.instagram.com/sfrazaoleiloeirosoficiais/" title="Instagram" target="_blank">
+                <i class="fab fa-instagram"></i>
+              </a>
+              <a class="nav-link back-1 text-white p-3 rounded-circle d-flex align-items-center justify-content-center m-1 hvr-glow" href="https://twitter.com/sfrazaoleilao" title="Twitter" target="_blank">
+                <i class="fab fa-twitter"></i>
+              </a>
+              <a class="nav-link back-1 text-white p-3 rounded-circle d-flex align-items-center justify-content-center m-1 hvr-glow" href="https://www.linkedin.com/company/sfraz%C3%A3o-leiloeiros-oficiais/" title="LinkdIn" target="_blank">
+                <i class="fab fa-linkedin-in"></i>
+              </a>
+              <a class="nav-link back-1 text-white p-3 rounded-circle d-flex align-items-center justify-content-center m-1 hvr-glow" href="https://br.pinterest.com/sfrazaoleiloeirosoficiais/" title="Pinterest" target="_blank">
+                <i class="fab fa-pinterest"></i>
+              </a>
+              <a class="nav-link back-1 text-white p-3 rounded-circle d-flex align-items-center justify-content-center m-1 hvr-glow" href="https://www.tumblr.com/blog/view/sfrazaoleilao" title="Tumblr" target="_blank">
+                <i class="fab fa-tumblr"></i>
+              </a>
+              <a class="nav-link back-1 text-white p-3 rounded-circle d-flex align-items-center justify-content-center m-1 hvr-glow" href="https://api.whatsapp.com/send?phone=11947836112" title="WhatsApp" target="_blank">
+                <i class="fab fa-whatsapp"></i>
+              </a>
+              <a class="nav-link back-1 text-white p-3 rounded-circle d-flex align-items-center justify-content-center m-1 hvr-glow" href="https://www.youtube.com/@sfrazaoleiloes" title="Youtube" target="_blank">
+                <i class="fab fa-youtube"></i>
+              </a>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="container-fluid back-12">
+        <div class="container pt-3 pb-1 pb-md-3">
+          <div class="row">
+            <div class="col-12 d-flex align-items-center justify-content-center order-1 order-md-2">
+              <p class="text-light mb-0 text-center">SFrazão&reg; 2026 - Todos os direitos reservados.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="modalFooter" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="modalCenterTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+          <div class="modal-content ">
+            <div class="modal-header">
+              <h5 class="modal-title font-weight-bold" id="modalLongTitle">...</h5>
+            </div>
+            <div class="modal-body">...</div>
+            <div class="modal-footer"><button type="button" class="btn back-14 text-white btn-fechar" data-dismiss="modal"><i class="fa fa-times-circle mr-1" aria-hidden="true"></i> Fechar</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="popUpPrivacidade" class="popup shadow back-13 rounded">
+        <b class="text-white">Sobre privacidade</b><br>
+        <div class="mt-2 text-light">Utilizamos Cookies para identificarmos nossos usuários.<br>
+        Para mais informações acesse nossa <a class="text-white font-weight-bold" href="politicaPrivacidade.php">Política de privacidade</a>.</div>
+        <div class="text-right mr-2"><button type="button" onClick="aceitarPrivacidade();" class="btn back-1 text-white btn-sm mt-2 " data-dismiss="modal"><i class="fa fa-check"></i> Aceito</button></div>
+      </div>
+
+      <a href="#top" class="text-center"><i class="far fa-caret-square-up fore-2"></i></a>
+      <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="text/javascript" async src="https://d335luupugsy2.cloudfront.net/js/loader-scripts/c9a3ccc6-f913-41fa-9bb7-ada4d83df213-loader.js" ></script>
+    </div>
+    <script src="jquery/jquery.js"></script>
+    <script src="jquery/jquery.maskedinput.js"></script>
+    <script src="popper/umd/popper.js"></script>
+    <script src="bootstrap/js/bootstrap.js"></script>
+    <script src="fancybox/dist/js/jquery.fancybox.js"></script>
+    <script src="slick/slick.min.js"></script>
+    <script src="js/lib.js?3751390"></script>
+    <script type="text/javascript">
+    $(document).ready(function()
+    {
+                $('#collapseProcesso').collapse('show');
+                $("#navHabilitacao").click(function(){$.fancybox.open({href : 'leilaoHabilitacao.php?idLeilao=76', type : 'iframe',afterLoad : function(){$.extend(this, {aspectRatio : false, width : '90%', height : '90%', minHeight: 700});}});});
+        $("#navEdital").click(function(){$.fancybox.open({href : 'leilaoAnexos.php?idLeilao=76&action=0', type : 'iframe',afterLoad : function(){$.extend(this, {aspectRatio : false, width : '90%', height : '90%'});}});});
+        $("#navAnexo").click(function(){$.fancybox.open({href : 'loteAnexos.php?idLote=702', type : 'iframe',afterLoad : function(){$.extend(this, {aspectRatio : false, width : '90%', height : '90%'});}});});
+        $("#navImpressao").click(function(){$.fancybox.open({href : 'leilaoImpressao.php?idLeilao=76', type : 'iframe',afterLoad : function(){$.extend(this, {aspectRatio : false, width : '90%', height : '90%'});}});});
+        $("#navTransmissao").click(function(){$.fancybox.open({href : 'leilaoTransmissao.php?idLeilao=76', type : 'iframe',afterLoad : function(){$.extend(this, {aspectRatio : false, width : '30%', height : '70%'});}});});
+        $("#navCatalogo").click(function(){$.fancybox.open({padding: 0,href: '',type: 'iframe',afterLoad: function(){$.extend(this, {aspectRatio : false, width : '90%', height : '90%'});}});});
+        $("#navVisao360").click(function(){$.fancybox.open({padding: 0,href: '',type: 'iframe',afterLoad: function(){$.extend(this, {aspectRatio : false, width : '90%', height : '90%'});}});});
+    });
+    
+    </script>
+      <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4991a4a4dd578c2',t:'MTc5MTgzOTU0NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

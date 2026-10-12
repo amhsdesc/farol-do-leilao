@@ -258,3 +258,42 @@ def test_texto_estavel_preserva_datas_e_precos():
     assert texto_estavel(a) == texto_estavel(a.replace("\n10\n", "\n99\n"))  # só visitas: não reler
     d = "Termina em:\n20/10/2026 14:00\n"
     assert texto_estavel(d) == d.rstrip("\n") or "20/10/2026" in texto_estavel(d)
+
+
+def test_sfrazao_lote_com_lance_e_sem_lance():
+    from pathlib import Path
+    from coletor.adaptadores.estruturado import ler_com_motivo
+    base = Path(__file__).parent / "fixtures"
+    r, _ = ler_com_motivo((base / "sfrazao_lote10463.html").read_text(encoding="utf-8"), "", "https://www.sfrazao.com.br/lote.php?idLote=10463")
+    assert r["cidade"] == "Piracicaba" and r["uf"] == "SP" and r["valor_praca1"] == 192000.0 and r["valor_avaliacao"] == 320000.0
+    assert r["data_praca1"] == "2026-10-19T16:00" and r["id_externo"] == "10463"
+    r, _ = ler_com_motivo((base / "sfrazao_lote7217.html").read_text(encoding="utf-8"), "", "https://www.sfrazao.com.br/lote.php?idLote=7217")
+    assert r["cidade"] == "Guarujá" and r["uf"] == "SP" and r["valor_praca1"] == 300000.0
+
+
+def test_sfrazao_lote_vendido_vira_encerrado_e_titulo_residencia():
+    from pathlib import Path
+    from coletor.adaptadores.estruturado import ler_com_motivo
+    h = (Path(__file__).parent / "fixtures" / "sfrazao_lote7217.html").read_text(encoding="utf-8")
+    h = h.replace("Em leilão", "Vendido", 1).replace("Apto c/ 181,44m² AP em Enseada", "Residência com 3 Suítes em Enseada", 1)
+    r, motivo = ler_com_motivo(h, "", "https://www.sfrazao.com.br/lote.php?idLote=7217")
+    assert r and r["status"] == "encerrado" and r["cidade"] == "Guarujá", motivo
+
+
+def test_sfrazao_sublote_com_titulo_curto_e_areia():
+    from pathlib import Path
+    from coletor.adaptadores.estruturado import ler_com_motivo, NAO_IMOVEL
+    h = (Path(__file__).parent / "fixtures" / "sfrazao_lote7217.html").read_text(encoding="utf-8")
+    url = "https://www.sfrazao.com.br/lote.php?idLote=7217"
+    r, motivo = ler_com_motivo(h.replace("Apto c/ 181,44m² AP em Enseada, Guarujá-SP", "A"), "", url)
+    assert r is not NAO_IMOVEL and (r is None or r["titulo"].startswith("A")), motivo
+    r, _ = ler_com_motivo(h.replace("Apto c/ 181,44m² AP em Enseada, Guarujá-SP", "140m³ de areia grossa"), "", url)
+    assert r is NAO_IMOVEL
+
+
+def test_sfrazao_endereco_com_cidade_e_uf_rotulados():
+    from pathlib import Path
+    from coletor.adaptadores.estruturado import ler_com_motivo
+    h = (Path(__file__).parent / "fixtures" / "sfrazao_lote702.html").read_text(encoding="utf-8")
+    r, motivo = ler_com_motivo(h, "", "https://www.sfrazao.com.br/lote.php?idLote=702")
+    assert r and r["uf"] == "SP" and r["cidade"].lower() == "itapetininga", motivo

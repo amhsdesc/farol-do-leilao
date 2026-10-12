@@ -1,5 +1,5 @@
 # Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+# Site PHP próprio: a home lista os leilões com onClick="goTo('leilao.php?idLeilao=N')" e cada leilão lista os lotes (lote.php?idLote=N).
 id: antonio-carlos-celso-santos-frazao
 nome: Antonio Carlos Celso Santos Frazao
 site: https://www.sfrazao.com.br
@@ -7,6 +7,8 @@ tipo: automatico
 uf: [GO, MT, RJ, RO, SP]
 inicio:
   - https://www.sfrazao.com.br
-max_paginas_lista: 10
-max_lotes: 200
+padrao_link_lote: 'lote\.php\?idLote=\d+'
+padrao_link_lista: 'leilao\.php\?idLeilao=\d+'
+max_paginas_lista: 60
+max_lotes: 1000
 navegador: false
