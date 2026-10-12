@@ -145,6 +145,11 @@ class Extrator:
             valor = [x for x in map(aplicar, valor) if x] if isinstance(valor, list) else aplicar(valor)
         if isinstance(valor, list) and spec.get("junta") is not None:
             valor = spec["junta"].join(map(str, valor))
+        if spec.get("sem_html") and isinstance(valor, str):  # descrição que vem em HTML → texto corrido
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                valor = re.sub(r"\s+", " ", BeautifulSoup(valor, "lxml").get_text(" ", strip=True)).strip()
         if valor in (None, "", []) and "padrao" in spec:
             valor = spec["padrao"]
         return valor

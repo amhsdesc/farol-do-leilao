@@ -131,3 +131,41 @@ def test_paginas_de_navegacao_nao_sao_lote():
     for u in ("/leilao/x-15-09-2026/lotes/lista", "/leilao/x/planilha", "/leilao/x/online", "/leilao/auditorio-360", "/arrematante/login"):
         assert estruturado.pagina_de_evento(b + u), u
     assert not estruturado.pagina_de_evento(b + "/venda-direta/bem_id/129")
+
+
+def test_json_api_leiloes_judiciais_sem_ia():
+    """YAML real da fonte contra uma resposta no formato da API (get-lotes)."""
+    import httpx
+    from decimal import Decimal
+
+    from coletor.adaptadores import TIPOS
+    from coletor.http import Cliente
+    from coletor.registro import carregar
+
+    item = {"lote_id": 219008, "leilao_id": 99955, "nm_titulo_lote": "Grande imóvel - Terreno 21.404m² - B. Rio Branco",
+            "nm_descricao": '<p style="x"><span>Imóvel <b>desocupado</b> em Porto Alegre/RS.</span></p>',
+            "dt_fechamento": "2026-11-16 10:00:00-03", "vl_lanceminimo": "158894328.00", "vl_lanceinicial": "79447164.00",
+            "vl_lanceinicialsegundoleilao": None, "nm_cidade": "Porto Alegre", "nm_estado": "RS", "nm_statuslote": "Aberto para Lance",
+            "nm_subcategoria": "Comerciais", "nm_leiloeiro": "Joyce Ribeiro",
+            "fotos": [{"nm_path_completo": "https://s3.example/I_1.webp"}]}
+    visto = {}
+
+    def h(req: httpx.Request):
+        if str(req.url).endswith("/robots.txt"):
+            return httpx.Response(404)
+        visto["metodo"], visto["q"] = req.method, dict(req.url.params)
+        pg = int(req.url.params["pg"])
+        return httpx.Response(200, json={"items": [item] if pg == 1 else [], "totalPages": 1})
+
+    fonte = carregar()["leiloes-judiciais"]
+    ad = TIPOS[fonte["tipo"]](fonte, Cliente(intervalo=0, transport=httpx.MockTransport(h)), conn=None)
+    lotes = list(ad.coletar())
+    assert visto["metodo"] == "POST" and visto["q"]["tipo"] == "3" and visto["q"]["qtd_por_pagina"] == "50"
+    assert len(lotes) == 1
+    from coletor.normalizar import normalizar
+    n = normalizar(lotes[0], ad.padroes)
+    assert n.id_externo == "219008" and n.url == "https://www.leiloesjudiciais.com.br/lote/99955/219008"
+    assert n.cidade == "Porto Alegre" and n.uf == "RS" and n.tipo == "comercial"
+    assert n.valor_avaliacao == Decimal("158894328.00") and n.lance_minimo == Decimal("79447164.00")
+    assert n.data_praca1.day == 16 and n.data_praca1.hour == 10
+    assert "<" not in (n.descricao or "") and n.ocupacao == "desocupado"

@@ -1,12 +1,48 @@
-# Criado pelo catálogo (2026-09-28). Validação: pendente.
-# Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
+# Leilões Judiciais (Grupo Lance). Sem IA e sem navegador: a API JSON que o próprio site usa (get-lotes, imóveis = tipo 3).
+# Descoberta em 2026-10-12 lendo o JavaScript do site. A página de cada lote é só uma casca (os dados chegam por esta API),
+# então ler a página com IA não trazia nem valor nem praças. ~1.400 imóveis = ~30 requisições de 50 lotes.
+# Convenção dos valores (conferida com o texto das descrições): vl_lanceminimo = valor de avaliação; vl_lanceinicial = lance mínimo atual.
 id: leiloes-judiciais
 nome: Leilões Judiciais (Grupo Lance)
 site: https://www.leiloesjudiciais.com.br
-tipo: automatico
+tipo: json_api
 uf: [todas]
-inicio:
-  - https://www.leiloesjudiciais.com.br
-max_paginas_lista: 10
-max_lotes: 200
-navegador: false
+intervalo_segundos: 1
+requisicao:
+  url: https://api.leiloesjudiciais.com.br/core/api/get-lotes
+  metodo: POST
+  params:
+    pg: "{pagina}"
+    qtd_por_pagina: 50
+    tipo: 3
+    estado: 0
+    cidade: 0
+    valor_min: 0
+    valor_max: 0
+    palavra_chave: ""
+    leilao_id: 0
+    lote_id: 0
+    ehvitrinesaladisputa: "false"
+    faixa_desconto: 0
+    com_foto: 0
+    categoria: ""
+  cabecalhos: {Origin: "https://www.leiloesjudiciais.com.br", Referer: "https://www.leiloesjudiciais.com.br/"}
+  pagina_inicial: 1
+  paginas_max: 60
+itens: items
+total_paginas: totalPages
+url_lote: "https://www.leiloesjudiciais.com.br/lote/{leilao_id}/{lote_id}"
+campos:
+  id_externo: {json: lote_id}
+  titulo: {json: nm_titulo_lote}
+  descricao: {json: nm_descricao, sem_html: true}
+  tipo: {json: nm_subcategoria}
+  cidade: {json: nm_cidade}
+  uf: {json: nm_estado}
+  status: {json: nm_statuslote}
+  valor_avaliacao: {json: vl_lanceminimo}
+  lance_minimo: {json: vl_lanceinicial}
+  valor_praca2: {json: vl_lanceinicialsegundoleilao}
+  data_praca1: {json: dt_fechamento, regex: "^(\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2})"}
+  leiloeiro: {json: nm_leiloeiro}
+  fotos: {json: "fotos[0].nm_path_completo"}
