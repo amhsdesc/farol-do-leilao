@@ -5,6 +5,7 @@ import argparse
 import csv
 import logging
 import sys
+import time
 from urllib.parse import urlparse
 
 from . import registro
@@ -60,9 +61,15 @@ def cmd_coletar(a):
         if faltando or not a.ids:
             sys.exit(f"Fonte(s) desconhecida(s): {', '.join(faltando) or '(nenhuma informada)'}. Veja: python -m coletor fontes")
         alvo = [fontes[i] for i in a.ids]
+    prazo = time.monotonic() + a.limite_minutos * 60 if a.limite_minutos else None
     with conectar() as conn:
         migrar(conn)
-        for f in alvo:
+        for i, f in enumerate(alvo):
+            if prazo and time.monotonic() > prazo:
+                # não começa fonte nova depois do prazo: o job termina limpo antes do timeout do GitHub
+                print(f"⏱ Prazo de {a.limite_minutos} min do job esgotado; ficam para a próxima rodada: "
+                      f"{', '.join(x['id'] for x in alvo[i:])}", flush=True)
+                break
             print(f"→ {f['id']} ({f['tipo']})...", flush=True)
             r = executar(f, conn)
             c = r.contadores
@@ -284,6 +291,8 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("coletar", help="coleta uma ou mais fontes")
     s.add_argument("ids", nargs="*")
     s.add_argument("--todas", action="store_true")
+    s.add_argument("--limite-minutos", type=int, default=0,
+                   help="não inicia fonte nova depois desse prazo (0 = sem prazo)")
     s.add_argument("--tipo", help="só fontes deste tipo de adaptador")
     s.set_defaults(f=cmd_coletar)
     s = sub.add_parser("inspecionar", help="analisa um site para decidir como coletar")

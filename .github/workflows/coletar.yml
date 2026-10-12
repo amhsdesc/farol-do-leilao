@@ -2,8 +2,12 @@ name: Coleta
 
 on:
   schedule:
-    - cron: "17 */6 * * *" # a cada 6h, minuto fora da hora cheia (menos fila no GitHub)
+    - cron: "17 */8 * * *" # a cada 8h (00:17, 08:17, 16:17 UTC), minuto fora da hora cheia (menos fila no GitHub)
   workflow_dispatch: {} # botão "Run workflow" pra rodar na hora, quando quiser testar
+
+concurrency:
+  group: coleta
+  cancel-in-progress: false # rodada atrasada não roda junto com a seguinte
 
 env:
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -59,17 +63,20 @@ jobs:
             git push
           fi
 
-  # Monta os grupos de coleta paralela na hora, lendo quantos arquivos existem em fontes/ (em vez de
-  # manter listas fixas aqui). Uma fonte nova = um arquivo novo em fontes/; nunca precisa editar este
-  # workflow por causa disso. A Caixa vira um grupo por UF (27, rápidas, sem navegador) e os leiloeiros/
-  # bancos viram grupos de 3 (mais lentos, IA e às vezes navegador).
+  # Monta os grupos de coleta paralela na hora, lendo os arquivos de fontes/ (em vez de manter listas
+  # fixas aqui). Uma fonte nova = um arquivo novo em fontes/; nunca precisa editar este workflow.
+  # Três filas, na ordem de preferência do projeto (o que não usa IA vem antes do que usa):
+  #   caixa         um job por UF (CSV oficial, rápido)
+  #   estruturadas  APIs, POST/HTML, WordPress REST e seletores: um job por fonte, sem IA
+  #   ia            fontes "automatico" (presets sem IA primeiro; IA só se o preset não reconhece o site)
   preparar:
     needs: gerar-fontes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       matriz_caixa: ${{ steps.grupos.outputs.matriz_caixa }}
-      matriz_leiloeiros: ${{ steps.grupos.outputs.matriz_leiloeiros }}
+      matriz_estruturadas: ${{ steps.grupos.outputs.matriz_estruturadas }}
+      matriz_ia: ${{ steps.grupos.outputs.matriz_ia }}
     defaults:
       run:
         working-directory: coletor
@@ -78,7 +85,7 @@ jobs:
       - id: grupos
         run: |
           python3 <<'PY'
-          import glob, json, os
+          import glob, json, os, re
 
           def grupos_de(ids, tamanho):
               ids = sorted(ids)
@@ -87,27 +94,40 @@ jobs:
                   for i in range(0, len(ids), tamanho)
               ]
 
-          def ids_em(pasta):
+          def tipo_de(arquivo):
+              texto = open(arquivo, encoding="utf-8").read()
+              m = re.search(r"^tipo:\s*(\w+)", texto, re.M)
+              if m:
+                  return m.group(1)
+              h = re.search(r"^herda:\s*(\S+)", texto, re.M)  # herda o tipo do modelo em fontes/plataformas/
+              if h and os.path.exists(f"fontes/{h.group(1)}"):
+                  return tipo_de(f"fontes/{h.group(1)}")
+              return "automatico"  # na dúvida, vai para a fila que respeita o teto de IA
+
+          def fontes_em(pasta):
               return [
-                  os.path.splitext(os.path.basename(f))[0]
+                  (os.path.splitext(os.path.basename(f))[0], tipo_de(f))
                   for f in glob.glob(f"{pasta}/*.yaml")
                   if not os.path.basename(f).startswith("_")
               ]
 
-          caixa = grupos_de(ids_em("fontes/caixa"), 1)
-          leiloeiros = grupos_de(ids_em("fontes/leiloeiros") + ids_em("fontes/bancos"), 3)
+          caixa = grupos_de([i for i, _ in fontes_em("fontes/caixa")], 1)
+          outras = fontes_em("fontes/leiloeiros") + fontes_em("fontes/bancos")
+          estruturadas = grupos_de([i for i, t in outras if t != "automatico"], 1)
+          ia = grupos_de([i for i, t in outras if t == "automatico"], 5)
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"matriz_caixa={json.dumps(caixa)}\n")
-              f.write(f"matriz_leiloeiros={json.dumps(leiloeiros)}\n")
-          print(f"caixa: {len(caixa)} grupos. leiloeiros/bancos: {len(leiloeiros)} grupos.")
+              f.write(f"matriz_estruturadas={json.dumps(estruturadas)}\n")
+              f.write(f"matriz_ia={json.dumps(ia)}\n")
+          print(f"caixa: {len(caixa)} jobs. estruturadas (sem IA): {len(estruturadas)} jobs. ia: {len(ia)} jobs.")
           PY
 
   # Uma UF por job: csv_caixa só usa httpx (dependência base), sem navegador, então cada grupo sobe rápido.
   caixa:
     needs: [migrar, preparar]
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -123,19 +143,44 @@ jobs:
           python-version: "3.11"
       - run: pip install -e .
       - name: Coletar ${{ matrix.grupo.nome }}
-        run: python -m coletor coletar ${{ matrix.grupo.fontes }}
+        run: python -m coletor coletar --limite-minutos 35 ${{ matrix.grupo.fontes }}
 
-  # As fontes "automatico" (IA lê cada site) e as de banco rodam em paralelo, um grupo pequeno por
-  # máquina, pra terminar o mais rápido possível dentro do limite de jobs simultâneos do GitHub.
-  leiloeiros:
+  # Fontes lidas por API, POST/HTML, WordPress REST ou seletores: nenhuma usa IA. Rodam antes da fila de IA.
+  # Uma fonte por job, porque os sites são diferentes e um bloqueio ou lentidão numa não atrasa as outras.
+  estruturadas:
     needs: [migrar, preparar]
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        grupo: ${{ fromJson(needs.preparar.outputs.matriz_estruturadas) }}
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[listas]"
+      - name: Coletar ${{ matrix.grupo.fontes }}
+        run: python -m coletor coletar --limite-minutos 35 ${{ matrix.grupo.fontes }}
+
+  # Fontes "automatico": primeiro tentam os presets sem IA (leilao_pro, suaplataforma); a IA só entra
+  # quando o site não é reconhecido, e respeita o teto diário. Só começa depois que as fontes sem IA
+  # terminaram (com sucesso ou não), para que o orçamento de IA nunca concorra com elas.
+  ia:
+    needs: [migrar, preparar, estruturadas]
+    if: ${{ !cancelled() && needs.migrar.result == 'success' && needs.preparar.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       max-parallel: 10
       matrix:
-        grupo: ${{ fromJson(needs.preparar.outputs.matriz_leiloeiros) }}
+        grupo: ${{ fromJson(needs.preparar.outputs.matriz_ia) }}
     defaults:
       run:
         working-directory: coletor
@@ -147,10 +192,11 @@ jobs:
       - run: pip install -e ".[navegador,listas]"
       - run: playwright install --with-deps chromium
       - name: Coletar ${{ matrix.grupo.nome }}
-        run: python -m coletor coletar ${{ matrix.grupo.fontes }}
+        # 75 min: o job para de iniciar fontes novas e termina limpo antes do limite de 90 do GitHub
+        run: python -m coletor coletar --limite-minutos 75 ${{ matrix.grupo.fontes }}
 
   geocodificar:
-    needs: [caixa, leiloeiros]
+    needs: [caixa, estruturadas, ia]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30

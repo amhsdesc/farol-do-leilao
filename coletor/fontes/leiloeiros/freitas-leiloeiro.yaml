@@ -10,3 +10,4 @@ inicio:
 max_paginas_lista: 10
 max_lotes: 200
 navegador: false
+verificar_tls: false  # certificado do site com problema; confirmado no teste de 2026-10

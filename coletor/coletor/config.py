@@ -19,6 +19,8 @@ class Config:
     anthropic_api_key: str | None = os.getenv("ANTHROPIC_API_KEY") or None
     modelo_llm: str = os.getenv("MODELO_LLM", "claude-haiku-4-5-20251001")
     intervalo_minimo: float = float(os.getenv("INTERVALO_MINIMO_SEGUNDOS", "2"))
+    # Tempo máximo de UMA fonte numa coleta (a fonte pode mudar com `max_segundos:` no YAML). Estourou: grava o que já leu e para.
+    fonte_max_segundos: int = int(os.getenv("FONTE_MAX_SEGUNDOS") or "1200")
     respeitar_robots: bool = os.getenv("RESPEITAR_ROBOTS", "1") != "0"
     pasta_fontes: Path = Path(os.getenv("PASTA_FONTES", str(PASTA_COLETOR / "fontes")))
     pasta_dados: Path = Path(os.getenv("PASTA_DADOS", str(RAIZ / "dados")))

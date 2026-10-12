@@ -47,9 +47,13 @@ def executar(fonte: dict[str, Any], conn, cliente: Cliente | None = None, **kw_a
     c = Contadores()
     adaptador = classe(fonte, cliente, conn=conn, **kw_adaptador)
     inicio = time.monotonic()
+    limite = float(fonte.get("max_segundos") or config.fonte_max_segundos)
     concluida, mensagem = False, None
     try:
         for bruto in adaptador.coletar():
+            if time.monotonic() - inicio > limite:
+                # os lotes já lidos ficam gravados; execução vira "erro" e por isso nada é marcado como removido
+                raise ErroDeFonte(f"Tempo esgotado ({limite:.0f}s) nesta fonte; coleta interrompida e retomada na próxima rodada.")
             try:
                 lote = normalizar(bruto, adaptador.padroes)
                 repo.gravar(fonte_id, lote, execucao_id, c)
