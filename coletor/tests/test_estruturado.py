@@ -169,3 +169,17 @@ def test_json_api_leiloes_judiciais_sem_ia():
     assert n.valor_avaliacao == Decimal("158894328.00") and n.lance_minimo == Decimal("79447164.00")
     assert n.data_praca1.day == 16 and n.data_praca1.hour == 10
     assert "<" not in (n.descricao or "") and n.ocupacao == "desocupado"
+
+
+def test_lancevip_sem_ia():
+    from pathlib import Path
+    from coletor.adaptadores import estruturado as e
+    pasta = Path(__file__).parent / "fixtures"
+    carro, _ = e.ler_com_motivo((pasta / "lancevip_carro.html").read_text(encoding="utf-8"), "", "https://lancevip.com.br/leilao/2734/lote/1")
+    assert carro is e.NAO_IMOVEL
+    casa, motivo = e.ler_com_motivo((pasta / "lancevip_casa.html").read_text(encoding="utf-8"), "", "https://lancevip.com.br/leilao/2719/lote/2")
+    assert isinstance(casa, dict), motivo
+    assert casa["cidade"] == "São Miguel do Guaporé" and casa["uf"] == "RO"
+    assert casa["valor_avaliacao"] == 460000.0 and casa["lance_minimo"] == 276000.0
+    assert casa["modalidade"] == "venda_direta" and casa["id_externo"] == "2719-2"
+    assert "Matrícula" in casa["descricao"]

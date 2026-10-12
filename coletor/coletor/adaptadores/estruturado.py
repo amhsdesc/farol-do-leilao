@@ -141,6 +141,8 @@ def ler(html: str, texto: str = "", url: str = "") -> dict | object | None:
 def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | object | None, str]:
     """Como `ler`, mas devolve também o motivo quando não leu (para diagnóstico no comando `testar`)."""
     lote = extrair_var_lote(html)
+    if not lote and "lv-lote-pagina" in html:
+        return ler_lancevip(html, url)
     if not lote:
         return None, "sem JSON embutido (var lote)"
     if lote.get("status") != 1:  # só lote aberto é lido aqui; os demais seguem o caminho normal
@@ -194,5 +196,93 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         if not campos.get(k):
             campos[k] = v
     if not campos["valor_praca1"] and not campos["valor_avaliacao"]:
+        return None, "sem nenhum valor"
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+# ---------------------------------------------------------------------------------------------
+# Lance VIP (lancevip.com.br): página de lote renderizada no servidor, com rótulos <dt>/<dd>.
+
+_REAIS = re.compile(r"R\$\s*([\d.]+,\d{2})")
+_PRACA = re.compile(
+    r"([12])\s*[ªa]\s*pra[çc]a\s+(\d{2}/\d{2}/\d{4})\s+(\d{1,2}:\d{2})\s+R\$\s*([\d.]+,\d{2})(\s+em vigor)?", re.I)
+
+
+def _num(br: str | None) -> float | None:
+    try:
+        return _valor(br.replace(".", "").replace(",", ".")) if br else None
+    except AttributeError:
+        return None
+
+
+def ler_lancevip(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    s = BeautifulSoup(html, "lxml")
+    for x in s(["script", "style"]):
+        x.decompose()
+    rot: dict[str, str] = {}
+    for dt in s.find_all("dt"):
+        dd = dt.find_next_sibling("dd")
+        if dd:
+            rot[simplificar(dt.get_text(" ", strip=True))] = dd.get_text(" ", strip=True)
+    categoria = rot.get("categoria", "")
+    cat = simplificar(categoria)
+    if cat and _NAO_IMOVEL.search(cat):
+        return NAO_IMOVEL, f"categoria '{categoria}' não é imóvel"
+    h1 = s.find("h1")
+    titulo = _txt(h1.get_text(" ", strip=True)) if h1 else ""
+    if not (cat and _IMOVEL.search(cat)):
+        return None, f"categoria sem sinal claro de imóvel: {categoria!r}"
+    sit = s.select_one(".lv-situacao")
+    if not sit or "aberto" not in simplificar(sit.get_text(" ", strip=True)):
+        return None, f"situação não é 'aberto para lances': {sit.get_text(' ', strip=True) if sit else None!r}"
+    cidade, uf = (rot.get("cidade") or "").strip(), normalizar_uf(rot.get("uf"))
+    if not (cidade and uf):
+        return None, "sem cidade/UF nos rótulos"
+    campos: dict[str, Any] = {
+        "titulo": titulo,
+        "tipo": categoria,
+        "status": "aberto",
+        "uf": uf, "cidade": cidade,
+        "valor_avaliacao": _num((_REAIS.search(rot.get("avaliacao", "")) or [None, None])[1]),
+        "processo": None,
+        "dados": {"extraido_por": "html_lancevip", "vara": rot.get("vara")},
+    }
+    m = re.search(r"/leilao/(\d+)/lote/(\d+)", url or "")
+    if m:
+        campos["id_externo"] = f"{m.group(1)}-{m.group(2)}"
+    mod = simplificar(rot.get("modalidade", ""))
+    if "judicial" in mod:
+        campos["modalidade"] = "judicial"
+    elif "venda direta" in mod:
+        campos["modalidade"] = "venda_direta"
+    # descrição: bloco logo após o título "Descrição do bem"
+    for h in s.find_all(["h2", "h3", "h4"]):
+        if simplificar(h.get_text(" ", strip=True)).startswith("descricao do bem"):
+            alvo = h.find_next_sibling() or h.parent
+            campos["descricao"] = _txt(alvo.get_text("\n", strip=True))
+            break
+    pr = s.select_one(".lv-pracas")
+    vigente = None
+    if pr:
+        for n, dia, hora, val, vig in _PRACA.findall(pr.get_text(" ", strip=True)):
+            d, mes, a = dia.split("/")
+            campos[f"data_praca{n}"] = f"{a}-{mes}-{d}T{hora.zfill(5)}"
+            campos[f"valor_praca{n}"] = _num(val)
+            if vig:
+                vigente = _num(val)
+    lv = s.select_one(".lv-lote-valores")
+    if vigente is None and lv:
+        r = _REAIS.search(lv.get_text(" ", strip=True))
+        vigente = _num(r.group(1)) if r else None
+    if vigente:
+        campos["lance_minimo"] = vigente
+    par = rot.get("parcelamento", "")
+    if par:
+        campos["aceita_parcelamento"] = True
+    foto = s.select_one(".lv-lote-capa-foto") or s.select_one(".lv-lote-capa img")
+    src = (foto.get("src") if foto and foto.name == "img" else (foto.find("img").get("src") if foto and foto.find("img") else None))
+    if src and "suporteleiloes" in src:
+        campos["fotos"] = [src]
+    if not (campos.get("valor_avaliacao") or campos.get("lance_minimo")):
         return None, "sem nenhum valor"
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""
