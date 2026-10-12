@@ -1,11 +1,14 @@
 "use server";
 
 /**
- * "Pesquisar valor de mercado": busca anúncios de imóveis parecidos na região (portais de venda) e calcula
- * o preço médio por m². Usa a API da Anthropic com a ferramenta de busca na web (o mesmo provedor de IA já
- * usado no coletor, para não somar mais uma conta/mais um cartão ao projeto). Cada clique no botão custa uma
- * chamada de API (poucos centavos), diferente do resto do site, que é só consulta ao banco.
+ * "Pesquisar valor de mercado": calcula o preço por m² de ANÚNCIOS de venda parecidos na região (nunca dos
+ * editais, que é justamente o que queremos comparar). Ordem, da mais barata para a mais cara:
+ *  1) cache de 30 dias (custo zero);
+ *  2) servidor MCP público do Chaves na Mão, sem IA (custo zero em tokens), se houver anúncios suficientes DO
+ *     BAIRRO pedido (ou da cidade, quando não há bairro);
+ *  3) só então a API da Anthropic com busca na web (poucos centavos por pesquisa).
  */
+import { buscarNoChaves } from "./mercadoMcp.ts";
 
 export type EntradaPesquisaMercado = {
   uf: string;
@@ -25,7 +28,7 @@ export type AmostraMercado = {
 };
 
 export type ResultadoPesquisaMercado =
-  | { ok: true; precoM2Medio: number; amostras: AmostraMercado[]; observacao?: string }
+  | { ok: true; precoM2Medio: number; amostras: AmostraMercado[]; observacao?: string; fonte?: "chaves-na-mao" | "ia" }
   | { ok: false; erro: string };
 
 const TIPOS_BUSCA: Record<string, string> = {
@@ -40,7 +43,7 @@ const TIPOS_BUSCA: Record<string, string> = {
 };
 
 export async function mercadoConfigurado() {
-  return !!process.env.ANTHROPIC_API_KEY;
+  return true; // o caminho sem IA (MCP) não precisa de chave; a IA só entra como reserva, se houver chave
 }
 
 function extrairJson(texto: string): unknown {
@@ -132,7 +135,7 @@ async function comCache(chave: string[], buscar: () => Promise<ResultadoPesquisa
         if (!r.ok) throw new NaoGuardar(r); // lançar impede que a falha vire "resposta guardada"
         return r;
       },
-      ["mercado-v1", ...chave],
+      ["mercado-v2", ...chave],
       { revalidate: TRINTA_DIAS },
     )();
   } catch (err) {
@@ -143,9 +146,6 @@ async function comCache(chave: string[], buscar: () => Promise<ResultadoPesquisa
 }
 
 export async function pesquisarValorMercado(e: EntradaPesquisaMercado): Promise<ResultadoPesquisaMercado> {
-  if (!(await mercadoConfigurado())) {
-    return { ok: false, erro: "Pesquisa de valor de mercado ainda não está configurada neste site." };
-  }
   if (!e.uf || !e.cidade || !e.area || e.area <= 0) {
     return { ok: false, erro: "Informe estado, cidade e área do imóvel para pesquisar." };
   }
@@ -163,7 +163,26 @@ Responda SÓ com este JSON, sem texto antes ou depois (título com até 6 palavr
   // Resultados bons ficam guardados por 30 dias: o preço por m² de uma região muda devagar,
   // e cada pesquisa nova custa uma chamada com busca na web (a parte cara). Falhas nunca são guardadas.
   const chave = [e.uf, normalizarChave(e.cidade), normalizarChave(e.bairro ?? ""), e.tipo, `${faixa.min}-${faixa.max}`, String(e.quartos ?? "")];
-  return comCache(chave, () => buscarNaWeb(prompt));
+  return comCache(chave, async () => {
+    // 1º: caminho sem IA. Só aceita se tiver anúncios suficientes do bairro pedido.
+    const mcp = process.env.MERCADO_SEM_MCP === "1" ? ({ ok: false, motivo: "desligado por MERCADO_SEM_MCP=1" } as const) : await buscarNoChaves(e, faixa);
+    if (mcp.ok) {
+      return {
+        ok: true,
+        precoM2Medio: mcp.precoM2,
+        fonte: "chaves-na-mao",
+        amostras: mcp.amostras.map((a) => ({ titulo: a.titulo, preco: a.preco, area: a.area, precoM2: a.precoM2, url: a.url })),
+        observacao: `Mediana de ${mcp.total} anúncios de venda ${mcp.escopo === "bairro" ? `no bairro ${e.bairro}` : `em ${e.cidade}`} (Chaves na Mão, preços pedidos).`,
+      } satisfies ResultadoPesquisaMercado;
+    }
+    console.info(`[mercado] sem IA insuficiente: ${mcp.motivo}`);
+    // 2º: reserva com IA, só se houver chave configurada.
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return { ok: false, erro: "Não há anúncios suficientes para estimar o preço por m² dessa região." } satisfies ResultadoPesquisaMercado;
+    }
+    const r = await buscarNaWeb(prompt);
+    return r.ok ? { ...r, fonte: "ia" as const } : r;
+  });
 }
 
 async function buscarNaWeb(prompt: string): Promise<ResultadoPesquisaMercado> {

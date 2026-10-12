@@ -8,9 +8,11 @@ const FETCH_ORIGINAL = globalThis.fetch;
 
 beforeEach(() => {
   process.env.ANTHROPIC_API_KEY = "chave-de-teste";
+  process.env.MERCADO_SEM_MCP = "1"; // os testes abaixo cobrem só a reserva com IA; o caminho MCP está em mercadoMcp.test.ts
 });
 afterEach(() => {
   process.env.ANTHROPIC_API_KEY = CHAVE_ORIGINAL;
+  delete process.env.MERCADO_SEM_MCP;
   globalThis.fetch = FETCH_ORIGINAL;
 });
 
@@ -21,10 +23,10 @@ function respostaAnthropic(texto: string) {
   } as Response;
 }
 
-test("mercadoConfigurado reflete a variável de ambiente", async () => {
+test("mercadoConfigurado é sempre verdadeiro: o caminho sem IA não precisa de chave", async () => {
   assert.equal(await mercadoConfigurado(), true);
   delete process.env.ANTHROPIC_API_KEY;
-  assert.equal(await mercadoConfigurado(), false);
+  assert.equal(await mercadoConfigurado(), true);
 });
 
 test("sem chave configurada, devolve erro sem chamar a rede", async () => {
@@ -99,13 +101,24 @@ test("resposta HTTP não-ok vira mensagem amigável", async () => {
   assert.equal(r.ok, false);
 });
 
-test("resposta cortada na primeira tentativa: tenta de novo e aproveita a segunda", async () => {
+test("resposta cortada (já gastou tokens): NÃO tenta de novo, devolve erro amigável", async () => {
+  let chamadas = 0;
+  globalThis.fetch = (async () => {
+    chamadas++;
+    return respostaAnthropic('```json\n{"amostras": [{"titulo": "A", "preco": 300000, "area": 50, "precoM2":');
+  }) as typeof fetch;
+  const r = await pesquisarValorMercado({ uf: "GO", cidade: "Goiânia", tipo: "apartamento", area: 60 });
+  assert.equal(chamadas, 1);
+  assert.equal(r.ok, false);
+});
+
+test("API sobrecarregada (529): tenta uma segunda vez, pois ainda não gastou tokens", async () => {
   let chamadas = 0;
   globalThis.fetch = (async () => {
     chamadas++;
     return chamadas === 1
-      ? respostaAnthropic('```json\n{"amostras": [{"titulo": "A", "preco": 300000, "area": 50, "precoM2":')
-      : respostaAnthropic('```json\n{"amostras": [{"titulo": "A", "preco": 300000, "area": 50}], "precoM2Medio": 6000}\n```');
+      ? ({ ok: false, status: 529, text: async () => "" } as Response)
+      : respostaAnthropic('```json\n{"amostras": [{"titulo": "A", "preco": 300000, "area": 50}]}\n```');
   }) as typeof fetch;
   const r = await pesquisarValorMercado({ uf: "GO", cidade: "Goiânia", tipo: "apartamento", area: 60 });
   assert.equal(chamadas, 2);
