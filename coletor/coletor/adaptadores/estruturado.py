@@ -21,8 +21,8 @@ from ..normalizar import simplificar, uf as normalizar_uf
 
 NAO_IMOVEL = object()
 
-_NAO_IMOVEL = re.compile(r"\b(veiculo|carro|moto|caminhao|onibus|automovel|maquina|sucata|equipamento|movel|moveis|semovente|joia|eletronic|areia|brita|cascalho|entulho|gasolina|etanol|diesel|combustivel|compressor|litros|fiat|chevrolet|volkswagen|renault|toyota|hyundai|yamaha|vw|kombi|saveiro|pick|caminhonete|camioneta|astra|ford|honda|zafira|cadeira|cadeiras|ventilador|ventiladores|aspirador|aspiradores|aparelho|aparelhos|telhas)")
-_IMOVEL = re.compile(r"\b(imov|imoveis|terreno|apart|apto|casa|residen|suite|terras|chale|box |garagem|vaga|comercial|rural|galpao|sala|loja|conjunto|fazenda|chacara|sitio|lote|gleba|cobertura|edificio|predio|hotel|barrac)")
+_NAO_IMOVEL = re.compile(r"\b(veiculo|carro|moto|caminhao|onibus|automovel|maquina|sucata|equipamento|movel|moveis|semovente|joia|eletronic|areia|brita|cascalho|entulho|gasolina|etanol|diesel|combustivel|compressor|litros|fiat|chevrolet|volkswagen|renault|toyota|hyundai|yamaha|vw|kombi|saveiro|pick|caminhonete|camioneta|astra|ford|honda|zafira|cadeira|cadeiras|ventilador|ventiladores|aspirador|aspiradores|aparelho|aparelhos|telhas|prensa|retalhos|geladeira|geladeiras|tecidos|kgs|toneladas)")
+_IMOVEL = re.compile(r"\b(imov|imoveis|terreno|apart|apto|casa|residen|suite|terras|chale|area|box |garagem|vaga|comercial|rural|galpao|sala|loja|conjunto|fazenda|chacara|sitio|lote|gleba|cobertura|edificio|predio|hotel|barrac)")
 _CIDADE_UF = re.compile(r"(?:^|[-–,]\s*)([A-ZÀ-Ú][\wÀ-ú'. ]{1,40}?)\s*[-/]\s*([A-Z]{2})\s*$")
 
 
@@ -147,6 +147,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return ler_frazao(html, url)
     if not lote and "/evento/anuncio/" in (url or "") and "Comitente" in html:
         return ler_leilaovip(html, url)
+    if not lote and "v2-seo-snapshot" in html:
+        return ler_leilotech(html, url)
     if not lote and "Mais detalhes do lote" in html and "/lote/lote-" in (url or ""):
         return ler_casadeleiloes(html, url)
     if not lote and "Encerramento, valores e lances" in html and "idLote=" in (url or ""):
@@ -746,3 +748,68 @@ def ler_casadeleiloes(html: str, url: str = "") -> tuple[dict | object | None, s
     if mid:
         campos["id_externo"] = mid.group(1)
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+# ---------------------------------------------------------------------------------------------
+# Leilotech (sites <leiloeiro>.com.br em app JS): o servidor entrega um "snapshot SEO" (<section class="v2-seo-snapshot">)
+# com título, status, avaliação, situação e descrição. NÃO traz datas de praça nem lance (a API /go/graphql é fechada).
+
+def ler_leilotech(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    s = BeautifulSoup(html, "lxml")
+    snap = s.select_one("section.v2-seo-snapshot")
+    if not snap:
+        return None, "sem snapshot SEO"
+    h1 = snap.find("h1")
+    titulo = _txt(h1.get_text(" ", strip=True)) if h1 else ""
+    if " - " in titulo:  # 'Nome do Leiloeiro - Título do lote'
+        titulo = titulo.split(" - ", 1)[1].strip()
+    rot: dict[str, str] = {}
+    for dt in snap.find_all("dt"):
+        dd = dt.find_next_sibling("dd")
+        if dd:
+            rot[simplificar(dt.get_text(" ", strip=True))] = dd.get_text(" ", strip=True)
+    secs = {simplificar(h.get_text(" ", strip=True)): h.find_next_sibling("p") for h in snap.find_all("h2")}
+    desc_p = secs.get("descricao")
+    descricao = _txt(desc_p.get_text(" ", strip=True)) if desc_p else ""
+    sinal = simplificar(f"{titulo} {rot.get('categoria', '')}")
+    if _NAO_IMOVEL.search(sinal):
+        return NAO_IMOVEL, "título/categoria não é imóvel"
+    if not _IMOVEL.search(sinal):
+        return None, f"sem sinal claro de imóvel no título: {titulo[:60]!r}"
+    if simplificar(rot.get("status", "")) not in ("ativo", "aberto"):
+        return None, f"status do lote: {rot.get('status')!r}"
+    cidade = uf = None
+    for txt in (rot.get("leilao", ""), titulo, descricao[:600]):
+        cidade, uf = _cidade_uf_texto(txt)
+        if cidade and uf:
+            break
+    if not (cidade and uf):
+        return None, f"sem cidade/UF (título: {titulo[:70]!r})"
+    aval = _valor(_num_br(rot.get("avaliacao", "")))
+    if not aval:
+        return None, "sem avaliação"
+    sit = simplificar(rot.get("situacao", ""))
+    campos: dict[str, Any] = {
+        "titulo": titulo, "descricao": descricao[:4000], "tipo": None, "status": "aberto",
+        "uf": uf, "cidade": cidade, "valor_avaliacao": aval, "valor_praca1": aval,
+        "ocupacao": "desocupado" if sit == "desocupado" else "ocupado" if sit == "ocupado" else None,
+        "dados": {"extraido_por": "html_leilotech", "sem_data_praca": True},
+    }
+    mid = re.search(r"/lote/(\d+)", url or "")
+    if mid:
+        campos["id_externo"] = mid.group(1)
+    og = s.find("meta", attrs={"property": "og:image"})
+    if og and og.get("content"):
+        campos["fotos"] = [og["content"]]
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+def _num_br(txt: str) -> str | None:
+    """'R$ 300000.00' (ponto decimal, sem milhar) ou 'R$ 300.000,00' → '300000.00'."""
+    m = re.search(r"R\$\s*([\d.,]+)", txt or "")
+    if not m:
+        return None
+    v = m.group(1)
+    if "," in v:
+        v = v.replace(".", "").replace(",", ".")
+    return v

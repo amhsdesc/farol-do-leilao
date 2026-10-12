@@ -310,3 +310,13 @@ def test_casadeleiloes_imovel_e_nao_imovel():
     assert r and r["uf"] == "MS" and "dourados" in r["cidade"].lower(), motivo
     r, _ = ler_com_motivo((base / "casadeleiloes_veiculo.html").read_text(encoding="utf-8"), "", u + "66916")
     assert r is NAO_IMOVEL
+
+
+def test_leilotech_snapshot_imovel_e_veiculo():
+    from pathlib import Path
+    from coletor.adaptadores.estruturado import ler_com_motivo, NAO_IMOVEL
+    base = Path(__file__).parent / "fixtures"
+    r, motivo = ler_com_motivo((base / "leilotech_apto.html").read_text(encoding="utf-8"), "", "https://vasconcelosleiloes.com.br/lote/480/x")
+    assert r and r["uf"] == "SC" and r["cidade"] == "Barra Velha" and r["valor_avaliacao"] == 300000.0 and r["id_externo"] == "480", motivo
+    r, _ = ler_com_motivo((base / "leilotech_fiat.html").read_text(encoding="utf-8"), "", "https://vasconcelosleiloes.com.br/lote/524/x")
+    assert r is NAO_IMOVEL
