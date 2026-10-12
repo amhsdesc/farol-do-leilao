@@ -507,7 +507,12 @@ def ler_leilaovip(html: str, url: str = "") -> tuple[dict | object | None, str]:
         return None
 
     status = depois("Status") or ""
-    if not simplificar(status).startswith("aberto"):
+    st = simplificar(status)
+    if st.startswith("aberto") or st.startswith("em breve"):
+        status_lote = "aberto"
+    elif st.startswith("suspens"):
+        status_lote = "suspenso"
+    else:  # encerrado, vendido, cancelado...: segue o caminho normal
         return None, f"status do lote: {status!r}"
     categoria = depois("Categoria") or ""
     titulo = depois("LOTE 1") if False else next((linhas[i + 1] for i, l in enumerate(linhas) if re.fullmatch(r"LOTE\s+\d+:", l, re.I)), "")
@@ -522,7 +527,7 @@ def ler_leilaovip(html: str, url: str = "") -> tuple[dict | object | None, str]:
     endereco = depois("Endereço") or ""
     partes = [p.strip() for p in endereco.split(",") if p.strip()]
     campos: dict[str, Any] = {
-        "titulo": titulo, "tipo": categoria, "status": "aberto", "uf": uf, "cidade": cidade,
+        "titulo": titulo, "tipo": categoria, "status": status_lote, "uf": uf, "cidade": cidade,
         "endereco": endereco or None, "bairro": partes[-1].title() if len(partes) >= 3 else None,
         "processo": depois("Processo"), "leiloeiro": depois("Leiloeiro"),
         "dados": {"extraido_por": "html_leilaovip"},
