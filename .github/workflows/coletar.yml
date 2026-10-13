@@ -143,6 +143,12 @@ jobs:
           python-version: "3.11"
       - run: pip install -e .
       - name: Coletar ${{ matrix.grupo.nome }}
+        env:
+          # Leitura do detalhe não usa IA: o limite é o tempo (1 página a cada ~2 s), não o custo.
+          # 20 min de detalhe (~600 páginas) + fotos + gravação cabem nos 35 min do job.
+          CAIXA_DETALHE_MAX: "2000"
+          CAIXA_DETALHE_SEGUNDOS: "1200"
+          FONTE_MAX_SEGUNDOS: "2100"
         run: python -m coletor coletar --limite-minutos 35 ${{ matrix.grupo.fontes }}
 
   # Fontes lidas por API, POST/HTML, WordPress REST ou seletores: nenhuma usa IA. Rodam antes da fila de IA.
