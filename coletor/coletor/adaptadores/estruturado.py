@@ -199,6 +199,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return ler_casadeleiloes(html, url)
     if not lote and "Encerramento, valores e lances" in html and "idLote=" in (url or ""):
         return ler_sfrazao(html, url)
+    if not lote and "__NUXT_DATA__" in html and "dadosLotes-" in html:
+        return ler_leiloesjudiciais(html, url)
     if not lote and "/sale/detail" in (url or "") and "cdn-biasi" in html and "Informações sobre o Lote" in html:
         return ler_biasi(html, url)
     if not lote and re.search(r"/item/\d+/detalhes", url or "") and "Voltar a Lista" in html:
@@ -869,6 +871,114 @@ def _num_br(txt: str) -> str | None:
     if "," in v:
         v = v.replace(".", "").replace(",", ".")
     return v
+
+
+# ---------------------------------------------------------------------------------------------
+# Leilões Judiciais (leiloesjudiciais.com.br e os sites de leiloeiros que usam a mesma plataforma, ex.:
+# leiloesjudiciaismg.com.br): página Nuxt com os dados do lote num bloco JSON (`__NUXT_DATA__`, formato "devalue":
+# uma lista em que cada valor aponta para outras posições da lista). O texto visível da página é quase só o menu.
+
+_NUXT_DATA = re.compile(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', re.S)
+
+
+def _nuxt_resolver(arr: list, i: int, nivel: int = 0) -> Any:
+    """Desfaz o formato devalue do Nuxt: cada valor é o índice de outra posição da lista (negativo = indefinido/nulo)."""
+    if not isinstance(i, int) or i < 0 or i >= len(arr):
+        return None
+    v = arr[i]
+    if nivel > 12:
+        return None
+    if isinstance(v, dict):
+        return {k: _nuxt_resolver(arr, x, nivel + 1) for k, x in v.items()}
+    if isinstance(v, list):
+        if v and isinstance(v[0], str):
+            if v[0] in ("ShallowReactive", "Reactive", "Ref", "ShallowRef", "EmptyShallowRef", "EmptyRef") and len(v) == 2:
+                return _nuxt_resolver(arr, v[1], nivel + 1)
+            if v[0] == "Date" and len(v) == 2:
+                return v[1]
+            return None  # Set/Map/outros: não usados aqui
+        return [_nuxt_resolver(arr, x, nivel + 1) for x in v]
+    return v
+
+
+def _dados_nuxt(html: str) -> dict:
+    m = _NUXT_DATA.search(html)
+    if not m:
+        return {}
+    try:
+        arr = json.loads(m.group(1))
+        raiz = _nuxt_resolver(arr, 1)
+    except (ValueError, RecursionError):
+        return {}
+    dados = (raiz or {}).get("data") if isinstance(raiz, dict) else None
+    return dados if isinstance(dados, dict) else {}
+
+
+def ler_leiloesjudiciais(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    dados = _dados_nuxt(html)
+    chave_lote = next((k for k in dados if k.startswith("dadosLotes-")), None)
+    lote = ((dados.get(chave_lote) or {}).get("lote")) if chave_lote else None
+    if not isinstance(lote, dict):
+        return None, "sem dadosLotes no __NUXT_DATA__"
+    categoria = simplificar(f"{lote.get('nm_categoria') or ''} {lote.get('nm_segmento') or ''}")
+    if "imove" not in categoria:
+        return NAO_IMOVEL, f"categoria do lote é {lote.get('nm_categoria')!r}"
+    titulo = _txt(lote.get("nm_titulo_lote")) or ""
+    descricao = _txt(BeautifulSoup(lote.get("nm_descricao") or "", "lxml").get_text(" ", strip=True)) or ""
+    st = simplificar(lote.get("nm_statuslote"))
+    if lote.get("statuslote_id") == 1 or st.startswith("aberto"):
+        status = "aberto"
+    elif re.search(r"encerrad|vendid|arrematad|cancelad|retirad|nao vendid|sem licitante|deserto", st):
+        status = "encerrado"
+    elif "suspens" in st:
+        status = "suspenso"
+    else:
+        return None, f"status do lote: {lote.get('nm_statuslote')!r}"
+    cidade, uf = _txt(lote.get("nm_cidade")), normalizar_uf(lote.get("nm_estado"))
+    if not (cidade and uf):
+        return None, "sem cidade/UF"
+    def valor(v: Any) -> float | None:  # "140000.00" (ponto decimal), diferente do "140.000,00" que _num lê
+        try:
+            return float(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    avaliacao, lance = valor(lote.get("vl_lanceminimo")), valor(lote.get("vl_lanceinicial"))  # a página rotula vl_lanceminimo de "Avaliação"
+    if not (avaliacao or lance):
+        return None, "sem nenhum valor"
+    leilao = (dados.get(next((k for k in dados if k.startswith("dadosLeilao-")), "")) or {})
+
+    def data(dia: Any, hora: Any) -> str | None:
+        m = re.fullmatch(r"(\d{2})/(\d{2})/(\d{4})", str(dia or ""))
+        h = re.match(r"(\d{1,2}):(\d{2})", str(hora or ""))
+        return f"{m.group(3)}-{m.group(2)}-{m.group(1)}T{int(h.group(1)):02d}:{h.group(2)}" if m and h else None
+
+    fotos = []
+    for f in lote.get("fotos") or []:
+        if not isinstance(f, dict):
+            continue
+        # 'tamanho' só traz os nomes das pastas de miniaturas ("640x480"); a foto grande é o mesmo arquivo nessa pasta
+        grande = (f.get("tamanho") or {}).get("thumb_grande") if isinstance(f.get("tamanho"), dict) else None
+        base, arq = f.get("nm_path_incompleto"), f.get("nm_path")
+        u = f"{base}{grande}/{arq}" if grande and base and arq and str(base).startswith("http") else f.get("nm_path_completo")
+        if isinstance(u, str) and u.startswith("http") and u not in fotos:
+            fotos.append(u)
+    campos: dict[str, Any] = {
+        "titulo": titulo, "descricao": descricao[:4000], "status": status, "uf": uf, "cidade": cidade,
+        "tipo": normalizar_tipo(lote.get("nm_subcategoria"), titulo, descricao[:300]),
+        "valor_avaliacao": avaliacao, "lance_minimo": lance,
+        "valor_praca1": avaliacao, "data_praca1": data(leilao.get("dt_formatada"), leilao.get("hr_formatada")),
+        "valor_praca2": valor(lote.get("vl_lanceinicialsegundoleilao")) or lance,
+        "data_praca2": data(leilao.get("dt_segundoleilao_data"), leilao.get("dt_segundoleilao_hora")),
+        "leiloeiro": _txt(lote.get("nm_leiloeiro")),
+        "id_externo": str(lote.get("lote_id") or ""),
+        "fotos": fotos[:20],
+        "dados": {"extraido_por": "nuxt_leiloesjudiciais"},
+    }
+    if lote.get("nu_parcelas") and lote.get("nu_parcelas") > 1:
+        campos["aceita_parcelamento"] = True
+    return {k: v for k, v in campos.items() if v not in (None, "", [])}, ""
+
 
 
 # ---------------------------------------------------------------------------------------------

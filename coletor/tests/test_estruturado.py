@@ -384,3 +384,19 @@ def test_cidade_no_inicio_do_titulo_e_bem_que_nao_e_imovel_nao_gasta_ia():
     finally:
         e.extrair_var_lote = original
     assert r is e.NAO_IMOVEL, motivo
+
+
+def test_leiloesjudiciais_nuxt_imovel_e_nao_imovel():
+    html = (FIX / "leiloesjudiciais_imovel.html").read_text(encoding="utf-8")
+    d, motivo = estruturado.ler_com_motivo(html, "", "https://www.leiloesjudiciaismg.com.br/lote/100349/220217")
+    assert isinstance(d, dict), motivo
+    assert (d["cidade"], d["uf"], d["tipo"], d["status"]) == ("Pouso Alegre", "MG", "casa", "aberto")
+    assert d["valor_avaliacao"] == 140000.0 and d["lance_minimo"] == 70000.0  # a página: Avaliação R$ 140.000 / Lance mínimo atual R$ 70.000
+    assert d["data_praca1"] == "2026-09-25T16:00" and d["data_praca2"] == "2026-10-13T16:00"
+    assert d["leiloeiro"] == "Alessandro de Assis Teixeira" and d["id_externo"] == "220217"
+    assert len(d["fotos"]) == 3 and "/640x480/" in d["fotos"][0]
+    lote = Automatico.montar(d, url="https://x/lote/1")  # o resultado vira LoteBruto sem erro
+    assert lote and normalizar(lote).tipo == "casa"
+    # vacas: o site tem de tudo; categoria 'Animais' é descartada sem IA
+    animais = (FIX / "leiloesjudiciais_animais.html").read_text(encoding="utf-8")
+    assert estruturado.ler_com_motivo(animais, "", "https://www.leiloesjudiciaismg.com.br/lote/100414/220351")[0] is estruturado.NAO_IMOVEL
