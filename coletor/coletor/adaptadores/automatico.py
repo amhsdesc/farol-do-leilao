@@ -424,6 +424,8 @@ class Automatico(Adaptador):
                 if lido is estruturado.NAO_IMOVEL:
                     continue
                 if lido:
+                    if not lido.get("fotos"):
+                        lido["fotos"] = estruturado.fotos_genericas(html, self.url_final or url)
                     lote = self.montar(lido, url=self.url_final or url)
                     if lote:
                         self.lidos_sem_ia += 1
@@ -453,6 +455,8 @@ class Automatico(Adaptador):
                 continue
             campos = {k: v for k, v in extraido.items() if k != "eh_lote_de_imovel"}
             campos["dados"] = {"extraido_por": "llm", "modelo": config.modelo_llm}
+            if not campos.get("fotos"):
+                campos["fotos"] = estruturado.fotos_genericas(html, url)
             lote = self.montar(campos, url=url)
             if lote:
                 yield lote

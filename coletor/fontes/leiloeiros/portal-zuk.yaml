@@ -34,3 +34,4 @@ campos:
   ocupacao: {css: ".card-property-news"}
   lance_minimo: {css: ".card-property-price-value", regex: "(R\\$\\s*[\\d.,]+)"}
   data_praca1: {css: ".card-property-price-data"}
+  fotos: {css: "img[src*='imagens.portalzuk']", attr: src, todos: true}   # miniatura do card

@@ -26,3 +26,4 @@ listagem:
     valor_praca1: {css: ".instance .card-instance-value"}
     data_praca2: {css: ".card-second-instance-date", regex: "(\\d{2}/\\d{2}/\\d{4}[^\\n]*)"}
     valor_praca2: {css: ".instance + .instance .card-instance-value"}
+    fotos: {css: "a[data-bg]", attr: data-bg, todos: true}   # miniatura do card (CDN da Mega, 320x240)

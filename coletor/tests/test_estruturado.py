@@ -350,3 +350,17 @@ def test_itemleilao_cravo_central_brasilia():
     assert r and r["valor_avaliacao"] == 200000.0 and r["valor_praca1"] == 120000.0, m  # 'Sem licitante', data 'Em breve'
     r, m = le("brasilia_item5539", "https://www.leiloeirosdebrasilia.com.br/item/5539/detalhes")
     assert r and r["uf"] == "DF" and r["valor_praca2"] == 2575628.61, m
+
+
+def test_fotos_do_json_embutido_lance_vip_e_capa_generica():
+    fotos_genericas = estruturado.fotos_genericas
+
+    base = (FIX / "var_lote_leilaobrasil.html").read_text(encoding="utf-8")
+    lido, _ = estruturado.ler_com_motivo(base, "", "https://x.com.br/oferta/imoveis/lote/1")
+    assert lido["fotos"] == ["https://static.suporteleiloes.com.br/leilaobrasil/leiloes/lotes/imagens/064f1e317087f4.jpg"]
+    casa = (FIX / "lancevip_casa.html").read_text(encoding="utf-8")
+    lido, _ = estruturado.ler_com_motivo(casa, "", "https://www.lancevip.com.br/x")
+    assert len(lido["fotos"]) == 2 and all("/bens/35336/" in f for f in lido["fotos"])  # fotos de lotes parecidos ficam de fora
+    # og:image genérico: vale a capa do lote, não o logotipo do site
+    assert fotos_genericas('<meta property="og:image" content="/img/lote1.jpg">', "https://a.com/l/1") == ["https://a.com/img/lote1.jpg"]
+    assert fotos_genericas('<meta property="og:image" content="https://a.com/assets/logo.jpg">', "https://a.com") == []

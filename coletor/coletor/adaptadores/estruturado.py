@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
@@ -138,6 +139,43 @@ def ler(html: str, texto: str = "", url: str = "") -> dict | object | None:
     return ler_com_motivo(html, texto, url)[0]
 
 
+_IMG_EXT = re.compile(r"\.(?:jpe?g|png|webp)(?:\?|$)", re.I)
+_FOTO_RUIM = re.compile(r"logo|favicon|default|placeholder|brand|sem-?foto|no-?image|banner|avatar|\.svg", re.I)
+
+
+def _fotos_var_lote(lote: dict) -> list[str]:
+    """Fotos do JSON embutido (Leilão PRO e afins): lista de arquivos do bem; senão a imagem de capa."""
+    bem = lote.get("bem") or {}
+    achadas: list[str] = []
+
+    def add(u: Any) -> None:
+        if isinstance(u, str) and u.startswith("http") and not _FOTO_RUIM.search(u) and u not in achadas:
+            achadas.append(u)
+
+    for a in bem.get("arquivos") or []:
+        if isinstance(a, dict) and (_IMG_EXT.search(a.get("url") or "") or str(a.get("mimetype") or a.get("type") or "").startswith("image")):
+            add(a.get("url"))
+    for origem in (bem.get("image"), ((lote.get("leilao") or {}).get("stats") or {}).get("lote", {}).get("bem", {}).get("image") if isinstance((lote.get("leilao") or {}).get("stats"), dict) else None):
+        if isinstance(origem, dict):
+            for tam in ("full", "min", "thumb"):
+                if isinstance(origem.get(tam), dict) and origem[tam].get("url"):
+                    add(origem[tam]["url"])
+                    break
+    return achadas[:20]
+
+
+def fotos_genericas(html: str, url: str = "") -> list[str]:
+    """Reserva para páginas sem leitor próprio: a imagem de capa (og:image / twitter:image), se não for logo."""
+    s = BeautifulSoup(html, "lxml")
+    achadas: list[str] = []
+    for m in s.find_all("meta"):
+        if (m.get("property") or m.get("name") or "").lower() in ("og:image", "og:image:url", "og:image:secure_url", "twitter:image"):
+            c = urljoin(url or "", (m.get("content") or "").strip())
+            if c.startswith("http") and not _FOTO_RUIM.search(c) and c not in achadas:
+                achadas.append(c)
+    return achadas[:3]
+
+
 def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | object | None, str]:
     """Como `ler`, mas devolve também o motivo quando não leu (para diagnóstico no comando `testar`)."""
     lote = extrair_var_lote(html)
@@ -208,6 +246,7 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         "ocupacao": "ocupado" if ocupado is True else "desocupado" if ocupado is False else None,
         "aceita_parcelamento": leilao.get("permitirParcelamento") if isinstance(leilao.get("permitirParcelamento"), bool) else None,
         "leiloeiro": (leilao.get("leiloeiro") or {}).get("nome") if isinstance(leilao.get("leiloeiro"), dict) else None,
+        "fotos": _fotos_var_lote(lote),
         "dados": {"extraido_por": "json_embutido"},
     }
     for k, v in _datas_do_texto(texto).items():  # sites sem datas no JSON: lê "1º leilão / 2º leilão" do texto
@@ -305,7 +344,9 @@ def ler_lancevip(html: str, url: str = "") -> tuple[dict | object | None, str]:
     foto = s.select_one(".lv-lote-capa-foto") or s.select_one(".lv-lote-capa img")
     src = (foto.get("src") if foto and foto.name == "img" else (foto.find("img").get("src") if foto and foto.find("img") else None))
     if src and "suporteleiloes" in src:
-        campos["fotos"] = [src]
+        bem = re.search(r"/bens/(\d+)/", src)
+        mesmas = [i.get("src") for i in s.find_all("img") if bem and f"/bens/{bem.group(1)}/" in (i.get("src") or "")]
+        campos["fotos"] = list(dict.fromkeys([src, *mesmas]))[:20]  # outras fotos da página são de lotes parecidos
     if not (campos.get("valor_avaliacao") or campos.get("lance_minimo")):
         return None, "sem nenhum valor"
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""
