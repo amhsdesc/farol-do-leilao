@@ -43,7 +43,7 @@ const COLUNAS_ITEM = `imovel_id, tipo, uf, cidade, bairro, endereco, area::float
   n_fontes::int n_fontes, desconto_avaliacao::float8 desconto_avaliacao, preco_m2::float8 preco_m2, preco_caiu, tags`;
 
 export const POR_PAGINA = 24;
-export const MAX_PONTOS = 20000;
+export const MAX_PONTOS = 60000; // ~40 bytes por ponto: 60 mil cabem em ~2,4 MB (limite de resposta da Vercel: 4,5 MB)
 
 /** Lista de imóveis (a área visível do mapa, quando há bbox). */
 export async function buscar(f: Filtros) {
@@ -149,6 +149,7 @@ export type Lote = {
   aceita_fgts: boolean | null;
   aceita_parcelamento: boolean | null;
   debitos_por_conta: string;
+  dados?: { caixa_detalhe?: { campos?: { condominio?: string; tributos?: string } } } | null;
   leiloeiro: string | null;
   comitente: string | null;
   processo: string | null;

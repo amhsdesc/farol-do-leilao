@@ -163,7 +163,7 @@ def test_adaptador_repassa_o_que_ja_foi_lido_sem_buscar_de_novo():
     campos = ler_detalhe(DETALHE)
     # a chave da lista = "lance_minimo|modalidade" como vêm no CSV, para o cache valer
     chave = "689.000,00|2º Leilão SFI"
-    banco = Banco([{"id_externo": IDS_DF[0], "d": {"lido_em": agora, "chave_lista": chave, "campos": campos}}])
+    banco = Banco([{"id_externo": IDS_DF[0], "d": {"v": 2, "lido_em": agora, "chave_lista": chave, "campos": campos}}])
     ad = CaixaCSV(_fonte(), cli, conn=banco)  # com banco, o detalhe liga sozinho
     lotes = {l.id_externo: l for l in ad.coletar()}
     assert normalizar(lotes[IDS_DF[0]]).aceita_fgts is True
@@ -180,8 +180,8 @@ def test_adaptador_rele_quando_o_preco_muda_ou_a_leitura_vence():
     recente = agora.isoformat(timespec="seconds")
     campos = ler_detalhe(DETALHE)
     banco = Banco([
-        {"id_externo": IDS_DF[0], "d": {"lido_em": recente, "chave_lista": "preço antigo|2º Leilão SFI", "campos": campos}},
-        {"id_externo": IDS_DF[1], "d": {"lido_em": velho, "chave_lista": "275.000,00|Venda Direta Online", "campos": campos}},
+        {"id_externo": IDS_DF[0], "d": {"v": 2, "lido_em": recente, "chave_lista": "preço antigo|2º Leilão SFI", "campos": campos}},
+        {"id_externo": IDS_DF[1], "d": {"v": 2, "lido_em": velho, "chave_lista": "275.000,00|Venda Direta Online", "campos": campos}},
         {"id_externo": IDS_DF[2], "d": {"falhou_em": recente, "motivo": "HTTP 500"}},
     ])
     list(CaixaCSV(_fonte(), cli, conn=banco).coletar())
@@ -201,3 +201,15 @@ def test_detalhe_pode_ser_desligado():
     pedidos: list[str] = []
     ad = CaixaCSV(_fonte(detalhe=False), _cliente({}, pedidos), conn=Banco([]))
     assert len(list(ad.coletar())) == 3 and pedidos == []
+
+
+def test_ler_detalhe_exclusivamente_a_vista_nega_fgts_financiamento_parcelamento():
+    d = ler_detalhe(_pagina(
+        "<p>FORMAS DE PAGAMENTO ACEITAS:</p><p>Exclusivamente à vista (somente recursos próprios).</p>"
+        "<p>REGRAS PARA PAGAMENTO DAS DESPESAS (caso existam):</p>"
+        "<p>Condomínio: Sob responsabilidade do comprador, até o limite de 10% em relação ao valor de avaliação do imóvel. A CAIXA realizará o pagamento apenas do valor que exceder o limite de 10% do valor de avaliação.</p>"
+        "<p>Tributos: Sob responsabilidade do comprador, quando o débito for inferior a 10% do valor de avaliação. A CAIXA paga integralmente quando o débito for superior a 10% do valor de avaliação.</p>"
+    ))
+    assert d["aceita_fgts"] is False and d["aceita_financiamento"] is False and d["aceita_parcelamento"] is False
+    assert d["debitos_por_conta"] == "arrematante"
+    assert "10%" in d["condominio"] and "CAIXA paga" in d["tributos"]

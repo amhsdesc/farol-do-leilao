@@ -111,7 +111,7 @@ function contagem(data: string | null) {
 
 type Estado = { rotulo: string; classe: "bom" | "aviso" | "ruim" | "neutro"; ajuda: string };
 
-function condicoes(ocupacao: string, debitos: string, fgts: boolean | null, fin: boolean | null, parc: boolean | null) {
+function condicoes(ocupacao: string, debitos: string, fgts: boolean | null, fin: boolean | null, parc: boolean | null, regraDespesas?: string) {
   const simNao = (v: boolean | null, sim: string, nao: string, nada: string): Estado =>
     v === true
       ? { rotulo: "Sim", classe: "bom", ajuda: sim }
@@ -132,7 +132,9 @@ function condicoes(ocupacao: string, debitos: string, fgts: boolean | null, fin:
       ...(debitos === "vendedor"
         ? { rotulo: "Ficam com o vendedor", classe: "bom", ajuda: "Segundo a fonte, dívidas antigas não passam para você. Confira no edital." }
         : debitos === "arrematante"
-          ? { rotulo: "Ficam com você", classe: "ruim", ajuda: "Você paga as dívidas atrasadas além do lance. Peça os valores antes." }
+          ? regraDespesas
+            ? { rotulo: "Com você, com regras", classe: "aviso", ajuda: `Regra da fonte: ${regraDespesas} Peça os valores antes.` }
+            : { rotulo: "Ficam com você", classe: "ruim", ajuda: "Você paga as dívidas atrasadas além do lance. Peça os valores antes." }
           : { rotulo: "Não informado", classe: "aviso", ajuda: "A fonte não diz quem paga. Leia o edital e pergunte ao condomínio e à prefeitura." }),
     },
     { nome: "Aceita FGTS", ...simNao(fgts, "Dá para usar o FGTS, dentro das regras do fundo.", "O pagamento não pode usar FGTS.", "Confira no edital.") },
@@ -177,7 +179,9 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
     },
     salvo?.dados,
   );
-  const lista = condicoes(cond.ocupacao, cond.debitos, cond.fgts, cond.financiamento, cond.parcelamento);
+  const det = melhor?.dados?.caixa_detalhe?.campos;
+  const regraDespesas = [det?.condominio && `Condomínio: ${det.condominio}`, det?.tributos && `Tributos: ${det.tributos}`].filter(Boolean).join(" ");
+  const lista = condicoes(cond.ocupacao, cond.debitos, cond.fgts, cond.financiamento, cond.parcelamento, regraDespesas || undefined);
   const descricao = base.map((l) => l.descricao).filter(Boolean).sort((a, b) => b!.length - a!.length)[0];
   const desconto = melhor?.valor_avaliacao && melhor?.lance_minimo ? 1 - melhor.lance_minimo / melhor.valor_avaliacao : null;
   const data = dataProxima(melhor);

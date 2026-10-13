@@ -102,6 +102,11 @@ def ler_detalhe(html: str) -> dict[str, Any]:
         fgts = _item(t, r"(?:permite|aceita|admite)[^.]{0,30}fgts", r"(?:nao|vedad[oa])[^.]{0,30}(?:permite|aceita|admite|utilizacao)[^.]{0,30}fgts|fgts[^.]{0,20}(?:nao (?:e )?(?:permitid|aceit)|vedad)")
         fin = _item(t, r"(?:permite|aceita|admite)[^.]{0,30}financiamento", r"(?:nao|vedad[oa])[^.]{0,30}(?:permite|aceita|admite)[^.]{0,30}financiamento|financiamento[^.]{0,20}(?:nao (?:e )?(?:permitid|aceit)|vedad)")
         par = _item(t, r"(?:permite|aceita|admite)[^.]{0,30}parcelamento", r"(?:nao|vedad[oa])[^.]{0,30}(?:permite|aceita|admite)[^.]{0,30}parcelamento|parcelamento[^.]{0,20}(?:nao (?:e )?(?:permitid|aceit)|vedad)")
+        # "Exclusivamente à vista (somente recursos próprios)": a própria Caixa exclui FGTS, financiamento e parcelamento
+        if re.search(r"exclusivamente a vista|somente a vista|apenas a vista|somente recursos proprios|exclusivamente recursos proprios", t):
+            fgts = False if fgts is None else fgts
+            fin = False if fin is None else fin
+            par = False if par is None else par
         for campo, v in (("aceita_fgts", fgts), ("aceita_financiamento", fin), ("aceita_parcelamento", par)):
             if v is not None:
                 saida[campo] = v

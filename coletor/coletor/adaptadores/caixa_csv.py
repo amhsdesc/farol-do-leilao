@@ -40,6 +40,7 @@ log = logging.getLogger(__name__)
 URL_PADRAO = "https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_{uf}.csv"
 URL_DETALHE = "https://venda-imoveis.caixa.gov.br/sistema/detalhe-imovel.asp?hdnimovel={id}"
 
+VERSAO_LEITOR = 2               # sobe quando caixa_detalhe passa a ler algo novo: as leituras antigas são refeitas (prioridade 2)
 VALIDADE_DETALHE_DIAS = 30      # depois disso a página é lida de novo (FGTS e regras de despesa quase nunca mudam)
 RETENTAR_FALHA_HORAS = 24       # página que falhou não é tentada de novo antes disso
 MAX_FALHAS_SEGUIDAS = 8         # Caixa bloqueando ou fora do ar: para de insistir nesta rodada
@@ -191,7 +192,7 @@ class CaixaCSV(Adaptador):
             return 0
         if c.get("chave_lista") != self._chave_lista(lote):
             return 1
-        if self._antes_de(c["lido_em"], timedelta(days=VALIDADE_DETALHE_DIAS), agora):
+        if c.get("v", 1) < VERSAO_LEITOR or self._antes_de(c["lido_em"], timedelta(days=VALIDADE_DETALHE_DIAS), agora):
             return 2
         return None
 
@@ -241,7 +242,7 @@ class CaixaCSV(Adaptador):
                 continue
             seguidas = 0
             lidos += 1
-            cache[lote.id_externo] = {"lido_em": agora_iso, "chave_lista": self._chave_lista(lote), "campos": campos}
+            cache[lote.id_externo] = {"v": VERSAO_LEITOR, "lido_em": agora_iso, "chave_lista": self._chave_lista(lote), "campos": campos}
 
         for lote in lotes:
             c = cache.get(lote.id_externo)
