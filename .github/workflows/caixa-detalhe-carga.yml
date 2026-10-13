@@ -45,7 +45,7 @@ jobs:
   carga:
     needs: preparar
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ fromJSON(inputs.minutos) + 15 }}
+    timeout-minutes: 360 # o teto real vem de FONTE_MAX_SEGUNDOS (abaixo); as expressoes do GitHub nao somam
     strategy:
       fail-fast: false
       max-parallel: 3 # a Caixa é a mesma para todos: poucos leitores ao mesmo tempo
