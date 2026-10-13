@@ -26,3 +26,4 @@ campos:
   lance_minimo: {css: ".valor", regex: "R\\$\\s*([\\d.,]+)"}
   data_praca1: {texto_regex: "(\\d{1,2}/\\d{1,2} às \\d{1,2}h(?:\\d{2})?)"}
   descricao: {css: "i.compartilhar", attr: onclick, regex: "_compartilhar\\('(.*?)', '"}
+  fotos: {css: "img.foto", attr: src, todos: true}   # card traz só a 1ª foto: /imagem/imovel/<id>_1.jpg (endereço relativo vira absoluto)
