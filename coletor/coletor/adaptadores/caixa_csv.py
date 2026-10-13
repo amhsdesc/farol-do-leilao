@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -46,8 +47,16 @@ RETENTAR_FALHA_HORAS = 24       # página que falhou não é tentada de novo ant
 MAX_FALHAS_SEGUIDAS = 8         # Caixa bloqueando ou fora do ar: para de insistir nesta rodada
 CAMPOS_DO_DETALHE = (
     "aceita_fgts", "aceita_financiamento", "aceita_parcelamento", "debitos_por_conta", "ocupacao",
-    "matricula", "cartorio", "data_praca1", "valor_praca1", "data_praca2", "valor_praca2",
+    "matricula", "cartorio", "data_praca1", "valor_praca1", "data_praca2", "valor_praca2", "fotos",
 )
+
+FOTO_URL = "https://venda-imoveis.caixa.gov.br/fotos/F{id}{n}.jpg"  # F + nº do imóvel + 21, 22, 23...
+FOTO_PRIMEIRA = 21
+FOTO_MAX_POR_IMOVEL = 10
+FOTO_REVERIFICAR_DIAS = 7       # imóvel sem foto é consultado de novo depois disso
+FOTO_MAX_POR_RODADA = 3000
+FOTO_MAX_SEGUNDOS = 420
+FOTO_PARALELO = 6
 
 ALIASES = {
     "id_externo": ["n do imovel", "no do imovel", "numero do imovel", "n imovel", "imovel"],
@@ -251,6 +260,75 @@ class CaixaCSV(Adaptador):
         pendentes = max(0, len(fila) - lidos - falhas)
         self.avisos.append(f"detalhe da Caixa: {lidos} lidos, {falhas} falhas, {pendentes} ainda na fila")
 
+    # ------------------------------------------------------------ fotos por endereço
+
+    def _foto_existe(self, url: str) -> bool:
+        """True só se a Caixa devolve uma imagem (a ausência vem como 404 com página HTML)."""
+        with self.cliente.http.stream("GET", url, timeout=20) as r:
+            return r.status_code == 200 and r.headers.get("content-type", "").startswith("image")
+
+    def _fotos_do_imovel(self, id_externo: str) -> list[str]:
+        """Procura F<id>21.jpg, 22, 23... (se a 21 não existe, tenta a 22) e para na primeira que falta."""
+        achadas: list[str] = []
+        n = FOTO_PRIMEIRA
+        while len(achadas) < FOTO_MAX_POR_IMOVEL and n < FOTO_PRIMEIRA + FOTO_MAX_POR_IMOVEL + 1:
+            url = FOTO_URL.format(id=id_externo, n=n)
+            if self._foto_existe(url):
+                achadas.append(url)
+            elif achadas or n > FOTO_PRIMEIRA:
+                break
+            n += 1
+        return achadas
+
+    def _verificar_fotos(self, lotes: list[LoteBruto]) -> None:
+        """Descobre as fotos sem abrir a página de detalhe. O resultado fica em lote.fotos (quando há) e
+        `lote.dados['caixa_foto']` (quando não há, para não perguntar de novo todo dia)."""
+        if self.conn is None:
+            return
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "select id_externo, cardinality(fotos) as n, dados->'caixa_foto' as f from lote where fonte_id = %s",
+                (self.fonte["id"],),
+            )
+            estado = {r["id_externo"]: r for r in cur.fetchall()}
+        self.conn.commit()
+        agora = datetime.now(timezone.utc)
+        fila: list[LoteBruto] = []
+        for lote in lotes:
+            if lote.fotos:  # o detalhe já trouxe
+                continue
+            e = estado.get(lote.id_externo)
+            if e and (e.get("n") or 0) > 0:
+                continue
+            f = e.get("f") if e and isinstance(e.get("f"), dict) else None
+            if f and f.get("verificado_em") and not self._antes_de(f["verificado_em"], timedelta(days=FOTO_REVERIFICAR_DIAS), agora):
+                lote.dados = {**lote.dados, "caixa_foto": f}
+                continue
+            fila.append(lote)
+        fila = fila[:FOTO_MAX_POR_RODADA]
+        inicio = time.monotonic()
+
+        def trabalhar(lote: LoteBruto) -> tuple[LoteBruto, list[str] | None]:
+            if time.monotonic() - inicio > FOTO_MAX_SEGUNDOS:
+                return lote, None
+            try:
+                return lote, self._fotos_do_imovel(lote.id_externo)
+            except Exception:  # rede/limite: tenta de novo na próxima rodada, sem marcar como "sem foto"
+                return lote, None
+
+        com = sem = pulados = 0
+        with ThreadPoolExecutor(max_workers=FOTO_PARALELO) as ex:
+            for lote, fotos in ex.map(trabalhar, fila):
+                if fotos is None:
+                    pulados += 1
+                elif fotos:
+                    lote.fotos = fotos
+                    com += 1
+                else:
+                    lote.dados = {**lote.dados, "caixa_foto": {"verificado_em": agora.isoformat(timespec="seconds"), "achou": False}}
+                    sem += 1
+        self.avisos.append(f"fotos da Caixa: {com} com foto, {sem} sem foto, {pulados} não verificados nesta rodada")
+
     # ------------------------------------------------------------ coleta
 
     def coletar(self) -> Iterator[LoteBruto]:
@@ -280,4 +358,10 @@ class CaixaCSV(Adaptador):
             except Exception as e:  # o detalhe é um complemento: nunca impede a lista de ser gravada
                 log.exception("detalhe da Caixa")
                 self.avisos.append(f"detalhe da Caixa não aplicado: {type(e).__name__}: {e}"[:200])
+        if lotes and self.fonte.get("fotos_por_endereco", True):
+            try:
+                self._verificar_fotos(lotes)
+            except Exception as e:  # complemento: nunca impede a lista de ser gravada
+                log.exception("fotos da Caixa")
+                self.avisos.append(f"fotos da Caixa não verificadas: {type(e).__name__}: {e}"[:200])
         yield from lotes

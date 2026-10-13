@@ -272,7 +272,12 @@ class Repositorio:
                 lote_id = atual["id"]
                 reapareceu = atual["status"] == "removido"
                 mudou = atual["hash_conteudo"] != h
-                sets = ", ".join(f"{x} = %({x})s" for x in CAMPOS_LOTE)
+                # fotos: leitura sem foto (ex.: o CSV da Caixa) não apaga as já guardadas (pela coleta ou pelo site)
+                sets = ", ".join(
+                    "fotos = case when cardinality(%(fotos)s::text[]) > 0 then %(fotos)s::text[] else lote.fotos end"
+                    if x == "fotos" else f"{x} = %({x})s"
+                    for x in CAMPOS_LOTE
+                )
                 cur.execute(
                     f"""update lote set {sets}, dados = %(dados)s, hash_conteudo = %(hash)s,
                             imovel_id = %(imovel_id)s, ultimo_visto_em = now()

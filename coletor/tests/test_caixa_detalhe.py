@@ -106,6 +106,8 @@ def _cliente(respostas: dict[str, str | int], pedidos: list[str]) -> Cliente:
             return httpx.Response(404)
         if url == CSV_DF:
             return httpx.Response(200, content=(FIX / "Lista_imoveis_DF.csv").read_bytes())
+        if "/fotos/" in url:
+            return httpx.Response(200, content=b"x" * 10, headers={"content-type": "image/jpeg"}) if respostas.get("__fotos__") and url.endswith(("21.jpg", "22.jpg")) else httpx.Response(404, content=b"<html/>", headers={"content-type": "text/html"})
         pedidos.append(url)
         r = respostas.get(url)
         if isinstance(r, int):
@@ -213,3 +215,59 @@ def test_ler_detalhe_exclusivamente_a_vista_nega_fgts_financiamento_parcelamento
     assert d["aceita_fgts"] is False and d["aceita_financiamento"] is False and d["aceita_parcelamento"] is False
     assert d["debitos_por_conta"] == "arrematante"
     assert "10%" in d["condominio"] and "CAIXA paga" in d["tributos"]
+
+
+def test_ler_detalhe_fotos():
+    d = ler_detalhe(_pagina(
+        "<img src='venda-online/images/icon-condicoes.jpg?v1.0' width='30px'>"
+        "<ul><li><img onclick='preview.src=\"/fotos/F144440061732621.jpg\"' src='/fotos/F144440061732621.jpg' alt='Foto do imóvel'></li>"
+        "<li><img src='/fotos/F144440061732622.jpg'></li></ul>"
+        "<img id=\"preview\" src=\"/fotos/F144440061732621.jpg\" alt=\"Foto do imóvel\"/>"
+    ))
+    assert d["fotos"] == [
+        "https://venda-imoveis.caixa.gov.br/fotos/F144440061732621.jpg",
+        "https://venda-imoveis.caixa.gov.br/fotos/F144440061732622.jpg",
+    ]
+    assert "fotos" not in ler_detalhe(_pagina("<p>sem imagens</p>"))
+
+
+class BancoFotos(Banco):
+    """Responde às duas consultas do adaptador: cache do detalhe (vazio aqui) e estado das fotos."""
+
+    def __init__(self, estado):
+        super().__init__([])
+        self.estado = estado
+        self._ultima = ""
+
+    def execute(self, sql, *a, **k):
+        self._ultima = sql
+
+    def fetchall(self):
+        return self.estado if "cardinality(fotos)" in self._ultima else []
+
+
+def test_fotos_por_endereco_acha_e_lembra_quem_nao_tem():
+    pedidos: list[str] = []
+    cli = _cliente({"__fotos__": True}, pedidos)
+    # lote 2 já tem foto guardada (pula); lote 3 foi visto sem foto há pouco (pula e leva a marca adiante)
+    marca = {"verificado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"), "achou": False}
+    banco = BancoFotos([
+        {"id_externo": IDS_DF[1], "n": 2, "f": None},
+        {"id_externo": IDS_DF[2], "n": 0, "f": marca},
+    ])
+    ad = CaixaCSV(_fonte(detalhe=False), cli, conn=banco)
+    lotes = {l.id_externo: l for l in ad.coletar()}
+    assert lotes[IDS_DF[0]].fotos == [
+        f"https://venda-imoveis.caixa.gov.br/fotos/F{IDS_DF[0]}21.jpg",
+        f"https://venda-imoveis.caixa.gov.br/fotos/F{IDS_DF[0]}22.jpg",
+    ]
+    assert lotes[IDS_DF[1]].fotos == [] and lotes[IDS_DF[2]].fotos == []
+    assert lotes[IDS_DF[2]].dados["caixa_foto"] == marca
+    assert any("1 com foto, 0 sem foto" in av for av in ad.avisos)
+
+
+def test_fotos_por_endereco_marca_imovel_sem_foto():
+    cli = _cliente({}, [])  # toda foto devolve 404
+    ad = CaixaCSV(_fonte(detalhe=False), cli, conn=BancoFotos([]))
+    lotes = list(ad.coletar())
+    assert all(l.fotos == [] and l.dados["caixa_foto"]["achou"] is False for l in lotes)

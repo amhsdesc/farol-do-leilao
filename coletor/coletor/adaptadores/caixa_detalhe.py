@@ -153,6 +153,16 @@ def ler_detalhe(html: str) -> dict[str, Any]:
         if v:
             saida[f"valor_praca{n}"] = v.group(1)
 
+    # --- fotos: <img src='/fotos/F<hdnimovel>21.jpg'> (a miniatura repete o "preview": sem duplicar)
+    fotos = []
+    for m in re.finditer(r"""<img[^>]+src=["']([^"']*/fotos/[^"']+\.jpe?g)["']""", html, re.I):
+        u = m.group(1)
+        u = "https://venda-imoveis.caixa.gov.br" + (u if u.startswith("/") else "/" + u) if not u.startswith("http") else u
+        if u not in fotos:
+            fotos.append(u)
+    if fotos:
+        saida["fotos"] = fotos[:12]
+
     # --- cadastro do imóvel
     mat = _valor(linhas, simples, "matricula")
     if mat:
