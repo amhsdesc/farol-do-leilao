@@ -364,3 +364,23 @@ def test_fotos_do_json_embutido_lance_vip_e_capa_generica():
     # og:image genérico: vale a capa do lote, não o logotipo do site
     assert fotos_genericas('<meta property="og:image" content="/img/lote1.jpg">', "https://a.com/l/1") == ["https://a.com/img/lote1.jpg"]
     assert fotos_genericas('<meta property="og:image" content="https://a.com/assets/logo.jpg">', "https://a.com") == []
+
+
+def test_cidade_no_inicio_do_titulo_e_bem_que_nao_e_imovel_nao_gasta_ia():
+    assert estruturado._local({}, "RIO VERDE/GO - UMA CASA RESIDENCIAL COM 12 CÔMODOS", "") == ("Rio Verde", "GO", None)
+    assert estruturado._local({}, "SANTA HELENA DE GOIÁS/GO - FAZENDA", "")[0] == "Santa Helena de Goiás"
+    # veículo/equipamento com status diferente de 1: descartado sem IA (antes ia para a IA só para ser descartado)
+    html = (FIX / "var_lote_leilaobrasil.html").read_text(encoding="utf-8")
+    lote = estruturado.extrair_var_lote(html)
+    lote["status"] = 0
+    lote["bem"]["siteTitulo"] = "LANCHA TRITON 27.5 MARCA TRITON YACHTS"
+    lote["bem"]["tipo"] = None
+    lote["bem"]["tipoPai"] = None
+    import coletor.adaptadores.estruturado as e
+    original = e.extrair_var_lote
+    e.extrair_var_lote = lambda h: lote
+    try:
+        r, motivo = e.ler_com_motivo(html, "", "https://x.com.br/eventos/leilao/1/lancha/lote/2/lancha")
+    finally:
+        e.extrair_var_lote = original
+    assert r is e.NAO_IMOVEL, motivo

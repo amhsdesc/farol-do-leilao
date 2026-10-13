@@ -22,9 +22,10 @@ from ..normalizar import simplificar, tipo as normalizar_tipo, uf as normalizar_
 
 NAO_IMOVEL = object()
 
-_NAO_IMOVEL = re.compile(r"\b(veiculo|carro|moto|caminhao|onibus|automovel|maquina|sucata|equipamento|movel|moveis|semovente|joia|eletronic|areia|brita|cascalho|entulho|gasolina|etanol|diesel|combustivel|compressor|litros|fiat|chevrolet|volkswagen|renault|toyota|hyundai|yamaha|vw|kombi|saveiro|pick|caminhonete|camioneta|astra|ford|honda|zafira|cadeira|cadeiras|ventilador|ventiladores|aspirador|aspiradores|aparelho|aparelhos|telhas|prensa|retalhos|geladeira|geladeiras|tecidos|kgs|toneladas)")
+_NAO_IMOVEL = re.compile(r"\b(veiculo|carro|moto|caminhao|onibus|automovel|maquina|sucata|equipamento|movel|moveis|semovente|joia|eletronic|areia|brita|cascalho|entulho|gasolina|etanol|diesel|combustivel|compressor|litros|fiat|chevrolet|volkswagen|renault|toyota|hyundai|yamaha|vw|kombi|saveiro|pick|caminhonete|camioneta|astra|ford|honda|zafira|cadeira|cadeiras|ventilador|ventiladores|aspirador|aspiradores|aparelho|aparelhos|telhas|prensa|retalhos|geladeira|geladeiras|tecidos|kgs|toneladas|lancha|lanchas|embarcacao|embarcacoes|barco|jetski|forno|fornos|trator|tratores|colheitadeira|reboque|carreta|notebook|televisao|celular|empilhadeira|empilhadeiras|peugeot|citroen|nissan|jeep|scania|iveco|volvo|mitsubishi|suzuki|kawasaki|bmw|audi|harley)")
 _IMOVEL = re.compile(r"\b(imov|imoveis|terreno|apart|apto|casa|residen|suite|terras|chale|area|box |garagem|vaga|comercial|rural|galpao|sala|loja|conjunto|fazenda|chacara|sitio|lote|gleba|cobertura|edificio|predio|hotel|barrac)")
 _CIDADE_UF = re.compile(r"(?:^|[-–,]\s*)([A-ZÀ-Ú][\wÀ-ú'. ]{1,40}?)\s*[-/]\s*([A-Z]{2})\s*$")
+_CIDADE_UF_INICIO = re.compile(r"^([A-ZÀ-Ú][A-ZÀ-Ú'. ]{1,40}?)\s*/\s*([A-Z]{2})\s*[-–:]")  # "RIO VERDE/GO - UMA CASA ..."
 
 
 # Página de evento (lista de lotes): /eventos/leilao/<id>/<slug>, sem o trecho /lote.
@@ -93,6 +94,13 @@ def _valor(v: Any) -> float | None:
     return f if f > 0 else None
 
 
+def _caixa_cidade(nome: str) -> str:
+    """'SANTA HELENA DE GOIÁS' → 'Santa Helena de Goiás' (só mexe em nome todo em maiúsculas)."""
+    if not nome.isupper():
+        return nome
+    return " ".join(p.lower() if p.lower() in {"de", "da", "do", "das", "dos", "e"} and i else p.capitalize() for i, p in enumerate(nome.lower().split()))
+
+
 def _local(bem: dict, titulo: str, texto: str) -> tuple[str | None, str | None, str | None]:
     """cidade, uf, bairro: do JSON; se faltar, de 'Cidade - UF' no título ou numa linha do texto."""
     cidade, uf, bairro = (bem.get("cidade") or None), normalizar_uf(bem.get("uf")), (bem.get("bairro") or None)
@@ -100,9 +108,9 @@ def _local(bem: dict, titulo: str, texto: str) -> tuple[str | None, str | None, 
         return cidade.strip(), uf, bairro
     candidatos = [titulo] + [l.strip() for l in texto.splitlines()[:60]]
     for c in candidatos:
-        m = _CIDADE_UF.search(c) if c and len(c) < 160 else None
+        m = (_CIDADE_UF.search(c) or _CIDADE_UF_INICIO.search(c.strip())) if c and len(c) < 300 else None
         if m and normalizar_uf(m.group(2)):
-            return m.group(1).strip(), normalizar_uf(m.group(2)), bairro
+            return _caixa_cidade(m.group(1).strip()), normalizar_uf(m.group(2)), bairro
     return None, None, None
 
 
@@ -200,9 +208,6 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
     if not lote:
         return None, "sem JSON embutido (var lote)"
     venda_direta = "/oferta/venda-direta/" in (url or "")
-    # 1 = aberto; 8 = venda direta ativa (recebe propostas), só aceito em URL de venda direta
-    if lote.get("status") != 1 and not (venda_direta and lote.get("status") == 8):
-        return None, f"status do lote = {lote.get('status')!r} (só 1=aberto é lido sem IA)"
     categoria_url, sub_url = _categoria_da_url(url)
     if categoria_url and categoria_url != "imoveis":
         return NAO_IMOVEL, "categoria da URL não é imóvel"
@@ -219,7 +224,13 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return NAO_IMOVEL, "tipo do bem não é imóvel"
     base = simplificar(f"{categoria} {titulo} {sub_url or ''}")
     if categoria_url != "imoveis" and not _IMOVEL.search(base):
+        if _NAO_IMOVEL.search(base):
+            return NAO_IMOVEL, "título é de veículo/equipamento"
         return None, "sem sinal claro de imóvel no tipo/título"
+    # 1 = aberto; 8 = venda direta ativa (recebe propostas), só aceito em URL de venda direta.
+    # (depois das checagens de tipo: lote que não é imóvel é descartado qualquer que seja o status, sem gastar IA)
+    if lote.get("status") != 1 and not (venda_direta and lote.get("status") == 8):
+        return None, f"status do lote = {lote.get('status')!r} (só 1=aberto é lido sem IA)"
     cidade, uf, bairro = _local(bem, titulo, texto)
     if not (cidade and uf):
         return None, f"sem cidade/UF (título: {titulo[:80]!r})"
