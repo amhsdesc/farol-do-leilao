@@ -17,7 +17,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from ..normalizar import simplificar, uf as normalizar_uf
+from ..normalizar import simplificar, tipo as normalizar_tipo, uf as normalizar_uf
 
 NAO_IMOVEL = object()
 
@@ -155,6 +155,8 @@ def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | ob
         return ler_sfrazao(html, url)
     if not lote and "/sale/detail" in (url or "") and "cdn-biasi" in html and "Informações sobre o Lote" in html:
         return ler_biasi(html, url)
+    if not lote and re.search(r"/item/\d+/detalhes", url or "") and "Voltar a Lista" in html:
+        return ler_itemleilao(html, url)
     if not lote and "borda-branca-produto" in html and "subtit-produto" in html:
         return ler_smart(html, url)
     if not lote:
@@ -894,4 +896,119 @@ def ler_biasi(html: str, url: str = "") -> tuple[dict | object | None, str]:
         campos["id_externo"] = mid.group(1)
     if imgs:
         campos["fotos"] = list(dict.fromkeys(imgs))[:20]
+    return {k: v for k, v in campos.items() if v not in (None, "")}, ""
+
+
+# ---------------------------------------------------------------------------------------------
+# Plataforma "/item/<id>/detalhes" (Cravo Leilões, Central dos Leilões, Leiloeiros de Brasília e outros): rótulos em texto
+# ("LANCE INICIAL", "Data 1º Leilão:", "Valor de Avaliação:", "Cidade:") e fotos em /bens/<n>/img-*.
+
+_DATA_ITEM = re.compile(r"(\d{2})/(\d{2})/(\d{4})\D{0,6}(\d{1,2}):(\d{2})")
+
+
+def ler_itemleilao(html: str, url: str = "") -> tuple[dict | object | None, str]:
+    s = BeautifulSoup(html, "lxml")
+    fotos = [i.get("src") or i.get("data-src") for i in s.find_all("img")]
+    fotos += [a.get("href") for a in s.find_all("a")]
+    fotos = [f for f in dict.fromkeys(fotos) if f and re.search(r"/bens/\d+/img-", f)]
+    for x in s(["script", "style"]):
+        x.decompose()
+    linhas = [l.strip() for l in s.get_text("\n", strip=True).split("\n") if l.strip()]
+    idx = [i for i, l in enumerate(linhas) if re.fullmatch(r"LOTE\s+\d+", l, re.I)]
+    if not idx or idx[-1] + 2 >= len(linhas):
+        return None, "sem cabeçalho 'LOTE NNN'"
+    i0 = idx[-1]
+    titulo = _txt(linhas[i0 + 1])
+    topo = linhas[i0 + 1:i0 + 60]
+
+    def depois(rotulo: str, ini: int = 0, lista: list[str] | None = None) -> str | None:
+        lista = linhas if lista is None else lista
+        for i in range(ini, len(lista) - 1):
+            if lista[i].rstrip(":").strip().lower() == rotulo.lower():
+                return lista[i + 1]
+        return None
+
+    def valor(txt: str | None) -> float | None:
+        m = re.search(r"R\$\s*([\d.]+,\d{2})", txt or "")
+        return _num(m.group(1)) if m else None
+
+    def data(txt: str | None) -> str | None:
+        m = _DATA_ITEM.search(txt or "")
+        return f"{m.group(3)}-{m.group(2)}-{m.group(1)}T{m.group(4).zfill(2)}:{m.group(5)}" if m else None
+
+    # situação: a linha logo depois do título (ou das fotos)
+    status = next((l for l in topo[:6] if simplificar(l) in (
+        "aberto para lances", "proposta", "sem licitante", "encerrado", "vendido", "arrematado", "cancelado", "suspenso",
+        "condicional", "deserto", "fracassado", "em breve")), "")
+    st = simplificar(status)
+    d1 = data(depois("Data 1º Leilão") or depois("Data 1° Leilão")) or data(depois("Data do Leilão")) or data(depois("Envie sua proposta até"))
+    if st in ("aberto para lances", "proposta", "em breve"):
+        status_lote = "aberto"
+    elif st == "sem licitante":
+        # sem lances ainda: segue aberto se a data é futura ou "Em breve"; senão a rodada já passou
+        status_lote = "aberto"
+    elif st in ("encerrado", "vendido", "arrematado", "cancelado", "deserto", "fracassado", "condicional"):
+        status_lote = "encerrado"
+    elif st == "suspenso":
+        status_lote = "suspenso"
+    else:
+        return None, f"status do lote: {status!r}"
+
+    i_det = next((i for i, l in enumerate(linhas) if l == "Detalhes do Lote"), len(linhas) - 1)
+    bloco = linhas[i_det:]
+    cidade_txt = depois("Cidade", 0, bloco) or ""
+    desc_ini = next((i for i, l in enumerate(bloco) if l.rstrip(":") == "Descrição"), None)
+    descricao = " ".join(bloco[desc_ini + 1:desc_ini + 30])[:4000] if desc_ini is not None else ""
+    sinal = simplificar(f"{titulo} {descricao[:300]}")
+    if _NAO_IMOVEL.search(sinal):
+        return NAO_IMOVEL, "título não é imóvel"
+    if not _IMOVEL.search(sinal):
+        return None, f"sem sinal claro de imóvel no título: {titulo[:60]!r}"
+    cidade = uf = None
+    mc = re.fullmatch(r"\s*(.+?)\s*/\s*([A-Za-z]{2})\s*", cidade_txt)  # 'Senhor do Bonfim/BA'
+    if mc and normalizar_uf(mc.group(2).upper()):
+        cidade, uf = mc.group(1).strip(), normalizar_uf(mc.group(2).upper())
+    if not (cidade and uf):
+        cidade, uf = _cidade_uf_texto(titulo)
+    if not (cidade and uf):
+        return None, f"sem cidade/UF (cidade: {cidade_txt[:40]!r}; título: {titulo[:60]!r})"
+    aval = valor(depois("Valor de Avaliação"))
+    v1 = valor(depois("Lance Inicial"))
+    # praças: "Data 1º Leilão:" -> data; "Lance Inicial:" (com dois pontos) logo depois -> valor da praça
+    v_praca1 = v_praca2 = None
+    d2 = None
+    for i, l in enumerate(linhas):
+        m = re.match(r"Data\s+([12])[º°o]\s*Leil", l, re.I)
+        if m:
+            n = m.group(1)
+            dt = data(linhas[i + 1] if i + 1 < len(linhas) else "")
+            vl = next((valor(linhas[j + 1]) for j in range(i + 2, min(i + 5, len(linhas) - 1)) if linhas[j].lower() == "lance inicial:"), None)
+            if n == "1":
+                v_praca1 = vl
+            else:
+                v_praca2, d2 = vl, dt
+    minimo = valor(depois("Valor Mínimo"))
+    lance = v_praca1 or v1 or minimo
+    if not lance:
+        return None, "sem valor (lance inicial / valor mínimo)"
+    texto_modo = simplificar(" ".join(topo))
+    campos: dict[str, Any] = {
+        "titulo": titulo, "descricao": descricao, "status": status_lote, "uf": uf, "cidade": cidade,
+        "tipo": normalizar_tipo(titulo, descricao[:400]),  # título genérico ("Imóvel"): a descrição desempata
+        "endereco": depois("Endereço", 0, bloco),
+        "valor_avaliacao": aval, "valor_praca1": lance, "data_praca1": d1,
+        "valor_praca2": v_praca2, "data_praca2": d2,
+        "comitente": depois("Comitente", 0, bloco),
+        "processo": None,
+        "dados": {"extraido_por": "html_itemleilao"},
+    }
+    if "leilao judicial" in texto_modo or "alienacao judicial" in texto_modo:
+        campos["modalidade"] = "judicial"
+    elif "extrajudicial" in texto_modo:
+        campos["modalidade"] = "extrajudicial"
+    mid = re.search(r"/item/(\d+)/", url or "")
+    if mid:
+        campos["id_externo"] = mid.group(1)
+    if fotos:
+        campos["fotos"] = fotos[:20]
     return {k: v for k, v in campos.items() if v not in (None, "")}, ""

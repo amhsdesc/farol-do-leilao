@@ -10,3 +10,7 @@ inicio:
 max_paginas_lista: 10
 max_lotes: 400
 navegador: false
+# Plataforma "/item/<id>/detalhes": leitura sem IA em estruturado.ler_itemleilao. Os lotes aparecem na home e nas listas de cada leilão.
+padrao_link_lote: '/item/\d+/detalhes'
+padrao_link_lista: '/leilao/\d+/lotes|/lotes/imovel'
+sem_query_lote: true

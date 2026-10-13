@@ -333,3 +333,20 @@ def test_biasi_lote_imovel_duas_pracas():
     assert r["status"] == "aberto" and r["id_externo"] == "62735"
     r, motivo = ler_com_motivo((base / "biasi_lote63763.html").read_text(encoding="utf-8"), "", "https://www.biasileiloes.com.br/sale/detail?id=63763")
     assert r and r["uf"] == "SP" and r["cidade"] == "Mauá" and r["valor_praca2"] == 194835.05, motivo
+
+
+def test_itemleilao_cravo_central_brasilia():
+    from pathlib import Path
+    from coletor.adaptadores.estruturado import ler_com_motivo
+    base = Path(__file__).parent / "fixtures"
+    def le(nome, url):
+        return ler_com_motivo((base / f"itemleilao_{nome}.html").read_text(encoding="utf-8"), "", url)
+    r, m = le("cravo_item12321", "https://www.cravoleiloes.com.br/item/12321/detalhes")
+    assert r and r["cidade"] == "Salvador" and r["uf"] == "BA" and r["valor_praca1"] == 190000.0 and r["valor_praca2"] == 97000.0, m
+    assert r["data_praca1"] == "2026-10-20T14:00" and r["data_praca2"] == "2026-10-27T14:00" and r["id_externo"] == "12321"
+    r, m = le("cravo_item12594", "https://www.cravoleiloes.com.br/item/12594/detalhes")
+    assert r and r["valor_praca1"] == 1000000.0 and r["data_praca1"] == "2026-10-18T15:00", m  # venda por proposta
+    r, m = le("central_item7866", "https://www.centraldosleiloes.com.br/item/7866/detalhes?page=1")
+    assert r and r["valor_avaliacao"] == 200000.0 and r["valor_praca1"] == 120000.0, m  # 'Sem licitante', data 'Em breve'
+    r, m = le("brasilia_item5539", "https://www.leiloeirosdebrasilia.com.br/item/5539/detalhes")
+    assert r and r["uf"] == "DF" and r["valor_praca2"] == 2575628.61, m

@@ -194,8 +194,11 @@ class Automatico(Adaptador):
                     if href not in expandidos:
                         expandidos.add(href)
                         novos_eventos.append(href)
-                elif padrao.search(href) and href not in lotes:
-                    lotes.append(href)
+                elif padrao.search(href):
+                    if self.fonte.get("sem_query_lote"):  # /item/5/detalhes?page=1 e /item/5/detalhes são o mesmo lote
+                        href = href.split("?")[0]
+                    if href not in lotes:
+                        lotes.append(href)
                 elif ((lista and lista.search(href)) or HEURISTICA_PAGINACAO.search(href)) and href not in visitadas and href not in fila:
                     fila.append(href)
             for ev in novos_eventos:
