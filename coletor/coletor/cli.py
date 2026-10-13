@@ -270,8 +270,8 @@ def cmd_testar(a):
 def cmd_geocodificar(a):
     from .geocodificar import Geocodificador
     with conectar() as conn:
-        r = Geocodificador(conn).executar(a.limite)
-    print(f"No endereço: {r['endereco']} | no bairro: {r['bairro']} | na cidade: {r['cidade']} | sem resultado: {r['falhou']}")
+        r = Geocodificador(conn).executar(a.limite, a.max_segundos)
+    print(f"No endereço: {r['endereco']} | no bairro: {r['bairro']} | na cidade: {r['cidade']} | sem resultado: {r['falhou']} | refinados do centro da cidade para endereço/bairro: {r['refinados']}")
 
 
 def cmd_classificar(a):
@@ -346,7 +346,8 @@ def main(argv: list[str] | None = None) -> None:
     x.add_argument("--incluir-pendentes", action="store_true", help="inclui os ainda não validados em lista oficial")
     s.set_defaults(f=cmd_catalogo, acao="cobertura")
     s = sub.add_parser("geocodificar", help="põe no mapa os imóveis sem coordenada")
-    s.add_argument("--limite", type=int, default=500)
+    s.add_argument("--limite", type=int, default=100000)
+    s.add_argument("--max-segundos", type=float, default=1200, help="tempo máximo da rodada (o Nominatim público aceita 1 consulta por segundo)")
     s.set_defaults(f=cmd_geocodificar)
     s = sub.add_parser("classificar", help="calcula as tags de investimento (airbnb, praia, turístico, universitário), sem IA")
     s.add_argument("--limite", type=int, default=None, help="só os N primeiros imóveis (teste)")

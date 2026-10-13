@@ -85,28 +85,65 @@ class Geocodificador:
             )
             return cur.fetchall()
 
-    def executar(self, limite: int = 500) -> dict[str, int]:
-        cont = {"endereco": 0, "bairro": 0, "cidade": 0, "falhou": 0}
+    def refinaveis(self) -> list[dict]:
+        """Imóveis que hoje estão só no centro da cidade mas têm endereço ou bairro para tentar de novo."""
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """select i.id, i.endereco, i.bairro, i.cidade, i.uf from imovel i
+                   where i.geo_precisao = 'cidade' and i.cidade is not null
+                     and (i.endereco is not null or i.bairro is not null)
+                     and exists (select 1 from lote l where l.imovel_id = i.id and l.status in ('ativo','suspenso'))
+                   order by i.id""",
+            )
+            return cur.fetchall()
+
+    def _gravar(self, im_id: int, lat: float, lon: float, precisao: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """update imovel set geom = st_setsrid(st_makepoint(%s, %s), 4326)::geography,
+                   geo_precisao = %s, geo_fonte = 'nominatim', atualizado_em = now() where id = %s""",
+                (lon, lat, precisao, im_id),
+            )
+        self.conn.commit()
+
+    def executar(self, limite: int = 100000, max_segundos: float = 1200) -> dict[str, int]:
+        """Duas passadas, para ninguém ficar fora do mapa esperando na fila:
+        1) todo imóvel sem ponto ganha o centro da cidade (poucas consultas distintas, quase tudo vem do cache);
+        2) com o tempo que sobra, os que estão só na cidade tentam endereço e bairro (o que já falhou está no cache e custa nada).
+        O tempo (`max_segundos`) é o limite real: a rodada para limpa e continua na próxima."""
+        cont = {"endereco": 0, "bairro": 0, "cidade": 0, "falhou": 0, "refinados": 0}
+        inicio = time.monotonic()
+
+        def acabou() -> bool:
+            return time.monotonic() - inicio > max_segundos
+
         for im in self.pendentes(limite):
-            achou = False
-            for consulta, precisao in consultas(im):
+            if acabou():
+                break
+            consulta, precisao = consultas(im)[-1]  # a da cidade
+            try:
+                r = self._buscar(consulta)
+            except httpx.HTTPError as e:
+                log.warning("Geocodificação falhou (%s): %s", consulta, e)
+                r = None
+            if r:
+                self._gravar(im["id"], r[0], r[1], precisao)
+                cont["cidade"] += 1
+            else:
+                cont["falhou"] += 1
+
+        for im in self.refinaveis():
+            if acabou():
+                break
+            for consulta, precisao in consultas(im)[:-1]:  # endereço, depois bairro
                 try:
                     r = self._buscar(consulta)
                 except httpx.HTTPError as e:
                     log.warning("Geocodificação falhou (%s): %s", consulta, e)
                     r = None
                 if r:
-                    lat, lon, _ = r
-                    with self.conn.cursor() as cur:
-                        cur.execute(
-                            """update imovel set geom = st_setsrid(st_makepoint(%s, %s), 4326)::geography,
-                               geo_precisao = %s, geo_fonte = 'nominatim', atualizado_em = now() where id = %s""",
-                            (lon, lat, precisao, im["id"]),
-                        )
-                    self.conn.commit()
+                    self._gravar(im["id"], r[0], r[1], precisao)
                     cont[precisao] += 1
-                    achou = True
+                    cont["refinados"] += 1
                     break
-            if not achou:
-                cont["falhou"] += 1
         return cont
