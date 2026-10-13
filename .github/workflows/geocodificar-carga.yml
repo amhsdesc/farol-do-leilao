@@ -1,0 +1,37 @@
+# Põe no mapa os imóveis sem coordenada (Nominatim, sem IA e sem custo).
+# A geocodificação da coleta normal roda só 20 min por vez; este botão serve para adiantar o estoque com mais tempo.
+# Pode rodar de novo sem problema: o que já foi achado (ou já falhou) fica no cache e não é consultado outra vez.
+name: Geocodificar - carga
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutos:
+        description: "Minutos de geocodificação (o Nominatim público aceita 1 consulta por segundo)"
+        default: "90"
+
+concurrency:
+  group: geocodificacao # grupo próprio: pode rodar junto com a coleta e com a carga da Caixa (só mexe em imovel.geom)
+  cancel-in-progress: false
+
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  CONTATO_EMAIL: ${{ vars.CONTATO_EMAIL }}
+
+jobs:
+  geocodificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Geocodificar
+        env:
+          MINUTOS: ${{ inputs.minutos }}
+        run: python -m coletor geocodificar --max-segundos $(( MINUTOS * 60 ))
