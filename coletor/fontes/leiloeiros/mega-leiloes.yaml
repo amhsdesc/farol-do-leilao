@@ -16,7 +16,7 @@ listagem:
     id_externo: {css: ".card-number"}
     url: {css: "a.card-title", attr: href, regex: "^([^?]+)"}
     titulo: {css: "a.card-title"}
-    tipo: {css: "a.card-title", regex: "^([A-Za-zÀ-ÿ]+)"}
+    tipo: {css: "a.card-title", attr: href, regex: "/imoveis/([a-z-]+)/"}   # categoria da URL (a 1ª palavra do título erra: "Direitos sobre terreno")
     cidade: {css: ".card-locality", regex: "^(.*),"}
     uf: {css: ".card-locality", regex: ",\\s*([A-Z]{2})$"}
     modalidade: {css: ".card-instance-title a"}

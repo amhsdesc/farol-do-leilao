@@ -167,9 +167,9 @@ def booleano(valor: Any) -> bool | None:
 _TIPOS = [
     ("apartamento", ["apartamento", "apto", "flat", "cobertura", "kitnet", "kitinete", "studio", "loft"]),
     ("casa", ["casa", "sobrado", "residencia"]),
-    ("rural", ["rural", "fazenda", "sitio", "chacara", "gleba"]),
+    ("rural", ["rural", "rurais", "fazenda", "sitio", "chacara", "gleba"]),
     ("terreno", ["terreno", "lote urbano", "area urbana"]),
-    ("galpao", ["galpao", "armazem", "industrial", "industriais", "deposito"]),
+    ("galpao", ["galpao", "galpoes", "armazem", "industrial", "industriais", "deposito"]),
     ("comercial", ["comercial", "comerciais", "sala", "loja", "predio", "edificio", "escritorio", "hotel", "posto"]),
     ("vaga", ["vaga de garagem", "vagas de garagem", "box de garagem"]),
 ]
