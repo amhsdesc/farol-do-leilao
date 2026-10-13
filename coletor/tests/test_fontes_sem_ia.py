@@ -107,3 +107,11 @@ def test_cache_prazo_de_revisao_respeita_urgencia_e_conta_uso_por_fonte(conn):
         cur.execute("update pagina_cache set atualizado_em = now() - interval '10 days'")
     conn.commit()
     assert ad._cache_revisao("u1")["recente"] is False           # lida há mais de 3 dias: confere
+
+
+def test_suaplataforma_descarta_veiculo_mesmo_com_leilao_de_imoveis():
+    from coletor.adaptadores.suaplataforma import SuaPlataforma
+    s = SuaPlataforma.__new__(SuaPlataforma)
+    base = {"Leilao": "Leilão de imóveis e veículos", "ID_Leilao": 1, "ID_Leiloes_Lote": 2, "Cidade": "Serra Talhada", "UF": "PE"}
+    assert s.converter({**base, "Categoria": "Veículos", "URLlote": "lote/veiculo-vw-crossfox/4745/"}, "https://x.com.br") is None
+    assert s.converter({**base, "Categoria": "Casa", "URLlote": "lote/casa-hortolandia-sp/4701/"}, "https://x.com.br")

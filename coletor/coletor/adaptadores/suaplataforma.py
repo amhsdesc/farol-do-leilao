@@ -45,6 +45,12 @@ class SuaPlataforma(Adaptador):
         if normalizar_tipo(lote.get("Categoria"), lote.get("IconeCategoria"), lote.get("Leilao"),
                            lote.get("Lote_Complemento")) == "outros":
             return None  # veículo, máquina, etc.
+        # o nome do leilão pode falar de imóveis e o lote ser um carro: a categoria e o endereço do lote mandam
+        from .estruturado import _NAO_IMOVEL
+        from ..normalizar import simplificar
+        if normalizar_tipo(lote.get("Categoria")) == "outros" and _NAO_IMOVEL.search(
+                simplificar(f"{lote.get('Categoria') or ''} {lote.get('URLlote') or ''}")):
+            return None
         praca = int(rt.get("PracaAtual") or lote.get("PracaAtual") or 1)
         lance = rt.get(["", "ValorMinimoLancePrimeiraPraca", "ValorMinimoLanceSegundaPraca",
                         "ValorMinimoLanceTerceiraPraca"][min(max(praca, 1), 3)]) or rt.get("ProximoLance")
