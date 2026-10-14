@@ -72,6 +72,16 @@ export async function pontos(f: Filtros) {
   return linhas.map((l) => l.p.map((v) => (v == null ? null : Number(v))) as [number, number, number, number | null]);
 }
 
+/** Quantos imóveis do filtro ainda não têm coordenada (não aparecem no mapa): explica a diferença entre o filtro e o mapa. */
+export async function semLocalizacao(f: Filtros): Promise<number> {
+  const { where, params } = montarWhere(f, false);
+  const r = await consulta<{ n: number }>(
+    `select count(*)::int n from vw_busca ${where} ${where ? "and" : "where"} lat is null`,
+    params,
+  );
+  return r[0]?.n ?? 0;
+}
+
 /** Resumo de um imóvel para o balão do mapa (livre). */
 export async function resumo(id: number) {
   const [r] = await consulta<ItemBusca>(`select ${COLUNAS_ITEM} from vw_busca where imovel_id = $1`, [id]);

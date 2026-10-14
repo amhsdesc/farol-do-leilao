@@ -39,6 +39,7 @@ export default function Busca({ assinante, opcoes, filtrosIniciais, totais }: Pr
   const [bbox, setBbox] = useState<Bbox | null>(null);
   const [pagina, setPagina] = useState(1);
   const [pontos, setPontos] = useState<PontoCompacto[]>([]);
+  const [semLocal, setSemLocal] = useState(0);
   const [lista, setLista] = useState<Lista | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [selecionado, setSelecionado] = useState<number | null>(null);
@@ -67,6 +68,7 @@ export default function Busca({ assinante, opcoes, filtrosIniciais, totais }: Pr
         .then((d) => {
           const ps: PontoCompacto[] = d.pontos ?? [];
           setPontos(ps);
+          setSemLocal(Number(d.sem_local) || 0);
           setTotalFiltrado(ps.length);
           if (enquadrarAoFiltrar.current && ps.length) {
             enquadrarAoFiltrar.current = false;
@@ -216,7 +218,8 @@ export default function Busca({ assinante, opcoes, filtrosIniciais, totais }: Pr
             <div className="aviso-area num" aria-live="polite">
               {lista == null
                 ? "Carregando o mapa…"
-                : `${lista.total.toLocaleString("pt-BR")} imóveis nesta área${lista.total > 0 ? " · aproxime para ver cada um" : ""}`}
+                : `${lista.total.toLocaleString("pt-BR")} imóveis nesta área${lista.total > 0 ? " · aproxime para ver cada um" : ""}${
+                    semLocal > 0 ? ` · ${semLocal.toLocaleString("pt-BR")} deste filtro ainda sem localização no mapa` : ""}`}
             </div>
           </div>
 
