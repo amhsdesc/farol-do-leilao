@@ -113,3 +113,139 @@ CAMPI: list[tuple[str, float, float]] = [
 # (a palavra solta apareceria em qualquer endereço, "Rua da Faculdade" etc.).
 TEXTO_UNIVERSITARIO = r"\b(proxim[oa]s?\s+(?:a|ao|da|do|de)\s+(?:universidade|faculdade|campus|ufmg|usp|unb|ufrj|ufrgs|ufsc|ufpr|ufba|unicamp)|republica estudantil|moradia estudantil)\b"
 BAIRRO_UNIVERSITARIO = r"\buniversitari[oa]\b"
+
+
+# =====================================================================================================================
+# Ampliação (outubro/2026): mais cidades de praia, campi de universidades públicas e PRIVADAS, e pontos que alimentam
+# a pontuação do Airbnb. Coordenadas aproximadas (erro de algumas centenas de metros); confira e acrescente à vontade.
+# =====================================================================================================================
+
+
+def _pares(por_uf: dict[str, str]) -> set[tuple[str, str]]:
+    return {(c, uf) for uf, nomes in por_uf.items() for c in nomes.split("|") if c}
+
+
+# Municípios litorâneos (todo o estoque a poucos minutos da praia). Cidades grandes continuam por bairro, acima.
+CIDADES_PRAIA |= _pares({
+    "SP": "iguape|ilha comprida|cananeia",
+    "RJ": "sao joao da barra|sao francisco de itabapoana|quissama|armacao de buzios|buzios|itaguai|mangaratiba|saquarema|araruama|marica|sao pedro da aldeia",
+    "ES": "aracruz|presidente kennedy|itapemirim|marataizes|anchieta|piuma|guarapari|conceicao da barra",
+    "BA": "camacari|madre de deus|vera cruz|itaparica|jaguaripe|nilo pecanha|una|canavieiras|belmonte|santa cruz cabralia|alcobaca|nova vicosa|caravelas|mucuri|prado|porto seguro|ilheus|itacare|urucuca|marau|camamu|cairu|esplanada|conde|jandaira|entre rios|mata de sao joao",
+    "SE": "barra dos coqueiros|estancia|pirambu|japaratuba",
+    "AL": "marechal deodoro|barra de sao miguel|paripueira|sao miguel dos milagres|passo de camaragibe|japaratinga|maragogi|porto de pedras|coruripe|feliz deserto|piacabucu|barra de santo antonio|jequia da praia|roteiro",
+    "PE": "ipojuca|cabo de santo agostinho|tamandare|sirinhaem|rio formoso|barreiros|sao jose da coroa grande|goiana|itamaraca|ilha de itamaraca|igarassu|fernando de noronha",
+    "PB": "lucena|cabedelo|conde|pitimbu|baia da traicao|mataraca",
+    "RN": "ceara-mirim|extremoz|maxaranguape|rio do fogo|touros|pedra grande|caicara do norte|galinhos|guamare|macau|porto do mangue|areia branca|grossos|tibau|canguaretama|baia formosa|nisia floresta|tibau do sul|sao miguel do gostoso",
+    "CE": "caucaia|sao goncalo do amarante|paracuru|paraipaba|trairi|itapipoca|amontada|itarema|acarau|cruz|jijoca de jericoacoara|camocim|barroquinha|chaval|granja|aquiraz|cascavel|beberibe|fortim|aracati|icapui",
+    "PI": "parnaiba|ilha grande|luis correia|cajueiro da praia",
+    "MA": "sao jose de ribamar|raposa|paco do lumiar|icatu|humberto de campos|tutoia|araioses|santo amaro do maranhao|barreirinhas|alcantara|cururupu|primeira cruz",
+    "PA": "salinopolis|maracana|marapanim|curuca|soure|salvaterra|augusto correa|braganca|vigia|colares|sao joao de pirabas",
+    "SC": "governador celso ramos|barra velha|balneario barra do sul|paulo lopes|jaguaruna|balneario gaivota|passo de torres|icara|balneario arroio do silva|sao francisco do sul",
+    "PR": "pontal do parana|matinhos|guaratuba",
+    "RS": "osorio|santa vitoria do palmar|mostardas|tavares|sao jose do norte|palmares do sul|balneario pinhal|cidreira|tramandai|imbe|xangri-la|capao da canoa|arroio do sal|terra de areia|torres|dom pedro de alcantara",
+})
+
+# Bairros de orla em cidades grandes ou médias (acrescenta aos de cima)
+BAIRROS_PRAIA.setdefault(("salvador", "BA"), set()).update(
+    {"ribeira", "bonfim", "monte serrat", "boa viagem", "porto da barra", "graca", "pituacu", "jardim armacao", "praia do flamengo", "itapagipe", "paripe"})
+BAIRROS_PRAIA[("parnamirim", "RN")] = {"pirangi do norte", "cotovelo", "pium"}
+BAIRROS_PRAIA[("paranagua", "PR")] = {"ilha do mel", "ilha dos valadares"}
+BAIRROS_PRAIA[("linhares", "ES")] = {"pontal do ipiranga", "regencia", "povoacao"}
+BAIRROS_PRAIA[("sao mateus", "ES")] = {"guriri", "barra nova"}
+BAIRROS_PRAIA[("belem", "PA")] = {"mosqueiro", "outeiro"}
+BAIRROS_PRAIA.setdefault(("itajai", "SC"), set()).update({"praia dos amores"})
+BAIRROS_PRAIA.setdefault(("biguacu", "SC"), set()).update({"prainha", "jardim janaina", "praia de fora"})
+BAIRROS_PRAIA.setdefault(("tijucas", "SC"), set()).update({"praia de tijucas", "praia grande", "praia da tijucas"})
+
+# --- Universidades: grandes públicas e privadas (centro do campus principal) --------------------------------------
+CAMPI += [
+    # São Paulo e região
+    ("USP Largo São Francisco", -23.5450, -46.6350), ("USP Leste (EACH)", -23.4838, -46.4999), ("USP Piracicaba (ESALQ)", -22.7110, -47.6310),
+    ("UFABC São Bernardo", -23.6720, -46.5650), ("UFSCar Sorocaba", -23.5818, -47.5232), ("PUC-Campinas", -22.8337, -47.0467),
+    ("UNESP Rio Claro", -22.3953, -47.5435), ("UNESP Presidente Prudente", -22.1180, -51.4080), ("UNESP Jaboticabal", -21.2410, -48.3040),
+    ("UNESP São José do Rio Preto", -20.7940, -49.3590), ("UNESP Botucatu", -22.8960, -48.4470),
+    ("FGV Paulista", -23.5703, -46.6477), ("Insper", -23.5985, -46.6761), ("FAAP", -23.5417, -46.6585), ("Anhembi Morumbi", -23.5963, -46.6857),
+    ("UNIP Paraíso", -23.5746, -46.6410), ("Uninove Barra Funda", -23.5265, -46.6635), ("Uninove Vergueiro", -23.5742, -46.6397),
+    ("FMU Liberdade", -23.5565, -46.6340), ("São Judas Mooca", -23.5601, -46.5996), ("Cruzeiro do Sul Liberdade", -23.5575, -46.6355),
+    ("ESPM Vila Mariana", -23.5906, -46.6389), ("Unisa Santo Amaro", -23.6502, -46.7114), ("UniSantos", -23.9570, -46.3380),
+    # Rio de Janeiro e Niterói
+    ("UFRJ Praia Vermelha", -22.9545, -43.1655), ("UNIRIO Urca", -22.9537, -43.1740), ("FGV Botafogo", -22.9410, -43.1810),
+    ("CEFET-RJ Maracanã", -22.9137, -43.2158), ("UCAM Centro", -22.9043, -43.1769), ("Ibmec Centro", -22.9096, -43.1741),
+    ("Veiga de Almeida Tijuca", -22.9233, -43.2380), ("UFF Valonguinho", -22.8920, -43.1180), ("UENF Campos", -21.7560, -41.2910),
+    # Minas Gerais
+    ("UniBH Buritis", -19.9720, -43.9640), ("FUMEC Cruzeiro", -19.9380, -43.9280), ("UFTM Uberaba", -19.7500, -47.9380),
+    ("Unimontes", -16.7240, -43.8750), ("UFSJ São João del-Rei", -21.1340, -44.2530), ("UNIFEI Itajubá", -22.4130, -45.4490),
+    ("Unifal Alfenas", -21.4260, -45.9480), ("UFVJM Diamantina", -18.2490, -43.5970),
+    # Centro-Oeste
+    ("PUC Goiás", -16.6770, -49.2440), ("UCB Taguatinga", -15.8668, -48.0326), ("UniCEUB Asa Norte", -15.7680, -47.8940),
+    ("UFGD Dourados", -22.1990, -54.9330),
+    # Nordeste
+    ("UFC Benfica", -3.7410, -38.5410), ("UNIFOR", -3.7690, -38.4800), ("UECE Itaperi", -3.7940, -38.5540), ("UNICAP Recife", -8.0575, -34.8890),
+    ("Unifacs Salvador", -12.9810, -38.4530), ("UCSAL Pituaçu", -12.9540, -38.4090), ("UEFS Feira de Santana", -12.1960, -38.9700),
+    ("UESB Vitória da Conquista", -14.8860, -40.8010), ("UESC Ilhéus", -14.7960, -39.1730), ("UFCG Campina Grande", -7.2140, -35.9080),
+    ("UEPB Campina Grande", -7.2110, -35.9090), ("UERN Mossoró", -5.2030, -37.3240), ("UFERSA Mossoró", -5.2070, -37.3170),
+    ("UEMA São Luís", -2.5900, -44.2960),
+    # Norte
+    ("UNAMA Belém", -1.4510, -48.4880), ("UFRR Boa Vista", -2.8300, -60.6990), ("UFAC Rio Branco", -9.9560, -67.8660), ("UNIR Porto Velho", -8.7680, -63.9390),
+    # Sul
+    ("Unisinos", -29.7950, -51.1520), ("Ulbra Canoas", -29.9210, -51.1570), ("UCS Caxias do Sul", -29.1650, -51.1720), ("UPF Passo Fundo", -28.2280, -52.3800),
+    ("FURG Rio Grande", -32.0730, -52.1660), ("Unisc Santa Cruz do Sul", -29.6960, -52.4390), ("Univates Lajeado", -29.4360, -51.9660),
+    ("Feevale Novo Hamburgo", -29.6730, -51.1250), ("UFCSPA Porto Alegre", -30.0300, -51.2200),
+    ("UDESC Florianópolis", -27.5920, -48.5380), ("Univali Itajaí", -26.9090, -48.6860), ("Unisul Pedra Branca", -27.6540, -48.6760),
+    ("FURB Blumenau", -26.9190, -49.0880), ("UNIVILLE Joinville", -26.3050, -48.8450), ("UNESC Criciúma", -28.7050, -49.4000),
+    ("Unochapecó", -27.1020, -52.6050),
+    ("UTFPR Curitiba", -25.4390, -49.2690), ("PUCPR Curitiba", -25.4520, -49.2530), ("Universidade Positivo", -25.4440, -49.3570),
+    ("UEPG Ponta Grossa", -25.0900, -50.1000), ("Unioeste Cascavel", -24.9950, -53.4580), ("Unicesumar Maringá", -23.4410, -51.9010),
+]
+
+# Palavras do texto que indicam moradia de estudante (amplia a lista de proximidade)
+TEXTO_UNIVERSITARIO = (r"\b(proxim[oa]s?\s+(?:a|ao|da|do|de)\s+(?:universidade|faculdade|campus|ufmg|usp|unb|ufrj|ufrgs|ufsc|ufpr|ufba|unicamp"
+                       r"|estacio|unip|uninove|anhanguera|unopar|unicesumar|uninter|unisul|unisinos|unifor|uniceub|ucb|puc|mackenzie|fmu|insper|fgv)"
+                       r"|republica estudantil|moradia estudantil|kitnet universitaria)\b")
+
+# --- Pontos que alimentam o Airbnb (aluguel por temporada) -------------------------------------------------------------
+# Hospitais de referência (turismo de saúde: pacientes e acompanhantes ficam semanas)
+HOSPITAIS: list[tuple[str, float, float]] = [
+    ("Albert Einstein (SP)", -23.5993, -46.7157), ("Sírio-Libanês (SP)", -23.5576, -46.6460), ("HCor (SP)", -23.5710, -46.6483),
+    ("Beneficência Portuguesa (SP)", -23.5707, -46.6475), ("HC-FMUSP / InCor (SP)", -23.5560, -46.6695), ("A.C. Camargo (SP)", -23.5600, -46.6340),
+    ("Santa Casa (SP)", -23.5425, -46.6510), ("São Luiz Itaim (SP)", -23.5870, -46.6790),
+    ("Hospital de Amor (Barretos)", -20.5500, -48.5720), ("HC-FMRP (Ribeirão Preto)", -21.1700, -47.8570), ("HC Unicamp (Campinas)", -22.8270, -47.0690),
+    ("INCA (RJ)", -22.9100, -43.1850), ("Copa D'Or (RJ)", -22.9690, -43.1890), ("Samaritano Botafogo (RJ)", -22.9490, -43.1880),
+    ("Barra D'Or (RJ)", -23.0000, -43.3640), ("HUCFF UFRJ (RJ)", -22.8610, -43.2330),
+    ("HC UFMG (BH)", -19.9220, -43.9280), ("Mater Dei (BH)", -19.9330, -43.9480), ("Felício Rocho (BH)", -19.9360, -43.9510),
+    ("HC UFPR (Curitiba)", -25.4410, -49.2310), ("Erasto Gaertner (Curitiba)", -25.4020, -49.2420),
+    ("HCPA (Porto Alegre)", -30.0390, -51.2060), ("Santa Casa (Porto Alegre)", -30.0300, -51.2250), ("Moinhos de Vento (Porto Alegre)", -30.0250, -51.2000),
+    ("São Lucas PUCRS (Porto Alegre)", -30.0600, -51.1730), ("HC UFPE (Recife)", -8.0510, -34.9470), ("IMIP (Recife)", -8.0570, -34.8970),
+    ("Walter Cantídio (Fortaleza)", -3.7400, -38.5380), ("Araújo Jorge (Goiânia)", -16.6720, -49.2630), ("HU UFSC (Florianópolis)", -27.6030, -48.5200),
+]
+# Centros de convenções e feiras (turismo de negócios)
+EVENTOS: list[tuple[str, float, float]] = [
+    ("Anhembi (SP)", -23.5151, -46.6411), ("Expo Center Norte (SP)", -23.5105, -46.6175), ("São Paulo Expo (SP)", -23.6249, -46.6290),
+    ("Transamerica Expo (SP)", -23.6502, -46.7143), ("Riocentro (RJ)", -22.9760, -43.4130), ("Centro de Eventos do Ceará (Fortaleza)", -3.7590, -38.4880),
+    ("Centro de Convenções de Pernambuco", -8.0030, -34.8550), ("Minascentro (BH)", -19.9200, -43.9400),
+    ("Centro de Convenções Ulysses Guimarães (Brasília)", -15.7860, -47.8970), ("Expo Unimed (Curitiba)", -25.4780, -49.2690),
+]
+# Atrativos turísticos dentro de cidades grandes
+ATRATIVOS: list[tuple[str, float, float]] = [
+    ("Cristo Redentor (RJ)", -22.9519, -43.2105), ("Pão de Açúcar (RJ)", -22.9486, -43.1566), ("Maracanã (RJ)", -22.9121, -43.2302),
+    ("Parque Ibirapuera (SP)", -23.5874, -46.6576), ("MASP / Paulista (SP)", -23.5614, -46.6559), ("Pelourinho (Salvador)", -12.9710, -38.5100),
+    ("Farol da Barra (Salvador)", -13.0100, -38.5330), ("Praia de Iracema (Fortaleza)", -3.7240, -38.5190), ("Boa Viagem (Recife)", -8.1200, -34.9020),
+    ("Marco Zero (Recife)", -8.0630, -34.8710), ("Ponta Negra (Natal)", -5.8700, -35.1800), ("Tambaú (João Pessoa)", -7.1150, -34.8250),
+    ("Esplanada dos Ministérios (Brasília)", -15.7983, -47.8754), ("Mercado Central (BH)", -19.9230, -43.9420), ("Praça da Liberdade (BH)", -19.9330, -43.9380),
+    ("Pampulha (BH)", -19.8514, -43.9722), ("Jardim Botânico (Curitiba)", -25.4415, -49.2410), ("Orla do Guaíba (Porto Alegre)", -30.0470, -51.2300),
+    ("Teatro Amazonas (Manaus)", -3.1303, -60.0233), ("Ver-o-Peso (Belém)", -1.4530, -48.5020), ("Beach Park (Aquiraz)", -3.8420, -38.3930),
+]
+# Polos de negócios (executivos em viagem curta)
+NEGOCIOS: list[tuple[str, float, float]] = [
+    ("Faria Lima (SP)", -23.5780, -46.6880), ("Av. Paulista (SP)", -23.5640, -46.6540), ("Berrini (SP)", -23.6100, -46.6990), ("Itaim Bibi (SP)", -23.5850, -46.6780),
+    ("Vila Olímpia (SP)", -23.5950, -46.6860), ("Centro (RJ)", -22.9140, -43.1760), ("Savassi (BH)", -19.9390, -43.9370), ("Iguatemi (Salvador)", -12.9800, -38.4540),
+    ("Meireles (Fortaleza)", -3.7280, -38.5000), ("Setor Comercial Sul (Brasília)", -15.7960, -47.8890), ("Batel (Curitiba)", -25.4430, -49.2820),
+    ("Setor Bueno (Goiânia)", -16.7040, -49.2650),
+]
+# Cidades de turismo religioso, rural ou de eventos que faltavam
+CIDADES_TURISTICAS |= _pares({
+    "SP": "aparecida|brotas|barretos|bananal|sao bento do sapucai",
+    "CE": "juazeiro do norte|canoa quebrada",
+    "GO": "trindade",
+    "MG": "congonhas|santa rita do sapucai",
+})

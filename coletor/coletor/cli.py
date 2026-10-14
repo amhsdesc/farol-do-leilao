@@ -283,6 +283,12 @@ def cmd_classificar(a):
           f"turístico: {r['turistico']} | universitário: {r['universitario']}")
 
 
+def cmd_referencia_universidades(a):
+    from .referencia_osm import gerar
+    n = gerar(a.saida)
+    print(f"{n} universidades gravadas em {a.saida}")
+
+
 def cmd_status(_):
     with conectar() as conn, conn.cursor() as cur:
         cur.execute("""select
@@ -352,6 +358,9 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("classificar", help="calcula as tags de investimento (airbnb, praia, turístico, universitário), sem IA")
     s.add_argument("--limite", type=int, default=None, help="só os N primeiros imóveis (teste)")
     s.set_defaults(f=cmd_classificar)
+    s = sub.add_parser("referencia-universidades", help="baixa as universidades do Brasil do OpenStreetMap (uma vez; não usa o banco)")
+    s.add_argument("--saida", default="coletor/dados_ref/universidades.json")
+    s.set_defaults(f=cmd_referencia_universidades)
     sub.add_parser("status", help="números gerais da base").set_defaults(f=cmd_status)
     a = p.parse_args(argv)
     a.f(a)

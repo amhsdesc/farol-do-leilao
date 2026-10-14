@@ -6,15 +6,20 @@ Regras (conservadoras: na dúvida, não marca):
   - turistico: cidade de destino turístico da lista, ou texto como pousada/resort/temporada (apartamento, casa, terreno, comercial).
   - universitario: até 2,5 km de um campus (só quando a coordenada é do endereço, da rua ou do bairro, nunca do centro da
     cidade), ou texto "próximo à universidade/faculdade", ou bairro "Universitário". Só apartamento e casa.
-  - airbnb: apartamento ou casa compacta (até 3 quartos e até 150 m², dados ausentes não excluem) em lugar de praia ou
-    turístico, ou texto "flat/studio/temporada/airbnb" nesses lugares.
+  - airbnb: apartamento ou casa compacta (até 3 quartos e até 150 m², dados ausentes não excluem) que some 3 pontos ou
+    mais: praia ou cidade turística (3), atrativo turístico até 1,5 km (3), hospital de referência até 1,5 km (2),
+    centro de convenções até 2 km (2), polo de negócios até 1,2 km (2), universidade (1), texto de flat/temporada (2).
+    Os fatores de distância só valem com coordenada de endereço, rua ou bairro (nunca do centro da cidade).
 `classificar_imovel` é puro (sem banco). `Classificador.executar` lê os imóveis com lote ativo e grava a coluna `imovel.tags`.
 """
 from __future__ import annotations
 
+import json
 import logging
 import math
 import re
+from functools import lru_cache
+from pathlib import Path
 
 from . import referencia_tags as ref
 from .normalizar import simplificar
@@ -41,11 +46,80 @@ def _km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 12742 * math.asin(math.sqrt(a))
 
 
+class _Indice:
+    """Grade de 0,1° (~11 km) para achar o ponto mais próximo sem comparar com a lista inteira (a lista de campi pode ter milhares)."""
+
+    CELULA = 0.1
+
+    def __init__(self, pontos):
+        self.celulas: dict[tuple[int, int], list[tuple[str, float, float]]] = {}
+        for nome, la, lo in pontos:
+            self.celulas.setdefault((math.floor(la / self.CELULA), math.floor(lo / self.CELULA)), []).append((nome, la, lo))
+
+    def mais_proximo(self, lat: float, lon: float, raio_km: float) -> tuple[float, str] | None:
+        ci, cj = math.floor(lat / self.CELULA), math.floor(lon / self.CELULA)
+        melhor = None
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                for nome, la, lo in self.celulas.get((ci + di, cj + dj), ()):
+                    d = _km(lat, lon, la, lo)
+                    if d <= raio_km and (melhor is None or d < melhor[0]):
+                        melhor = (d, nome)
+        return melhor
+
+
+ARQUIVO_UNIVERSIDADES = Path(__file__).parent / "dados_ref" / "universidades.json"
+
+
+def _universidades_osm() -> list[tuple[str, float, float]]:
+    """Universidades do OpenStreetMap, se o arquivo foi gerado (`python -m coletor referencia-universidades`)."""
+    try:
+        return [(str(n), float(la), float(lo)) for n, la, lo in json.loads(ARQUIVO_UNIVERSIDADES.read_text(encoding="utf-8"))]
+    except (OSError, ValueError, TypeError):
+        return []
+
+
+@lru_cache(maxsize=1)
+def _indice_campi() -> _Indice:
+    return _Indice(list(ref.CAMPI) + _universidades_osm())  # a lista curada vem primeiro: em empate vale o nome dela
+
+
+@lru_cache(maxsize=None)
+def _indice(nome: str) -> _Indice:
+    return _Indice(getattr(ref, nome))
+
+
 def campus_proximo(lat: float | None, lon: float | None, raio_km: float = ref.RAIO_CAMPUS_KM) -> str | None:
     if lat is None or lon is None:
         return None
-    melhor = min(((_km(lat, lon, la, lo), nome) for nome, la, lo in ref.CAMPI), default=None)
-    return melhor[1] if melhor and melhor[0] <= raio_km else None
+    r = _indice_campi().mais_proximo(lat, lon, raio_km)
+    return r[1] if r else None
+
+
+def pontuar_airbnb(im: dict, tags: set[str], txt: str) -> tuple[int, list[str]]:
+    """Pontos de demanda de temporada e os motivos (para conferir uma marcação)."""
+    pontos, motivos = 0, []
+    if "praia" in tags:
+        pontos += 3
+        motivos.append("praia")
+    if "turistico" in tags:
+        pontos += 3
+        motivos.append("cidade turística")
+    lat, lon = im.get("lat"), im.get("lon")
+    if lat is not None and lon is not None and (im.get("geo_precisao") or "") in ("endereco", "rua", "bairro"):
+        for lista, raio, peso, rotulo in (("ATRATIVOS", 1.5, 3, "atrativo"), ("HOSPITAIS", 1.5, 2, "hospital"),
+                                           ("EVENTOS", 2.0, 2, "centro de convenções"), ("NEGOCIOS", 1.2, 2, "polo de negócios")):
+            r = _indice(lista).mais_proximo(lat, lon, raio)
+            if r:
+                pontos += peso
+                motivos.append(f"{rotulo}: {r[1]}")
+    if "universitario" in tags:
+        pontos += 1
+        motivos.append("universidade")
+    if _AIRBNB_TEXTO.search(txt):
+        pontos += 2
+        motivos.append("texto de flat/temporada")
+    return pontos, motivos
 
 
 def classificar_imovel(im: dict, texto: str = "") -> list[str]:
@@ -80,11 +154,13 @@ def classificar_imovel(im: dict, texto: str = "") -> list[str]:
         if (precisa and campus_proximo(lat, lon)) or _UNIV.search(txt) or _BAIRRO_UNIV.search(bairro):
             tags.add("universitario")
 
-    # airbnb: residencial compacto onde há demanda de temporada
-    if tipo in _RESIDENCIAL and ({"praia", "turistico"} & tags):
+    # airbnb: residencial compacto que soma pontos de demanda de temporada
+    if tipo in _RESIDENCIAL:
         quartos, area = im.get("quartos"), im.get("area")
         compacto = (quartos is None or quartos <= 3) and (area is None or float(area) <= 150)
-        if compacto or _AIRBNB_TEXTO.search(txt):
+        pontos, _ = pontuar_airbnb(im, tags, txt)
+        texto_forte = bool(_AIRBNB_TEXTO.search(txt)) and bool({"praia", "turistico"} & tags)
+        if pontos >= 3 and (compacto or texto_forte):
             tags.add("airbnb")
     return [t for t in TAGS if t in tags]
 
