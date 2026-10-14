@@ -236,14 +236,18 @@ class CaixaCSV(Adaptador):
             agora_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
             try:
                 r = self.cliente.get(URL_DETALHE.format(id=lote.id_externo))
-                campos = ler_detalhe(decodificar(r.content))
+                html = decodificar(r.content)
+                campos = ler_detalhe(html)
                 if not campos:
-                    raise ValueError("página sem nenhum dado reconhecido (layout mudou ou imóvel indisponível)")
+                    trecho = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()[:160]
+                    raise ValueError(
+                        f"página sem nenhum dado reconhecido (status {r.status_code}, {len(r.content)} bytes; início: {trecho})"
+                    )
             except Exception as e:
                 falhas += 1
                 seguidas += 1
                 # guarda a falha (e o que já se sabia) para não tentar o mesmo lote toda rodada
-                cache[lote.id_externo] = {**anterior, "falhou_em": agora_iso, "motivo": str(e)[:200]}
+                cache[lote.id_externo] = {**anterior, "falhou_em": agora_iso, "motivo": str(e)[:300]}
                 log.warning("[%s] detalhe %s: %s", self.fonte.get("id"), lote.id_externo, e)
                 if seguidas >= MAX_FALHAS_SEGUIDAS:
                     self.avisos.append(f"detalhe da Caixa: {seguidas} falhas seguidas ({str(e)[:120]}); leitura interrompida nesta rodada")

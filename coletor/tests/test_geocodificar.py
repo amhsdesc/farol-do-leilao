@@ -22,7 +22,7 @@ class FakeCur:
         elif s.startswith("insert into geocache"):
             self.b.cache.setdefault(params[0], {"lat": params[1], "lon": params[2], "resposta": {}})
         elif "where i.geom is null" in s:
-            self.res = [im for im in self.b.imoveis.values() if im["geom"] is None]
+            self.res = [im for im in self.b.imoveis.values() if im["geom"] is None and im["cidade"] and im["uf"]]
         elif "i.geo_precisao = 'cidade'" in s:
             self.res = [im for im in self.b.imoveis.values() if im["precisao"] == "cidade" and (im["endereco"] or im["bairro"])]
         elif s.startswith("update imovel set geom"):
@@ -103,3 +103,17 @@ def test_respeita_o_tempo_maximo():
     t, pedidos = _transporte(so_cidade=False)
     Geocodificador(conn, transport=t, intervalo=0).executar(max_segundos=-1)
     assert pedidos == []
+
+
+def test_imovel_sem_uf_nao_derruba_a_rodada():
+    from coletor.geocodificar import consultas as _c
+    assert _c({"cidade": "Mato Leitão", "uf": None}) == []
+    conn = FakeConn([
+        {"id": 1, "endereco": None, "bairro": None, "cidade": "Mato Leitão", "uf": None},
+        {"id": 2, "endereco": None, "bairro": None, "cidade": "Gramado", "uf": "RS"},
+    ])
+    # mesmo que a consulta de pendentes devolva o imóvel sem UF, a rodada segue
+    g = Geocodificador(conn, transport=_transporte(False)[0], intervalo=0)
+    g.pendentes = lambda limite: list(conn.imoveis.values())
+    r = g.executar()
+    assert r["falhou"] == 1 and r["cidade"] == 1

@@ -78,7 +78,7 @@ class Geocodificador:
         with self.conn.cursor() as cur:
             cur.execute(
                 """select i.id, i.endereco, i.bairro, i.cidade, i.uf from imovel i
-                   where i.geom is null and i.cidade is not null
+                   where i.geom is null and i.cidade is not null and i.uf is not null
                      and exists (select 1 from lote l where l.imovel_id = i.id and l.status in ('ativo','suspenso'))
                    order by i.id limit %s""",
                 (limite,),
@@ -90,7 +90,7 @@ class Geocodificador:
         with self.conn.cursor() as cur:
             cur.execute(
                 """select i.id, i.endereco, i.bairro, i.cidade, i.uf from imovel i
-                   where i.geo_precisao = 'cidade' and i.cidade is not null
+                   where i.geo_precisao = 'cidade' and i.cidade is not null and i.uf is not null
                      and (i.endereco is not null or i.bairro is not null)
                      and exists (select 1 from lote l where l.imovel_id = i.id and l.status in ('ativo','suspenso'))
                    order by i.id""",
@@ -120,7 +120,11 @@ class Geocodificador:
         for im in self.pendentes(limite):
             if acabou():
                 break
-            consulta, precisao = consultas(im)[-1]  # a da cidade
+            todas = consultas(im)
+            if not todas:  # sem cidade ou sem UF: não há o que consultar
+                cont["falhou"] += 1
+                continue
+            consulta, precisao = todas[-1]  # a da cidade
             try:
                 r = self._buscar(consulta)
             except httpx.HTTPError as e:
