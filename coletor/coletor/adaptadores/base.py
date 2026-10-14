@@ -37,6 +37,8 @@ class Adaptador:
             p.setdefault("uf", ufs[0])
         if self.fonte.get("comitente"):  # fonte de um vendedor só (ex.: site de um banco)
             p.setdefault("comitente", self.fonte["comitente"])
+        elif self.fonte.get("nome"):  # fonte de leiloeiro: o nome da fonte é o leiloeiro (filtro "Leiloeiro" do site)
+            p.setdefault("leiloeiro", self.fonte["nome"])
         return p
 
     def coletar(self) -> Iterator[LoteBruto]:  # pragma: no cover
