@@ -1,5 +1,6 @@
 # Outlet de imóveis do Santander (venda direta e leilões do banco). Sem IA:
-# a lista vem da API do WordPress do próprio site (com a data de modificação de cada imóvel) e a página
+# a API REST do site responde 403 (fechada), então a lista vem do sitemap que o site publica para buscadores
+# (robots.txt só bloqueia /wp-admin/), com a data de modificação de cada imóvel; a página
 # de cada imóvel é lida por regra. Só imóvel novo ou modificado é relido (ver adaptadores/wordpress_rest.py).
 id: santander-imoveis
 nome: Santander Imóveis
@@ -9,9 +10,8 @@ comitente: Santander
 uf: todas
 intervalo_segundos: 1
 requisicao:
-  url: https://www.santanderimoveis.com.br/wp-json/wp/v2/estate_property
-  por_pagina: 100
-  paginas_max: 100
+  sitemap: https://www.santanderimoveis.com.br/sitemap_index.xml
+  sitemap_filtro: estate_property
 max_detalhes_por_execucao: 3000
 titulo_remove: " | Santander Imóveis"
 detalhe:

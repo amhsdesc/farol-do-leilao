@@ -52,9 +52,11 @@ def test_santander_wordpress_rest_sem_ia(cliente_para):
     from coletor.registro import carregar
     fonte = carregar()["santander-imoveis"]
     link = "https://www.santanderimoveis.com.br/venda/imovel/casa-a-venda-na-rua-benjamim-constant-mongagua-sp-codigo-02-25830-santander-imoveis/"
-    lista = json.dumps([{"id": 334157, "modified": "2026-10-06T08:42:48", "link": link,
-                         "title": {"rendered": "Casa à venda na Rua Benjamim Constant &#8211; Mongaguá/SP Código: 02.25830 | Santander Imóveis"}}])
-    cli = cliente_para({"https://www.santanderimoveis.com.br/wp-json/wp/v2/estate_property": lista, link: "santander_imovel.html"})
+    indice = "<sitemapindex><sitemap><loc>https://www.santanderimoveis.com.br/estate_property-sitemap1.xml</loc></sitemap></sitemapindex>"
+    filho = f"<urlset><url><loc>{link}</loc><lastmod>2026-10-06T08:42:48+00:00</lastmod></url></urlset>"
+    cli = cliente_para({"https://www.santanderimoveis.com.br/sitemap_index.xml": indice,
+                        "https://www.santanderimoveis.com.br/estate_property-sitemap1.xml": filho,
+                        link: "santander_imovel.html"})
     lotes = list(WordpressRest(fonte, cli).coletar())
     assert len(lotes) == 1
     l = normalizar(lotes[0], {"comitente": "Santander"})

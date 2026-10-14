@@ -16,6 +16,12 @@ Configuração:
     detalhe:
       campos: {...}                 # mini-linguagem de extracao.py, aplicada à página do imóvel
     titulo_remove: " | Santander Imóveis"    # sufixo a tirar do título (opcional)
+
+Quando a API REST do site está fechada (403), a lista pode vir do sitemap que o próprio site publica
+para os buscadores (Yoast: sitemap_index.xml -> estate_property-sitemapN.xml, com <lastmod> de cada imóvel):
+    requisicao:
+      sitemap: https://www.site.com.br/sitemap_index.xml
+      sitemap_filtro: estate_property        # só os sitemaps filhos cujo endereço contém isto
     max_detalhes_por_execucao: 3000          # páginas novas lidas por rodada (a carga inicial se espalha por várias)
 """
 from __future__ import annotations
@@ -60,8 +66,39 @@ class WordpressRest(Adaptador):
 
     # ---------------------------------------------------------------- listagem
 
+    @staticmethod
+    def _locs(xml: str) -> list[tuple[str, str]]:
+        """(loc, lastmod) de cada <url> ou <sitemap> de um XML de sitemap."""
+        out = []
+        for bloco in re.findall(r"<(?:url|sitemap)>(.*?)</(?:url|sitemap)>", xml, flags=re.S):
+            loc = re.search(r"<loc>\s*(.*?)\s*</loc>", bloco, flags=re.S)
+            mod = re.search(r"<lastmod>\s*(.*?)\s*</lastmod>", bloco, flags=re.S)
+            if loc:
+                out.append((html.unescape(loc.group(1)), mod.group(1) if mod else ""))
+        return out
+
+    def _itens_sitemap(self, indice: str, filtro: str) -> Iterator[dict[str, Any]]:
+        """Lista os imóveis pelo sitemap público (sem API REST). Cada item traz link e data de modificação."""
+        try:
+            filhos = [u for u, _ in self._locs(self.cliente.get(indice).text) if filtro in u]
+        except Exception as e:
+            raise ErroDeFonte(f"Sitemap {indice}: {e}") from e
+        if not filhos:
+            raise ErroDeFonte(f"Sitemap {indice}: nenhum sitemap filho contém '{filtro}'.")
+        for filho in filhos:
+            try:
+                entradas = self._locs(self.cliente.get(filho).text)
+            except Exception as e:
+                self.registrar_erro(f"Sitemap {filho}: {e}")
+                continue
+            for link, modificado in entradas:
+                yield {"link": link, "modified": modificado, "id": None, "title": {}}
+
     def _itens(self) -> Iterator[dict[str, Any]]:
         req = self.fonte.get("requisicao") or {}
+        if req.get("sitemap"):
+            yield from self._itens_sitemap(req["sitemap"], req.get("sitemap_filtro", ""))
+            return
         if not req.get("url"):
             raise ErroDeFonte("Informe requisicao.url no YAML.")
         por_pagina = int(req.get("por_pagina", 100))
@@ -124,7 +161,8 @@ class WordpressRest(Adaptador):
                     lidos += 1
                     self._gravar_cache(chave, versao, campos)
             campos = dict(campos)
-            campos.setdefault("id_externo", str(item.get("id")))
+            if item.get("id") is not None:
+                campos.setdefault("id_externo", str(item["id"]))
             lote = self.montar(campos, url=link)
             if lote:
                 yield lote
