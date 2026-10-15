@@ -24,3 +24,15 @@ def test_leiloeiro_informado_pela_pagina_tem_prioridade():
     ad = _ad({"id": "x", "nome": "Portal X"})
     l = normalizar(LoteBruto(id_externo="1", leiloeiro="Fulano de Tal"), ad.padroes)
     assert l.leiloeiro == "Fulano de Tal"
+
+
+def test_comitente_que_e_titulo_de_leilao_e_ignorado():
+    from coletor.normalizar import comitente
+    for titulo in ("SOLD", "VENDA DE 36 CASAS GERMINADAS EM ESTEIO/RS", "LEILÃO FEDERAL - SÃO PAULO", "LEILÕES DE IMÓVEIS",
+                   "LEILÃO DEZEMBRO 2026", "IMÓVEIS NO PARANÁ, RIO GRD DO SUL E STA CATARINA", "COMPRE JÁ OU FAÇA SUA PROPOSTA"):
+        assert comitente(titulo) is None, titulo
+    assert comitente("LEILÃO DE IMÓVEIS DA CELESC S.A.") == "CELESC S.A."
+    assert comitente("Casas Bahia SA") == "Casas Bahia SA"
+    assert comitente("BANCO SANTANDER S.A.") == "Santander"
+    # título sem vendedor: o texto do lote ainda pode revelar o banco
+    assert comitente("LEILÃO DEZEMBRO 2026", "Imóvel do Banco Bradesco S.A.") == "Bradesco"

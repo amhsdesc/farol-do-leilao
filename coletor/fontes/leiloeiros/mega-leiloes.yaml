@@ -12,6 +12,7 @@ listagem:
   pagina_inicial: 1
   paginas_max: 40
   item: "div[data-key]"
+  link: {css: "a.card-title", attr: href, regex: "^([^?]+)"}
   campos:
     id_externo: {css: ".card-number"}
     url: {css: "a.card-title", attr: href, regex: "^([^?]+)"}
@@ -27,3 +28,15 @@ listagem:
     data_praca2: {css: ".card-second-instance-date", regex: "(\\d{2}/\\d{2}/\\d{4}[^\\n]*)"}
     valor_praca2: {css: ".instance + .instance .card-instance-value"}
     fotos: {css: "a[data-bg]", attr: data-bg, todos: true}   # miniatura do card (CDN da Mega, 320x240)
+# Página do lote: só para o que o card não traz (comitente, leiloeiro, matrícula, cartório e o dossiê do Santander,
+# que permite juntar o lote com o da fonte santander-imoveis). Lida uma vez e guardada por 30 dias (pagina_cache);
+# no máximo 400 páginas novas por coleta, para não pesar no site.
+detalhe:
+  cache_dias: 30
+  max_por_execucao: 400
+  campos:
+    comitente: {css: ".author.item:-soup-contains('Comitente') .value"}
+    leiloeiro: {css: ".author.item:-soup-contains('Leiloeiro') .value", regex: "^(.+?)(?:\\s+JUC\\w*.*)?$"}
+    matricula: {texto_regex: "Matr[íi]cula\\(s\\):\\s*([\\d.]*\\d)"}
+    cartorio: {texto_regex: "Cart[óo]rio:\\s*([^.]+?)\\s*\\."}
+    dossie: {texto_regex: "Dossi[eê]:\\s*(\\d{2}\\.\\d+)"}

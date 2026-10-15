@@ -11,6 +11,7 @@ SB = "https://offer-query.superbid.net/offers/"
 def test_superbid_api(cliente_para):
     fonte = carregar()["superbid"]
     oferta = {"id": 5012922, "endDate": "2026-10-07 10:00:00", "store": {"name": "ANDRÉ LUIZ LEILÕES"},
+              "seller": {"id": 2213659, "name": "BANCO DAYCOVAL S.A."},
               "offerDetail": {"currentMinBid": 603395.41}, "auction": {"modalityDesc": "Leilão"},
               "product": {"shortDesc": "Apartamento Cond. Trentino II, 44,15m², Joinville/SC",
                           "location": {"city": "Joinville - SC"}, "galleryJson": [{"link": "https://ms.sbwebservices.net/photos/a.jpg"}]}}
@@ -20,7 +21,18 @@ def test_superbid_api(cliente_para):
     n = normalizar(lotes[0], {})
     assert n.id_externo == "5012922" and n.url == "https://www.superbid.net/oferta/5012922"
     assert n.cidade == "Joinville" and n.uf == "SC" and n.tipo == "apartamento" and n.lance_minimo == Decimal("603395.41")
-    assert n.comitente == "ANDRÉ LUIZ LEILÕES"
+    assert n.comitente == "Daycoval"  # o vendedor está em seller.name; a loja (store.name) é o leiloeiro
+    assert n.leiloeiro == "ANDRÉ LUIZ LEILÕES"
+
+
+def test_superbid_loja_sold_nao_e_leiloeiro_nem_comitente(cliente_para):
+    fonte = carregar()["superbid"]
+    oferta = {"id": 5030001, "endDate": "2026-10-20 10:00:00", "store": {"name": "SOLD"},
+              "seller": {"name": "Tribunal De Justica Do Estado De São Paulo"},
+              "offerDetail": {"currentMinBid": 56000}, "auction": {"modalityDesc": "Leilão"},
+              "product": {"shortDesc": "Sala comercial 19,66m² no Centro de Assis/SP", "location": {"city": "Assis - SP"}}}
+    n = normalizar(list(JsonApi(fonte, cliente_para({SB: {"offers": [oferta]}})).coletar())[0], {})
+    assert n.comitente == "Tribunal De Justica Do Estado De São Paulo" and n.leiloeiro == "Superbid Exchange"
 
 
 def test_sicoob_resale_api(cliente_para):

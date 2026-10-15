@@ -29,7 +29,10 @@ campos:
   tipo: {json: "product.shortDesc"}
   cidade: {json: "product.location.city", regex: "^(.*?)\\s*-\\s*[A-Z]{2}$"}
   uf: {json: "product.location.city", regex: "-\\s*([A-Z]{2})$"}
-  comitente: {json: "store.name"}
+  # vendedor de verdade (banco, tribunal, empresa) está em seller.name; store.name é a LOJA que conduz o leilão (casa de leilões),
+  # e para parte dos imóveis é a loja própria "SOLD", que não é leiloeiro nem vendedor: nesse caso vale "Superbid Exchange"
+  comitente: {json: "seller.name"}
+  leiloeiro: {json: "store.name", regex: "^(?!SOLD$)(.+)$", padrao: "Superbid Exchange"}
   modalidade: {json: "auction.modalityDesc"}
   lance_minimo: {json: "offerDetail.currentMinBid"}
   data_praca1: {json: endDate}

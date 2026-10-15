@@ -117,3 +117,30 @@ def test_suaplataforma_descarta_veiculo_mesmo_com_leilao_de_imoveis():
     base = {"Leilao": "Leilão de imóveis e veículos", "ID_Leilao": 1, "ID_Leiloes_Lote": 2, "Cidade": "Serra Talhada", "UF": "PE"}
     assert s.converter({**base, "Categoria": "Veículos", "URLlote": "lote/veiculo-vw-crossfox/4745/"}, "https://x.com.br") is None
     assert s.converter({**base, "Categoria": "Casa", "URLlote": "lote/casa-hortolandia-sp/4701/"}, "https://x.com.br")
+
+
+def test_mega_leiloes_le_comitente_e_dossie_na_pagina_do_lote(cliente_para):
+    from coletor.dedup import chaves
+    from coletor.registro import carregar
+    fonte = carregar()["mega-leiloes"]
+    url = "https://www.megaleiloes.com.br/imoveis?pagina={}"
+    lote_a = "https://www.megaleiloes.com.br/imoveis/casas/sp/aramina/casa-213-m2-santo-antonio-aramina-sp-x129793"
+    cli = cliente_para({url.format(1): "mega_lista.html", url.format(2): "mega_lista.html", lote_a: "mega_detalhe.html"})
+    lotes = list(Seletores(fonte, cli).coletar())
+    a = normalizar(lotes[0], {})
+    assert a.comitente == "Santander"
+    assert a.leiloeiro == "Fernando José Cerello G. Pereira"
+    assert a.matricula == "134.482" and a.cartorio == "9 CRI DO RIO DE JANEIRO"
+    assert "santander:218692" in chaves(a, "mega-leiloes")
+    # o 2º lote não teve página: continua só com o que o card traz (não é descartado)
+    assert len(lotes) == 2
+
+
+def test_dedup_santander_junta_fonte_propria_e_mega():
+    from coletor.dedup import chaves
+    from coletor.modelos import Lote
+    base = dict(id_externo="02.18692", url="https://x", uf="RJ", cidade="Rio de Janeiro")
+    s = Lote(**base)
+    m = Lote(**{**base, "id_externo": "X130257", "dados": {"dossie": "02.18692"}})
+    assert "santander:218692" in chaves(s, "santander-imoveis")
+    assert "santander:218692" in chaves(m, "mega-leiloes")

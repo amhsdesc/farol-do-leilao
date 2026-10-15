@@ -36,6 +36,13 @@ def chaves(lote: Lote, fonte_id: str) -> list[str]:
             if m:  # número de imóvel Caixa citado por leiloeiro que revende o lote
                 out.append(f"caixa:{m.group(1).lstrip('0')}")
 
+    # Santander: o mesmo código (ex.: 02.18692) aparece em santander-imoveis ("Cód.") e na Mega ("Dossie")
+    cod = (lote.dados or {}).get("dossie")
+    if not cod and fonte_id == "santander-imoveis":
+        cod = lote.id_externo
+    if cod and re.fullmatch(r"\d{2}\.\d+", str(cod).strip()):
+        out.append(f"santander:{_digitos(str(cod))}")
+
     end = lote.endereco_normalizado
     if end and re.search(r"\d", end) and lote.uf and lote.cidade:
         a = lote.area_privativa or lote.area_total or lote.area_terreno

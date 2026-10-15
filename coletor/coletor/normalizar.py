@@ -332,8 +332,30 @@ COMITENTES: dict[str, list[str]] = {
 }
 
 
+# Nome de leilão/lote que algumas fontes gravam no lugar do comitente ("LEILÃO FEDERAL - SÃO PAULO", "VENDA DIRETA CIVIA - ...").
+_ENTIDADE_NO_TITULO = re.compile(r"^leilao de imoveis d[aeo]s? (.{3,80})$")
+_PARECE_TITULO = re.compile(
+    r"^(?:leilao|leiloes|venda|compre|oportunidade|edital|\d+\s*(?:o|a)?\s*(?:leilao|vara|hasta|praca))\b"
+    r"|^(?:imoveis|imovel|terrenos?|casas?|apartamentos?|lotes?)\s+(?:de|em|no|na|nos|nas|com|para|a venda)\b"
+    r"|\b20\d\d\b|\bsold\b|/\s*[a-z]{2}$"
+)
+
+
+def _comitente_do_titulo(texto: Any) -> tuple[bool, str | None]:
+    """(parece título de leilão?, entidade citada no título). "LEILÃO DE IMÓVEIS DA CELESC S.A." → (True, "CELESC S.A.")."""
+    t = simplificar(texto)
+    m = _ENTIDADE_NO_TITULO.match(t)
+    if m:
+        original = re.sub(r"^\s*leil[ãa]o de im[óo]veis d[aeo]s?\s+", "", str(texto), flags=re.IGNORECASE)
+        return True, limpar(original)
+    return bool(_PARECE_TITULO.search(t)), None
+
+
 def comitente(valor: Any, *textos_extra: Any) -> str | None:
-    """Padroniza quem vende. Primeiro o campo informado, depois título/descrição."""
+    """Padroniza quem vende. Primeiro o campo informado, depois título/descrição.
+
+    Comitente informado que é só o nome do leilão ("LEILÃO FEDERAL - SÃO PAULO") não serve como vendedor: é ignorado
+    (a entidade citada no título, como "CELESC S.A.", é aproveitada)."""
     for texto in (valor, *textos_extra):
         t = simplificar(texto)
         if not t:
@@ -341,8 +363,12 @@ def comitente(valor: Any, *textos_extra: Any) -> str | None:
         for nome, padroes in COMITENTES.items():
             if any(re.search(p, t) for p in padroes):
                 return nome
-        if texto is valor:  # comitente informado e não reconhecido: mantém como veio
-            return limpar(valor)
+        if texto is valor:  # comitente informado e não reconhecido: mantém como veio, salvo se for título de leilão
+            titulo, entidade = _comitente_do_titulo(valor)
+            if entidade:
+                return entidade
+            if not titulo:
+                return limpar(valor)
     return None
 
 
