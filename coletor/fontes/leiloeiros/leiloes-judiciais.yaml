@@ -8,6 +8,7 @@ site: https://www.leiloesjudiciais.com.br
 tipo: json_api
 uf: [todas]
 intervalo_segundos: 1
+max_segundos: 2400   # fonte grande: ~1 lote/s para gravar no banco; o padrão (1200 s) cortava a fila no meio
 requisicao:
   url: https://api.leiloesjudiciais.com.br/core/api/get-lotes
   metodo: POST

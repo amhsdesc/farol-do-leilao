@@ -7,6 +7,7 @@ site: https://www.megaleiloes.com.br
 tipo: seletores
 uf: [todas]
 intervalo_segundos: 1
+max_segundos: 2400   # fonte grande: ~1 lote/s para gravar no banco; o padrão (1200 s) cortava a fila no meio
 listagem:
   url: https://www.megaleiloes.com.br/imoveis?pagina={pagina}
   pagina_inicial: 1
@@ -30,10 +31,10 @@ listagem:
     fotos: {css: "a[data-bg]", attr: data-bg, todos: true}   # miniatura do card (CDN da Mega, 320x240)
 # Página do lote: só para o que o card não traz (comitente, leiloeiro, matrícula, cartório e o dossiê do Santander,
 # que permite juntar o lote com o da fonte santander-imoveis). Lida uma vez e guardada por 30 dias (pagina_cache);
-# no máximo 400 páginas novas por coleta, para não pesar no site.
+# no máximo 350 páginas novas por coleta, para não pesar no site.
 detalhe:
   cache_dias: 30
-  max_por_execucao: 400
+  max_por_execucao: 350
   campos:
     comitente: {css: ".author.item:-soup-contains('Comitente') .value"}
     leiloeiro: {css: ".author.item:-soup-contains('Leiloeiro') .value", regex: "^(.+?)(?:\\s+JUC\\w*.*)?$"}
