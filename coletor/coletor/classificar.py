@@ -116,12 +116,18 @@ def campus_proximo(lat: float | None, lon: float | None, raio_km: float = ref.RA
     return r[1] if r else None
 
 
-def pontuar_airbnb(im: dict, tags: set[str], txt: str) -> tuple[int, list[str]]:
-    """Pontos de demanda de temporada e os motivos (para conferir uma marcação)."""
+def pontuar_airbnb(im: dict, tags: "set[str] | dict[str, list[str]]", txt: str) -> tuple[int, list[str]]:
+    """Pontos de demanda de temporada e os motivos (para conferir uma marcação).
+
+    Praia só pela CIDADE vale 2 pontos (município litorâneo pode ser grande e o imóvel longe da orla: Camaçari/Industrial);
+    bairro de orla ou texto do anúncio valem 3. Cidade turística (lista curada de destinos) vale 3.
+    """
     pontos, motivos = 0, []
     if "praia" in tags:
-        pontos += 3
-        motivos.append("praia")
+        porque = (tags.get("praia") or [""])[0] if isinstance(tags, dict) else ""
+        so_cidade = porque.startswith("cidade de praia")
+        pontos += 2 if so_cidade else 3
+        motivos.append("praia (só pela cidade)" if so_cidade else "praia")
     if "turistico" in tags:
         pontos += 3
         motivos.append("cidade turística")
@@ -192,7 +198,7 @@ def explicar_imovel(im: dict, texto: str = "") -> dict[str, list[str]]:
     if tipo in _RESIDENCIAL:
         quartos, area = im.get("quartos"), im.get("area")
         compacto = (quartos is None or quartos <= 3) and (area is None or float(area) <= 150)
-        pontos, motivos = pontuar_airbnb(im, set(tags), txt)
+        pontos, motivos = pontuar_airbnb(im, tags, txt)
         texto_forte = bool(_AIRBNB_TEXTO.search(txt)) and bool({"praia", "turistico"} & set(tags))
         if pontos >= 3 and (compacto or texto_forte):
             tags["airbnb"] = motivos

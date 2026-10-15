@@ -111,3 +111,15 @@ def test_cada_tag_traz_o_motivo():
     texto = explicar_imovel(im(), "Apartamento próximo à universidade")
     assert texto["universitario"] == ["o anúncio fala de universidade ou faculdade por perto"]
     assert list(explicar_imovel(im(), "")) == classificar_imovel(im(), "")
+
+
+def test_airbnb_praia_so_pela_cidade_nao_basta():
+    from coletor.classificar import explicar_imovel
+    # município litorâneo grande, sem nenhum outro fator: tem praia, mas não airbnb
+    r = explicar_imovel(im(cidade="Camaçari", uf="BA", quartos=2))
+    assert "praia" in r and "airbnb" not in r
+    # bairro de orla (3 pontos) basta
+    orla = explicar_imovel(im(cidade="Salvador", uf="BA", bairro="Barra", quartos=2))
+    assert "praia" in orla and "airbnb" in orla
+    # só cidade de praia + um segundo fator (texto de temporada) passa
+    assert "airbnb" in explicar_imovel(im(cidade="Camaçari", uf="BA", quartos=2), "Flat para temporada")
