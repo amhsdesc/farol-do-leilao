@@ -274,10 +274,40 @@ def cmd_geocodificar(a):
     print(f"No endereço: {r['endereco']} | no bairro: {r['bairro']} | na cidade: {r['cidade']} | sem resultado: {r['falhou']} | refinados do centro da cidade para endereço/bairro: {r['refinados']}")
 
 
+def padronizar_comitentes(conn) -> int:
+    """Aplica as regras atuais de comitente aos lotes que já estão no banco (sem precisar reler os sites)."""
+    from .normalizar import SEM_COMITENTE, SEM_COMITENTE_JUDICIAL, comitente, comitente_final
+    n = 0
+    with conn.cursor() as cur:
+        # 1) nomes já gravados: reescreve com a grafia padrão (tribunais, maiúsculas) ou descarta título de leilão ("SOLD")
+        cur.execute("select distinct comitente from lote where comitente is not null")
+        for r in cur.fetchall():
+            antigo = r["comitente"]
+            if antigo in (SEM_COMITENTE, SEM_COMITENTE_JUDICIAL):
+                continue
+            novo = comitente(antigo)
+            if novo == antigo:
+                continue
+            cur.execute("update lote set comitente = %s where comitente = %s", (novo, antigo))  # novo None → recalculado abaixo
+            n += cur.rowcount
+        # 2) sem comitente ou com o valor padrão: tenta de novo com o texto, o processo e a UF do próprio lote
+        cur.execute("""select l.id, l.titulo, l.descricao, l.modalidade, i.uf, l.processo, l.comitente
+                       from lote l left join imovel i on i.id = l.imovel_id
+                       where l.comitente is null or l.comitente in (%s, %s)""", (SEM_COMITENTE, SEM_COMITENTE_JUDICIAL))
+        for r in cur.fetchall():
+            novo = comitente_final(None, (r["titulo"], r["descricao"]), r["modalidade"], r["uf"], r["processo"])
+            if novo != r["comitente"]:
+                cur.execute("update lote set comitente = %s where id = %s", (novo, r["id"]))
+                n += 1
+    conn.commit()
+    return n
+
+
 def cmd_classificar(a):
     from .classificar import Classificador
     with conectar() as conn:
         migrar(conn)
+        print(f"{padronizar_comitentes(conn)} lotes com comitente padronizado")
         r = Classificador(conn).executar(a.limite)
     print(f"{r['imoveis']} imóveis lidos, {r['alterados']} com tags novas | airbnb: {r['airbnb']} | praia: {r['praia']} | "
           f"turístico: {r['turistico']} | universitário: {r['universitario']}")

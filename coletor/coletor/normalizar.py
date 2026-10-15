@@ -343,6 +343,65 @@ def comitente_padrao(modalidade_lote: str | None) -> str:
     return SEM_COMITENTE_JUDICIAL if modalidade_lote == "judicial" else SEM_COMITENTE
 
 
+_CNJ = re.compile(r"\b\d{7}-?\d{2}\.?\d{4}\.?([1-9])\.?(\d{2})\.?\d{4}\b")
+# "Comitente: X", "Vendedor: X", "Credor fiduciário: X" no texto; só vale se X parecer empresa/entidade (nunca pessoa física)
+_ROTULO_VENDEDOR = re.compile(r"(?:comitente|vendedor|credor(?: fiduciario)?|cedente)\s*[:\-]\s*([^.;|\n]{4,90})", re.IGNORECASE)
+_ENTIDADE = re.compile(
+    r"\b(?:banco|cooperativa|s\.?a\.?|ltda|financeira|fundo|fidc|securitizadora|associacao|prefeitura|municipio|estado d[eo]|uniao|"
+    r"instituto|companhia|cia|empresa|massa falida|consorcio|seguradora|condominio|caixa|crédito|credito)\b"
+)
+
+
+def _vendedor_no_texto(*textos: Any) -> str | None:
+    for texto in textos:
+        for m in _ROTULO_VENDEDOR.finditer(str(texto or "")):
+            cand = re.split(r"\s(?:-|–|cnpj|cpf|inscrit)", m.group(1), flags=re.IGNORECASE)[0].strip(" ,")
+            t = simplificar(cand)
+            if not t or _PARECE_TITULO.search(t) or not _ENTIDADE.search(t):
+                continue
+            nome = comitente(cand)
+            if nome and nome not in (SEM_COMITENTE, SEM_COMITENTE_JUDICIAL):
+                return nome
+    return None
+
+
+def _juizo(modalidade_lote: str | None, uf_lote: str | None, processo: Any, *textos: Any) -> str | None:
+    """Leilão judicial: quem vende é o juízo. Descobre o tribunal pelo número CNJ do processo, pelo texto ou, por último, pela UF."""
+    if modalidade_lote != "judicial":
+        return None
+    texto = " ".join(str(x) for x in (processo, *textos) if x)
+    m = _CNJ.search(texto)
+    if m:
+        j, tr = m.group(1), m.group(2)
+        if j == "8" and tr in _TJ_CNJ:
+            return _nome_tj(_TJ_CNJ[tr])
+        if j == "5":
+            return f"Justiça do Trabalho (TRT {int(tr)}ª Região)"
+        if j == "4":
+            return f"Justiça Federal (TRF {int(tr)}ª Região)"
+    t = simplificar(texto)
+    if re.search(r"\bjustica do trabalho\b|\bvara do trabalho\b|\btrt\b", t):
+        return "Justiça do Trabalho"
+    if re.search(r"\bjustica federal\b|\bvara federal\b|\btrf\b", t):
+        return "Justiça Federal"
+    for nome in sorted(_ESTADOS, key=len, reverse=True):
+        if re.search(rf"\btribunal de justica d[aeo]s? (?:estado d[aeo]s? )?{nome}\b", t):
+            return _nome_tj(nome)
+    if uf_lote in _UF_ESTADO:  # leilão judicial de imóvel é, quase sempre, da Justiça estadual do próprio estado
+        return _nome_tj(_UF_ESTADO[uf_lote])
+    return None
+
+
+def comitente_final(informado: Any, textos: tuple, modalidade_lote: str | None, uf_lote: str | None, processo: Any = None) -> str:
+    """Nunca devolve vazio: o informado/reconhecido, o vendedor citado no texto, o juízo (leilão judicial) ou o padrão."""
+    return (
+        comitente(informado, *textos)
+        or _vendedor_no_texto(*textos)
+        or _juizo(modalidade_lote, uf_lote, processo, *textos)
+        or comitente_padrao(modalidade_lote)
+    )
+
+
 # Nome de leilão/lote que algumas fontes gravam no lugar do comitente ("LEILÃO FEDERAL - SÃO PAULO", "VENDA DIRETA CIVIA - ...").
 _ENTIDADE_NO_TITULO = re.compile(r"^leilao de imoveis d[aeo]s? (.{3,80})$")
 _PARECE_TITULO = re.compile(
@@ -362,6 +421,67 @@ def _comitente_do_titulo(texto: Any) -> tuple[bool, str | None]:
     return bool(_PARECE_TITULO.search(t)), None
 
 
+# nome simplificado → (nome, preposição): "Tribunal de Justiça do Paraná", "…de São Paulo", "…da Bahia"
+_ESTADOS = {
+    "acre": ("Acre", "do"), "alagoas": ("Alagoas", "de"), "amapa": ("Amapá", "do"), "amazonas": ("Amazonas", "do"),
+    "bahia": ("Bahia", "da"), "ceara": ("Ceará", "do"), "distrito federal": ("Distrito Federal", "do"),
+    "espirito santo": ("Espírito Santo", "do"), "goias": ("Goiás", "de"), "maranhao": ("Maranhão", "do"),
+    "mato grosso": ("Mato Grosso", "de"), "mato grosso do sul": ("Mato Grosso do Sul", "de"),
+    "minas gerais": ("Minas Gerais", "de"), "para": ("Pará", "do"), "paraiba": ("Paraíba", "da"), "parana": ("Paraná", "do"),
+    "pernambuco": ("Pernambuco", "de"), "piaui": ("Piauí", "do"), "rio de janeiro": ("Rio de Janeiro", "do"),
+    "rio grande do norte": ("Rio Grande do Norte", "do"), "rio grande do sul": ("Rio Grande do Sul", "do"),
+    "rondonia": ("Rondônia", "de"), "roraima": ("Roraima", "de"), "santa catarina": ("Santa Catarina", "de"),
+    "sao paulo": ("São Paulo", "de"), "sergipe": ("Sergipe", "de"), "tocantins": ("Tocantins", "do"),
+}
+# Código do tribunal estadual no número CNJ do processo (NNNNNNN-DD.AAAA.8.TR.OOOO)
+_TJ_CNJ = {
+    "01": "acre", "02": "alagoas", "03": "amapa", "04": "amazonas", "05": "bahia", "06": "ceara", "07": "distrito federal",
+    "08": "espirito santo", "09": "goias", "10": "maranhao", "11": "mato grosso", "12": "mato grosso do sul", "13": "minas gerais",
+    "14": "para", "15": "paraiba", "16": "parana", "17": "pernambuco", "18": "piaui", "19": "rio de janeiro",
+    "20": "rio grande do norte", "21": "rio grande do sul", "22": "rondonia", "23": "roraima", "24": "santa catarina",
+    "25": "sergipe", "26": "sao paulo", "27": "tocantins",
+}
+_UF_ESTADO = {
+    "AC": "acre", "AL": "alagoas", "AP": "amapa", "AM": "amazonas", "BA": "bahia", "CE": "ceara", "DF": "distrito federal",
+    "ES": "espirito santo", "GO": "goias", "MA": "maranhao", "MT": "mato grosso", "MS": "mato grosso do sul", "MG": "minas gerais",
+    "PA": "para", "PB": "paraiba", "PR": "parana", "PE": "pernambuco", "PI": "piaui", "RJ": "rio de janeiro",
+    "RN": "rio grande do norte", "RS": "rio grande do sul", "RO": "rondonia", "RR": "roraima", "SC": "santa catarina",
+    "SP": "sao paulo", "SE": "sergipe", "TO": "tocantins",
+}
+
+
+def _nome_tj(estado: str) -> str:
+    nome, prep = _ESTADOS[estado]
+    return f"Tribunal de Justiça {prep} {nome}"
+
+
+_TRIBUNAL = re.compile(r"^(?:tribunal de justica|tj)\s*(?:do estado |de |do |da |-\s*)*([a-z ]+?)\s*(?:\(.*\))?$")
+_MINUSCULAS = {"de", "da", "do", "das", "dos", "e", "em"}
+
+
+def _tribunal(t: str) -> str | None:
+    """Mesmo tribunal escrito de jeitos diferentes ("TRIBUNAL DE JUSTICA DO PARANA", "Tribunal de Justiça do Estado de São Paulo")."""
+    m = _TRIBUNAL.match(t)
+    if m and m.group(1).strip() in _ESTADOS:
+        return _nome_tj(m.group(1).strip())
+    return None
+
+
+def _capitalizar(texto: str) -> str:
+    """Nome todo em maiúsculas (ou minúsculas) vira "Nome Próprio"; sigla (S.A., LTDA, BRB) e misto ficam como vieram."""
+    if texto != texto.upper() and texto != texto.lower():
+        return texto
+    palavras = []
+    for i, w in enumerate(texto.lower().split(" ")):
+        if re.fullmatch(r"(?:[a-z]\.){2,}|s/?a|ltda|me|epp|eireli|cef|bb|brb|bndes|spu|fgts|inss", w):
+            palavras.append(w.upper())
+        elif w in _MINUSCULAS and i > 0:
+            palavras.append(w)
+        else:
+            palavras.append(w[:1].upper() + w[1:])
+    return " ".join(palavras)
+
+
 def comitente(valor: Any, *textos_extra: Any) -> str | None:
     """Padroniza quem vende. Primeiro o campo informado, depois título/descrição.
 
@@ -376,12 +496,14 @@ def comitente(valor: Any, *textos_extra: Any) -> str | None:
                 return nome
         if texto is valor and _RECEITA.search(t):
             return "Receita Federal"
+        if texto is valor and (trib := _tribunal(t)):
+            return trib
         if texto is valor:  # comitente informado e não reconhecido: mantém como veio, salvo se for título de leilão
             titulo, entidade = _comitente_do_titulo(valor)
             if entidade:
                 return entidade
             if not titulo:
-                return limpar(valor)
+                return _capitalizar(limpar(valor))
     return None
 
 
@@ -505,7 +627,7 @@ def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: d
         aceita_parcelamento=aceita_parcelamento(campo("aceita_parcelamento"), *textos),
         debitos_por_conta=debitos_por_conta(campo("debitos_por_conta"), *textos),
         leiloeiro=limpar(campo("leiloeiro")),
-        comitente=comitente(campo("comitente"), *textos) or comitente_padrao(modalidade(campo("modalidade"), *textos)),
+        comitente=comitente_final(campo("comitente"), textos, modalidade(campo("modalidade"), *textos), uf(campo("uf")), campo("processo")),
         processo=limpar(campo("processo")),
         edital_url=limpar(campo("edital_url")),
         fotos=[f for f in (bruto.fotos or []) if f][:30],

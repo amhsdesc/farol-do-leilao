@@ -32,7 +32,7 @@ def test_superbid_loja_sold_nao_e_leiloeiro_nem_comitente(cliente_para):
               "offerDetail": {"currentMinBid": 56000}, "auction": {"modalityDesc": "Leilão"},
               "product": {"shortDesc": "Sala comercial 19,66m² no Centro de Assis/SP", "location": {"city": "Assis - SP"}}}
     n = normalizar(list(JsonApi(fonte, cliente_para({SB: {"offers": [oferta]}})).coletar())[0], {})
-    assert n.comitente == "Tribunal De Justica Do Estado De São Paulo" and n.leiloeiro == "Superbid Exchange"
+    assert n.comitente == "Tribunal de Justiça de São Paulo" and n.leiloeiro == "Superbid Exchange"
 
 
 def test_sicoob_resale_api(cliente_para):
