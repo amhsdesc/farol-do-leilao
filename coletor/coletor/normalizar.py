@@ -331,6 +331,17 @@ COMITENTES: dict[str, list[str]] = {
     "C6 Bank": [r"\bc6 bank\b"],
 }
 
+# Só vale no campo "comitente" informado pela fonte (na descrição, "Receita Federal" aparece por outros motivos, como débitos).
+_RECEITA = re.compile(r"\bleilao federal\b|\breceita federal\b|\bsecretaria (?:especial )?da receita\b|\bdelegacia da receita\b")
+
+# Nunca deixa o lote sem comitente: ele precisa aparecer no filtro do site.
+SEM_COMITENTE_JUDICIAL = "Leilão judicial"
+SEM_COMITENTE = "Não informado"
+
+
+def comitente_padrao(modalidade_lote: str | None) -> str:
+    return SEM_COMITENTE_JUDICIAL if modalidade_lote == "judicial" else SEM_COMITENTE
+
 
 # Nome de leilão/lote que algumas fontes gravam no lugar do comitente ("LEILÃO FEDERAL - SÃO PAULO", "VENDA DIRETA CIVIA - ...").
 _ENTIDADE_NO_TITULO = re.compile(r"^leilao de imoveis d[aeo]s? (.{3,80})$")
@@ -363,6 +374,8 @@ def comitente(valor: Any, *textos_extra: Any) -> str | None:
         for nome, padroes in COMITENTES.items():
             if any(re.search(p, t) for p in padroes):
                 return nome
+        if texto is valor and _RECEITA.search(t):
+            return "Receita Federal"
         if texto is valor:  # comitente informado e não reconhecido: mantém como veio, salvo se for título de leilão
             titulo, entidade = _comitente_do_titulo(valor)
             if entidade:
@@ -492,7 +505,7 @@ def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: d
         aceita_parcelamento=aceita_parcelamento(campo("aceita_parcelamento"), *textos),
         debitos_por_conta=debitos_por_conta(campo("debitos_por_conta"), *textos),
         leiloeiro=limpar(campo("leiloeiro")),
-        comitente=comitente(campo("comitente"), *textos),
+        comitente=comitente(campo("comitente"), *textos) or comitente_padrao(modalidade(campo("modalidade"), *textos)),
         processo=limpar(campo("processo")),
         edital_url=limpar(campo("edital_url")),
         fotos=[f for f in (bruto.fotos or []) if f][:30],
