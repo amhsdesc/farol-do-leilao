@@ -1,0 +1,29 @@
+# Recalcula as tags (airbnb, praia, turistico, universitario) sem coletar nada: só regras em memória sobre o que já está no banco.
+# Serve para aplicar uma mudança de regra ou de lista (cidades, universidades) na hora, sem esperar uma coleta inteira.
+name: Classificar - tags
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: classificacao
+  cancel-in-progress: false
+
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+jobs:
+  classificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: coletor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Classificar
+        run: python -m coletor classificar
