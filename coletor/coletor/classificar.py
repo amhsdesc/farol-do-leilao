@@ -21,6 +21,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from psycopg.types.json import Jsonb
+
 from . import referencia_tags as ref
 from .normalizar import simplificar
 from .referencia_osm import eh_instituicao
@@ -99,10 +101,18 @@ def _indice(nome: str) -> _Indice:
     return _Indice(getattr(ref, nome))
 
 
-def campus_proximo(lat: float | None, lon: float | None, raio_km: float = ref.RAIO_CAMPUS_KM) -> str | None:
+def _km_txt(d: float) -> str:
+    return f"{d:.1f}".replace(".", ",") + " km"
+
+
+def campus_mais_proximo(lat: float | None, lon: float | None, raio_km: float = ref.RAIO_CAMPUS_KM) -> tuple[float, str] | None:
     if lat is None or lon is None:
         return None
-    r = _indice_campi().mais_proximo(lat, lon, raio_km)
+    return _indice_campi().mais_proximo(lat, lon, raio_km)
+
+
+def campus_proximo(lat: float | None, lon: float | None, raio_km: float = ref.RAIO_CAMPUS_KM) -> str | None:
+    r = campus_mais_proximo(lat, lon, raio_km)
     return r[1] if r else None
 
 
@@ -122,7 +132,7 @@ def pontuar_airbnb(im: dict, tags: set[str], txt: str) -> tuple[int, list[str]]:
             r = _indice(lista).mais_proximo(lat, lon, raio)
             if r:
                 pontos += peso
-                motivos.append(f"{rotulo}: {r[1]}")
+                motivos.append(f"{rotulo}: {r[1]} (a {_km_txt(r[0])})")
     if "universitario" in tags:
         pontos += 1
         motivos.append("universidade")
@@ -132,30 +142,36 @@ def pontuar_airbnb(im: dict, tags: set[str], txt: str) -> tuple[int, list[str]]:
     return pontos, motivos
 
 
-def classificar_imovel(im: dict, texto: str = "") -> list[str]:
-    """`im`: tipo, uf, cidade, bairro, endereco, quartos, area, lat, lon, geo_precisao. `texto`: títulos/descrições dos lotes."""
+def explicar_imovel(im: dict, texto: str = "") -> dict[str, list[str]]:
+    """Tags do imóvel e o motivo de cada uma: {tag: [motivos]}. `im`: tipo, uf, cidade, bairro, endereco, quartos, area, lat, lon,
+    geo_precisao. `texto`: títulos/descrições dos lotes. Na dúvida, não marca."""
     tipo = (im.get("tipo") or "").lower()
     if tipo not in _INVESTIVEL:
-        return []
+        return {}
     uf = (im.get("uf") or "").strip().upper()
     cidade = simplificar(im.get("cidade"))
     bairro = simplificar(im.get("bairro"))
+    nome_cidade = (im.get("cidade") or "").strip()
+    nome_bairro = (im.get("bairro") or "").strip()
     local = f"{simplificar(im.get('endereco'))} {bairro}".strip()
     txt = simplificar(texto)[:6000]
-    tags: set[str] = set()
+    tags: dict[str, list[str]] = {}
 
     # praia
-    praia = (cidade, uf) in ref.CIDADES_PRAIA or bairro in ref.BAIRROS_PRAIA.get((cidade, uf), set())
-    if not praia and not _NEGA.search(txt):
-        praia = bool(_FORTE.search(txt) or _FORTE.search(local))
-    if not praia:
-        praia = bool(_LOCAL.search(f"{bairro} {simplificar(im.get('endereco'))}"))
-    if praia:
-        tags.add("praia")
+    if (cidade, uf) in ref.CIDADES_PRAIA:
+        tags["praia"] = [f"cidade de praia ({nome_cidade}/{uf})"]
+    elif bairro in ref.BAIRROS_PRAIA.get((cidade, uf), set()):
+        tags["praia"] = [f"bairro de orla ({nome_bairro}, {nome_cidade})"]
+    elif not _NEGA.search(txt) and (_FORTE.search(txt) or _FORTE.search(local)):
+        tags["praia"] = ["o anúncio fala de frente para o mar ou pé na areia"]
+    elif _LOCAL.search(f"{bairro} {simplificar(im.get('endereco'))}"):
+        tags["praia"] = ["o endereço ou o bairro é de orla"]
 
     # turístico
-    if (cidade, uf) in ref.CIDADES_TURISTICAS or _TURISTICO.search(txt[:1500]):
-        tags.add("turistico")
+    if (cidade, uf) in ref.CIDADES_TURISTICAS:
+        tags["turistico"] = [f"cidade de destino turístico ({nome_cidade}/{uf})"]
+    elif _TURISTICO.search(txt[:1500]):
+        tags["turistico"] = ["o anúncio fala de pousada, resort ou temporada"]
 
     # universitário (apartamento e casa)
     if tipo in _RESIDENCIAL:
@@ -163,18 +179,28 @@ def classificar_imovel(im: dict, texto: str = "") -> list[str]:
         lat, lon = im.get("lat"), im.get("lon")
         # coordenada de bairro é o centro do bairro, não o imóvel: raio menor para não marcar quem só mora perto
         raio = ref.RAIO_CAMPUS_KM if (im.get("geo_precisao") or "") in ("endereco", "rua") else ref.RAIO_CAMPUS_BAIRRO_KM
-        if (precisa and campus_proximo(lat, lon, raio)) or _UNIV.search(txt) or _BAIRRO_UNIV.search(bairro):
-            tags.add("universitario")
+        campus = campus_mais_proximo(lat, lon, raio) if precisa else None
+        if campus:
+            aprox = " (distância a partir do centro do bairro)" if (im.get("geo_precisao") or "") == "bairro" else ""
+            tags["universitario"] = [f"a {_km_txt(campus[0])} de {campus[1]}{aprox}"]
+        elif _UNIV.search(txt):
+            tags["universitario"] = ["o anúncio fala de universidade ou faculdade por perto"]
+        elif _BAIRRO_UNIV.search(bairro):
+            tags["universitario"] = [f"bairro {nome_bairro}"]
 
     # airbnb: residencial compacto que soma pontos de demanda de temporada
     if tipo in _RESIDENCIAL:
         quartos, area = im.get("quartos"), im.get("area")
         compacto = (quartos is None or quartos <= 3) and (area is None or float(area) <= 150)
-        pontos, _ = pontuar_airbnb(im, tags, txt)
-        texto_forte = bool(_AIRBNB_TEXTO.search(txt)) and bool({"praia", "turistico"} & tags)
+        pontos, motivos = pontuar_airbnb(im, set(tags), txt)
+        texto_forte = bool(_AIRBNB_TEXTO.search(txt)) and bool({"praia", "turistico"} & set(tags))
         if pontos >= 3 and (compacto or texto_forte):
-            tags.add("airbnb")
-    return [t for t in TAGS if t in tags]
+            tags["airbnb"] = motivos
+    return {t: tags[t] for t in TAGS if t in tags}
+
+
+def classificar_imovel(im: dict, texto: str = "") -> list[str]:
+    return list(explicar_imovel(im, texto))
 
 
 class Classificador:
@@ -187,7 +213,7 @@ class Classificador:
             cur.execute(
                 """select i.id, i.tipo, i.uf, i.cidade, i.bairro, i.endereco, i.quartos,
                           coalesce(i.area_privativa, i.area_total, i.area_terreno) as area,
-                          st_y(i.geom::geometry) as lat, st_x(i.geom::geometry) as lon, i.geo_precisao, i.tags,
+                          st_y(i.geom::geometry) as lat, st_x(i.geom::geometry) as lon, i.geo_precisao, i.tags, i.tags_motivos,
                           (select string_agg(coalesce(l.titulo, '') || ' ' || left(coalesce(l.descricao, ''), 1500), ' ')
                              from lote l where l.imovel_id = i.id and l.status in ('ativo', 'suspenso')) as texto
                    from imovel i
@@ -196,16 +222,17 @@ class Classificador:
             linhas = cur.fetchall()
         mudancas, contagem = [], {t: 0 for t in TAGS}
         for r in linhas:
-            novas = classificar_imovel(r, r["texto"] or "")
+            motivos = explicar_imovel(r, r["texto"] or "")
+            novas = list(motivos)
             for t in novas:
                 contagem[t] += 1
-            if sorted(novas) != sorted(r["tags"] or []):
-                mudancas.append((novas, r["id"]))
+            if sorted(novas) != sorted(r["tags"] or []) or motivos != (r["tags_motivos"] or {}):
+                mudancas.append((novas, Jsonb(motivos), r["id"]))
         with self.conn.cursor() as cur:
-            cur.executemany("update imovel set tags = %s, tags_em = now() where id = %s", mudancas)
+            cur.executemany("update imovel set tags = %s, tags_motivos = %s, tags_em = now() where id = %s", mudancas)
             if not limite:  # imóveis sem lote ativo não aparecem na busca: limpa para não sobrar tag velha
-                cur.execute("""update imovel set tags = '{}', tags_em = now()
-                               where tags <> '{}' and not exists
+                cur.execute("""update imovel set tags = '{}', tags_motivos = '{}', tags_em = now()
+                               where (tags <> '{}' or tags_motivos <> '{}'::jsonb) and not exists
                                  (select 1 from lote l where l.imovel_id = imovel.id and l.status in ('ativo', 'suspenso'))""")
         self.conn.commit()
         return {"imoveis": len(linhas), "alterados": len(mudancas), **contagem}

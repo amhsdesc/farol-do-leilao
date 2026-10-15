@@ -439,3 +439,6 @@ h1, h2, h3 { font-family: var(--display); line-height: 1.15; margin: 0; text-wra
   .barra-resultado-cel .ver { margin-left: auto; font-weight: 800; color: var(--luz); }
   .calculadora-pagina { padding-bottom: 80px; }
 }
+
+.motivos-tags { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.motivos-tags li { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }

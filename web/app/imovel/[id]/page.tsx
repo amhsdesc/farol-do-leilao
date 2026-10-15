@@ -9,13 +9,13 @@ import GraficoPreco from "@/components/ficha/GraficoPreco";
 import Mapa from "@/components/Mapa";
 import { acesso } from "@/lib/acesso";
 import { alertaDoImovel } from "@/lib/alertas/consultas";
-import { imovel, parecidos, type Lote } from "@/lib/consultas";
+import { imovel, motivosTags, parecidos, type Lote } from "@/lib/consultas";
 import { buscarFotosCaixa, salvarFotosLote } from "@/lib/fotos/caixa";
 import { Suspense } from "react";
 import EnriquecimentoLote, { EnriquecimentoCarregando, EnriquecimentoTravado } from "@/components/ficha/EnriquecimentoLote";
 import { enriquecimentoSalvo } from "@/lib/enriquecimento";
 import { aplicarEnriquecimento } from "@/lib/enriquecimento/regras";
-import { area, MODALIDADES, porcento, quando, reais, TIPOS } from "@/lib/formato";
+import { area, MODALIDADES, porcento, quando, reais, TAGS, TIPOS } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -148,8 +148,9 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
   if (!d) notFound();
   const { imovel: im, lotes, historico } = d;
   await completarFotosCaixa(lotes);
-  const [vizinhos, alertaExistente] = await Promise.all([
+  const [vizinhos, motivos, alertaExistente] = await Promise.all([
     parecidos(im.id),
+    motivosTags(im.id),
     assinante && usuario ? alertaDoImovel(usuario.id, im.id) : Promise.resolve(null),
   ]);
 
@@ -259,6 +260,25 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
               Avaliação é o valor que o vendedor ou o juiz deu ao imóvel. Não é o preço de mercado: pode estar acima ou abaixo.
             </p>
           </section>
+
+          {Object.keys(motivos).length > 0 && (
+            <section className="painel">
+              <h2>Perfil de investimento</h2>
+              <ul className="motivos-tags">
+                {Object.entries(motivos).map(([tag, porques]) => TAGS[tag] && (
+                  <li key={tag}>
+                    <span className="chip chip-tag" title={TAGS[tag].ajuda}>{TAGS[tag].rotulo}</span>
+                    {assinante ? (
+                      <span>{porques.join(" · ")}</span>
+                    ) : (
+                      <Link className="muted" href="/assinar"><Cadeado tamanho={12} /> Veja por que este imóvel tem esta marca</Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="muted nota">Marcas calculadas por regras (cidade, bairro, distância de campus, hospitais e pontos turísticos). São um ponto de partida: confira o entorno antes de decidir.</p>
+            </section>
+          )}
 
           {modalidade && (
             <section className="painel">

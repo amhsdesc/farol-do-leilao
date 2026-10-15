@@ -32,7 +32,7 @@ export const TAGS: Record<string, { rotulo: string; ajuda: string }> = {
   airbnb: { rotulo: "Airbnb", ajuda: "Apartamento ou casa compacta onde há procura por temporada" },
   praia: { rotulo: "Praia", ajuda: "Cidade ou bairro de orla, ou texto de frente para o mar" },
   turistico: { rotulo: "Turístico", ajuda: "Cidade de destino turístico" },
-  universitario: { rotulo: "Universitário", ajuda: "Até 2,5 km de um campus" },
+  universitario: { rotulo: "Universitário", ajuda: "Perto de um campus: até 2 km (1,2 km quando só sabemos o bairro)" },
 };
 
 export const MODALIDADES: Record<string, string> = {

@@ -221,6 +221,16 @@ export async function imovel(id: number) {
   return { imovel: im, lotes, historico };
 }
 
+/** Por que o imóvel tem cada tag (airbnb, praia...). Se a coluna ainda não existe (migração pendente), a ficha segue sem isso. */
+export async function motivosTags(id: number): Promise<Record<string, string[]>> {
+  try {
+    const [r] = await consulta<{ tags_motivos: Record<string, string[]> | null }>(`select tags_motivos from imovel where id = $1`, [id]);
+    return r?.tags_motivos ?? {};
+  } catch {
+    return {};
+  }
+}
+
 export type LinhaFonte = {
   id: string;
   nome: string;

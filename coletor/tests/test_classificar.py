@@ -96,3 +96,18 @@ def test_universitario_raio_menor_com_coordenada_de_bairro():
     assert "universitario" in classificar_imovel(perto)
     assert "universitario" not in classificar_imovel({**perto, "geo_precisao": "bairro"})
     assert campus_proximo(lat, lon) is not None
+
+
+def test_cada_tag_traz_o_motivo():
+    from coletor.classificar import explicar_imovel
+    praia = explicar_imovel(im(cidade="Maragogi", uf="AL"))
+    assert "praia" in praia and "Maragogi" in praia["praia"][0]
+    lat, lon = -22.8180, -47.0690  # Unicamp
+    univ = explicar_imovel(im(lat=lat + 0.01, lon=lon, geo_precisao="endereco"))
+    assert "universitario" in univ and "km de" in univ["universitario"][0]
+    bairro = explicar_imovel(im(lat=lat + 0.01, lon=lon, geo_precisao="bairro"))
+    if "universitario" in bairro:
+        assert "centro do bairro" in bairro["universitario"][0]
+    texto = explicar_imovel(im(), "Apartamento próximo à universidade")
+    assert texto["universitario"] == ["o anúncio fala de universidade ou faculdade por perto"]
+    assert list(explicar_imovel(im(), "")) == classificar_imovel(im(), "")
