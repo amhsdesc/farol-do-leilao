@@ -87,7 +87,8 @@ CIDADES_TURISTICAS: set[tuple[str, str]] = {(c, uf) for uf, nomes in {
 TEXTO_TURISTICO = r"\b(ponto turistico|pousada|resort|hotel|hospedagem|temporada|turismo|atracao turistica|polo turistico|chale)\b"
 
 # --- Universitário ---------------------------------------------------------------------------------------------
-RAIO_CAMPUS_KM = 2.5
+RAIO_CAMPUS_KM = 2.0
+RAIO_CAMPUS_BAIRRO_KM = 1.2
 CAMPI: list[tuple[str, float, float]] = [
     ("USP Butantã", -23.5614, -46.7344), ("PUC-SP Perdizes", -23.5380, -46.6700), ("Mackenzie", -23.5470, -46.6520),
     ("UFABC Santo André", -23.6460, -46.5280), ("UNIFESP Vila Clementino", -23.5980, -46.6430),

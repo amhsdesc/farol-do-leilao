@@ -66,7 +66,8 @@ def test_airbnb_por_pontuacao_hospital_e_negocios():
     from coletor.classificar import pontuar_airbnb
     # perto do Albert Einstein (hospital: 2) e da Berrini? só hospital = 2 pontos: não basta
     so_hospital = im(lat=-23.5990, lon=-46.7150, geo_precisao="endereco")
-    assert "airbnb" not in classificar_imovel(so_hospital)
+    pontos_hosp, _ = pontuar_airbnb(so_hospital, set(), "")  # sem depender de haver campus por perto (o arquivo de universidades muda)
+    assert pontos_hosp == 2
     # hospital + polo de negócios (Faria Lima/Itaim): 4 pontos
     hosp_neg = im(lat=-23.5870, lon=-46.6790, geo_precisao="endereco")  # São Luiz Itaim + Itaim Bibi
     pontos, motivos = pontuar_airbnb(hosp_neg, set(), "")
@@ -78,3 +79,20 @@ def test_airbnb_por_pontuacao_hospital_e_negocios():
     assert "airbnb" not in classificar_imovel(im(uf="BA", cidade="Salvador", lat=-12.9710, lon=-38.5100, geo_precisao="cidade"))
     # grande demais não é airbnb
     assert "airbnb" not in classificar_imovel(im(uf="BA", cidade="Salvador", quartos=5, area=320, lat=-12.9710, lon=-38.5100, geo_precisao="endereco"))
+
+
+def test_universitario_filtra_nomes_que_nao_sao_instituicao():
+    from coletor.referencia_osm import eh_instituicao
+    for ruim in ("1H", "43424 Informática", "Departamento de Matemática", "Bloco Central", "Laboratório de Física", "Biblioteca", "Sala de Matrícula"):
+        assert not eh_instituicao(ruim), ruim
+    for bom in ("UFRJ", "Universidade Estácio de Sá", "Faculdade Unopar", "IF Sudeste - Campus Manhuaçu", "Unesc", "PUC"):
+        assert eh_instituicao(bom), bom
+
+
+def test_universitario_raio_menor_com_coordenada_de_bairro():
+    from coletor.classificar import campus_proximo
+    lat, lon = -22.8180, -47.0690  # Unicamp
+    perto = im(lat=lat + 0.016, lon=lon, geo_precisao="endereco")  # ~1,8 km
+    assert "universitario" in classificar_imovel(perto)
+    assert "universitario" not in classificar_imovel({**perto, "geo_precisao": "bairro"})
+    assert campus_proximo(lat, lon) is not None

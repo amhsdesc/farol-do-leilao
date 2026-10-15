@@ -4,7 +4,7 @@ Regras (conservadoras: na dúvida, não marca):
   - praia: cidade litorânea da lista, bairro de orla em cidade grande, ou texto "frente mar / pé na areia / praia" no
     título, bairro ou endereço. Vale para apartamento, casa, terreno e comercial.
   - turistico: cidade de destino turístico da lista, ou texto como pousada/resort/temporada (apartamento, casa, terreno, comercial).
-  - universitario: até 2,5 km de um campus (só quando a coordenada é do endereço, da rua ou do bairro, nunca do centro da
+  - universitario: até 2 km de um campus com coordenada de endereço/rua e até 1,2 km com a do bairro (só quando a coordenada é do endereço, da rua ou do bairro, nunca do centro da
     cidade), ou texto "próximo à universidade/faculdade", ou bairro "Universitário". Só apartamento e casa.
   - airbnb: apartamento ou casa compacta (até 3 quartos e até 150 m², dados ausentes não excluem) que some 3 pontos ou
     mais: praia ou cidade turística (3), atrativo turístico até 1,5 km (3), hospital de referência até 1,5 km (2),
@@ -23,6 +23,7 @@ from pathlib import Path
 
 from . import referencia_tags as ref
 from .normalizar import simplificar
+from .referencia_osm import eh_instituicao
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +75,16 @@ ARQUIVO_UNIVERSIDADES = Path(__file__).parent / "dados_ref" / "universidades.jso
 def _universidades_osm() -> list[tuple[str, float, float]]:
     """Universidades do OpenStreetMap, se o arquivo foi gerado (`python -m coletor referencia-universidades`)."""
     try:
-        return [(str(n), float(la), float(lo)) for n, la, lo in json.loads(ARQUIVO_UNIVERSIDADES.read_text(encoding="utf-8"))]
+        bruto = json.loads(ARQUIVO_UNIVERSIDADES.read_text(encoding="utf-8"))
+        # filtra aqui também: o arquivo gerado antes do filtro tem departamentos, laboratórios e prédios repetidos
+        vistos: set[tuple[str, float, float]] = set()
+        saida: list[tuple[str, float, float]] = []
+        for n, la, lo in bruto:
+            chave = (str(n).lower(), round(float(la), 2), round(float(lo), 2))
+            if eh_instituicao(str(n)) and chave not in vistos:
+                vistos.add(chave)
+                saida.append((str(n), float(la), float(lo)))
+        return saida
     except (OSError, ValueError, TypeError):
         return []
 
@@ -151,7 +161,9 @@ def classificar_imovel(im: dict, texto: str = "") -> list[str]:
     if tipo in _RESIDENCIAL:
         precisa = (im.get("geo_precisao") or "") in ("endereco", "rua", "bairro")
         lat, lon = im.get("lat"), im.get("lon")
-        if (precisa and campus_proximo(lat, lon)) or _UNIV.search(txt) or _BAIRRO_UNIV.search(bairro):
+        # coordenada de bairro é o centro do bairro, não o imóvel: raio menor para não marcar quem só mora perto
+        raio = ref.RAIO_CAMPUS_KM if (im.get("geo_precisao") or "") in ("endereco", "rua") else ref.RAIO_CAMPUS_BAIRRO_KM
+        if (precisa and campus_proximo(lat, lon, raio)) or _UNIV.search(txt) or _BAIRRO_UNIV.search(bairro):
             tags.add("universitario")
 
     # airbnb: residencial compacto que soma pontos de demanda de temporada
