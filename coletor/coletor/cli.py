@@ -276,7 +276,7 @@ def cmd_geocodificar(a):
 
 def padronizar_comitentes(conn) -> int:
     """Aplica as regras atuais de comitente aos lotes que já estão no banco (sem precisar reler os sites)."""
-    from .normalizar import LEILOEIRO_INDEPENDENTE, SEM_COMITENTE, SEM_COMITENTE_JUDICIAL, comitente, comitente_final
+    from .normalizar import LEILOEIRO_INDEPENDENTE, SEM_COMITENTE, SEM_COMITENTE_JUDICIAL, comitente, comitente_final, mesmo_nome
     from .registro import carregar
     individuais = [i for i, f in carregar().items() if f.get("leiloeiro_individual")]
     n = 0
@@ -305,11 +305,20 @@ def padronizar_comitentes(conn) -> int:
             if novo != r["comitente"]:
                 cur.execute("update lote set comitente = %s where id = %s", (novo, r["id"]))
                 n += 1
-        # 3) leiloeiros individuais: o nome da fonte (gravado antes desta regra) passa a ser o rótulo agrupado
+        # 3) leiloeiros individuais: o nome da fonte (gravado antes desta regra, ou reescrito no passo 1 com "da/de/dos" em
+        #    minúscula) passa a ser o rótulo agrupado. Compara sem diferença de maiúsculas/acento: "Gabriel Silva Da Rosa"
+        #    (cadastro da fonte) e "Gabriel Silva da Rosa" (como ficou no lote) são a mesma pessoa.
         if individuais:
-            cur.execute("""update lote l set comitente = %s from fonte f
-                           where f.id = l.fonte_id and f.id = any(%s) and l.comitente = f.nome""", (LEILOEIRO_INDEPENDENTE, individuais))
-            n += cur.rowcount
+            cur.execute("select id, nome from fonte where id = any(%s)", (individuais,))
+            nomes = {r["id"]: r["nome"] for r in cur.fetchall()}
+            cur.execute("""select distinct fonte_id, comitente from lote
+                           where fonte_id = any(%s) and comitente is not null and comitente <> %s""",
+                        (individuais, LEILOEIRO_INDEPENDENTE))
+            for r in cur.fetchall():
+                if mesmo_nome(r["comitente"], nomes.get(r["fonte_id"])):
+                    cur.execute("update lote set comitente = %s where fonte_id = %s and comitente = %s",
+                                (LEILOEIRO_INDEPENDENTE, r["fonte_id"], r["comitente"]))
+                    n += cur.rowcount
     conn.commit()
     return n
 

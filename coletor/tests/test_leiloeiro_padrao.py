@@ -77,3 +77,34 @@ def test_leiloeiro_individual_agrupa_e_preposicao_fica_minuscula():
     assert "sem_comitente" not in outro.padroes
     assert _capitalizar("Cooperativa de Crédito e Investimento Com Interação Solidária Raiz") == \
         "Cooperativa de Crédito e Investimento com Interação Solidária Raiz"
+
+
+def test_mesmo_nome_ignora_maiuscula_e_acento():
+    from coletor.normalizar import mesmo_nome
+    assert mesmo_nome("Gabriel Silva da Rosa", "Gabriel Silva Da Rosa")
+    assert mesmo_nome("Caroline de Sousa Ribas", "Caroline De Sousa Ribas")
+    assert mesmo_nome("Bruno Cézar Alves Xavier", "BRUNO CEZAR ALVES XAVIER")
+    assert not mesmo_nome("Gabriel Silva da Rosa", "Gabriel Silva Rosa")
+    assert not mesmo_nome("", "")
+    assert not mesmo_nome(None, "Fulano")
+
+
+def test_individual_cujo_comitente_e_o_proprio_nome_vai_para_independente_em_qualquer_grafia():
+    """Plataformas costumam devolver o nome do leiloeiro como "comitente", às vezes com 'Da/De' em outra caixa."""
+    from coletor.normalizar import LEILOEIRO_INDEPENDENTE
+    ad = _ad({"id": "gabriel-silva-da-rosa", "nome": "Gabriel Silva Da Rosa", "leiloeiro_individual": True})
+    for informado in ("Gabriel Silva da Rosa", "GABRIEL SILVA DA ROSA", "Gabriel Silva Da Rosa", None):
+        l = normalizar(LoteBruto(id_externo="1", comitente=informado), ad.padroes)
+        assert l.comitente == LEILOEIRO_INDEPENDENTE, informado
+        assert l.leiloeiro == "Gabriel Silva Da Rosa"  # o nome continua na ficha do lote
+
+
+def test_individual_com_vendedor_de_verdade_mantem_o_vendedor():
+    ad = _ad({"id": "gabriel-silva-da-rosa", "nome": "Gabriel Silva Da Rosa", "leiloeiro_individual": True})
+    assert normalizar(LoteBruto(id_externo="1", comitente="Banco Pan S.A."), ad.padroes).comitente == "Banco Pan"
+    assert normalizar(LoteBruto(id_externo="2", comitente="Tribunal de Justiça do Paraná"), ad.padroes).comitente == "Tribunal de Justiça do Paraná"
+
+
+def test_fonte_que_nao_e_individual_continua_com_o_proprio_nome_como_comitente():
+    ad = _ad({"id": "frazao", "nome": "Frazão Leilões"})
+    assert normalizar(LoteBruto(id_externo="1"), ad.padroes).comitente == "Frazão Leilões"
