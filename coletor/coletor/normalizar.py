@@ -344,6 +344,12 @@ SEM_COMITENTE = "Não informado"
 LEILOEIRO_INDEPENDENTE = "Leiloeiro independente"  # onde a fonte é um leiloeiro individual e o lote não diz quem vende
 
 
+def mesmo_nome(a: Any, b: Any) -> bool:
+    """Mesmo nome escrito de jeitos diferentes ("Gabriel Silva Da Rosa" × "Gabriel Silva da Rosa"; com ou sem acento)."""
+    sa = simplificar(a)
+    return bool(sa) and sa == simplificar(b)
+
+
 def comitente_padrao(modalidade_lote: str | None) -> str:
     return SEM_COMITENTE_JUDICIAL if modalidade_lote == "judicial" else SEM_COMITENTE
 
@@ -528,6 +534,16 @@ def extrair_da_descricao(texto: str | None) -> dict[str, Any]:
 
 # ---------------------------------------------------------------- lote
 
+def _comitente_do_lote(informado: Any, textos: tuple, padroes: dict[str, Any]) -> str:
+    """Quem vende. Em fonte de leiloeiro individual, o próprio leiloeiro nunca é o vendedor: se o comitente que sobrou é o
+    nome dele (em qualquer grafia), o lote entra no grupo "Leiloeiro independente" do filtro, e não numa linha só dele."""
+    sem = padroes.get("sem_comitente")
+    nome = comitente_final(informado, textos, sem or padroes.get("leiloeiro") or padroes.get("nome"))
+    if sem == LEILOEIRO_INDEPENDENTE and mesmo_nome(nome, padroes.get("leiloeiro") or padroes.get("nome")):
+        return LEILOEIRO_INDEPENDENTE
+    return nome
+
+
 def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: datetime | None = None) -> Lote:
     """Converte LoteBruto em Lote. `padroes` preenche campos que a fonte não informa (ex.: uf)."""
     padroes = padroes or {}
@@ -598,7 +614,7 @@ def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: d
         aceita_parcelamento=aceita_parcelamento(campo("aceita_parcelamento"), *textos),
         debitos_por_conta=debitos_por_conta(campo("debitos_por_conta"), *textos),
         leiloeiro=limpar(campo("leiloeiro")),
-        comitente=comitente_final(campo("comitente"), textos, padroes.get("sem_comitente") or padroes.get("leiloeiro") or padroes.get("nome")),
+        comitente=_comitente_do_lote(campo("comitente"), textos, padroes),
         processo=limpar(campo("processo")),
         edital_url=limpar(campo("edital_url")),
         fotos=[f for f in (bruto.fotos or []) if f][:30],
