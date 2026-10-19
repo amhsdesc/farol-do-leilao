@@ -1,7 +1,8 @@
 # Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: luiz-fernando-moraes-da-cruz
-nome: Luiz Fernando Moraes Da Cruz
+nome: Luiz Fernando Moraes Da Cruz
+leiloeiro_individual: true
 site: http://www.santamarialeiloes.com.br
 tipo: automatico
 uf: [RS]

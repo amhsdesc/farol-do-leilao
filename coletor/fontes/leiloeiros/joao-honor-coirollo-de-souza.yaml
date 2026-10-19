@@ -1,7 +1,8 @@
 # Criado pelo catálogo (2026-09-30). Validação: validado por Junta Comercial (PDF oficial).
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: joao-honor-coirollo-de-souza
-nome: João Honor Coirollo de Souza
+nome: João Honor Coirollo de Souza
+leiloeiro_individual: true
 site: https://www.jhcleiloeirooficial.lel.br
 tipo: automatico
 uf: [RS]
