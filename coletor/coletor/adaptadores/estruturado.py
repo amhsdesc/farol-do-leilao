@@ -172,8 +172,38 @@ def _fotos_var_lote(lote: dict) -> list[str]:
     return achadas[:20]
 
 
+# Suporte Leilões (Leilões Monteiro, Trileilões, Peterlongo...): a galeria vem no HTML como
+# static.suporteleiloes.com.br/<site>/bens/<id do bem>/arquivos/sl-bem-*.jpg (miniaturas não têm o prefixo "sl-bem-";
+# PDFs de edital/certidão ficam na mesma pasta e são ignorados pela extensão).
+_FOTO_SUPORTE = re.compile(
+    r"https?://static\.suporteleiloes\.com\.br/[^\"'\s)<>\\]+?/bens/(\d+)/arquivos/sl-bem-[^\"'\s)<>\\]+?\.(?:jpe?g|png|webp)", re.I)
+
+
+def _fotos_suporte_leiloes(html: str) -> list[str]:
+    """Fotos da galeria do lote em páginas da plataforma Suporte Leilões.
+
+    O `var lote` dessas páginas às vezes não traz `bem.arquivos` (só a capa, em leilao.stats.lote.bem.image), então a
+    galeria é lida direto do HTML. Se a página mostra fotos de outros lotes (parecidos, próximo lote), vale só o bem deste.
+    """
+    achadas = [(m.group(1), m.group(0)) for m in _FOTO_SUPORTE.finditer(html.replace("\\/", "/"))]
+    if not achadas:
+        return []
+    lote = extrair_var_lote(html) or {}
+    stats = (lote.get("leilao") or {}).get("stats") if isinstance(lote.get("leilao"), dict) else None
+    bem = (((stats or {}).get("lote") or {}).get("bem") or {}) if isinstance(stats, dict) else {}
+    bem_id = str(bem.get("id") or "") if isinstance(bem, dict) else ""
+    if bem_id and any(b == bem_id for b, _ in achadas):
+        achadas = [(b, u) for b, u in achadas if b == bem_id]
+    fotos: list[str] = []
+    for _, u in achadas:
+        if u not in fotos:
+            fotos.append(u)
+    return fotos[:20]
+
+
 def fotos_genericas(html: str, url: str = "") -> list[str]:
-    """Reserva para páginas sem leitor próprio: a imagem de capa (og:image / twitter:image), se não for logo."""
+    """Reserva para páginas sem leitor próprio: a imagem de capa (og:image / twitter:image), se não for logo,
+    mais a galeria quando a página é de uma plataforma conhecida (ver `_fotos_suporte_leiloes`)."""
     s = BeautifulSoup(html, "lxml")
     achadas: list[str] = []
     for m in s.find_all("meta"):
@@ -181,7 +211,11 @@ def fotos_genericas(html: str, url: str = "") -> list[str]:
             c = urljoin(url or "", (m.get("content") or "").strip())
             if c.startswith("http") and not _FOTO_RUIM.search(c) and c not in achadas:
                 achadas.append(c)
-    return achadas[:3]
+    achadas = achadas[:3]
+    for u in _fotos_suporte_leiloes(html):
+        if u not in achadas:
+            achadas.append(u)
+    return achadas[:20]
 
 
 def ler_com_motivo(html: str, texto: str = "", url: str = "") -> tuple[dict | object | None, str]:

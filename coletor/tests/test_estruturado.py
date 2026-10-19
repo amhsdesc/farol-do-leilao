@@ -366,6 +366,30 @@ def test_fotos_do_json_embutido_lance_vip_e_capa_generica():
     assert fotos_genericas('<meta property="og:image" content="https://a.com/assets/logo.jpg">', "https://a.com") == []
 
 
+def test_fotos_da_galeria_suporte_leiloes_sem_og_image_nem_bem_no_json():
+    """Leilões Monteiro, lote 4780: sem og:image e com `bem` vazio no topo do var lote; as fotos só estão no HTML."""
+    s = "https://static.suporteleiloes.com.br/leiloesmonteirocombr/bens/"
+    capa = s + "4776/arquivos/sl-bem-4776-aaa-bbb.jpg"
+    json_lote = ('{"id":4780,"leilao":{"stats":{"lote":{"id":4780,"bem":{"id":4776,"image":{"full":{"url":"'
+                 + capa.replace("/", "\\/") + '"}}}}}}}')
+    html = (
+        "<html><body>"
+        f'<img src="{s}4776/arquivos/sl-bem-4776-aaa-bbb.jpg"><img src="{s}4776/arquivos/sl-bem-4776-ccc-ddd.png">'
+        f'<img src="{s}4776/arquivos/sl-bem-4776-eee-fff.jpg"><img src="{s}4776/arquivos/sl-bem-4776-eee-fff.jpg">'
+        f'<img src="{s}4776/arquivos/6aa83aec538e7-6aa83aec5873a.jpg">'  # miniatura: sem "sl-bem-"
+        f'<a href="{s}4776/arquivos/sl-bem-4776-ggg-hhh.pdf">Edital</a>'  # documento, não foto
+        f'<img src="{s}4999/arquivos/sl-bem-4999-xxx-yyy.jpg">'  # foto de outro lote (parecidos)
+        "<script>var lote = " + json_lote + ";</script></body></html>"
+    )
+    fotos = estruturado.fotos_genericas(html, "https://leiloesmonteiro.com.br/eventos/leilao/x/lote/4780/y")
+    assert fotos == [s + "4776/arquivos/sl-bem-4776-aaa-bbb.jpg", s + "4776/arquivos/sl-bem-4776-ccc-ddd.png", s + "4776/arquivos/sl-bem-4776-eee-fff.jpg"]
+    # sem var lote para saber qual é o bem do lote: vale tudo que a galeria mostra (ainda sem PDF nem miniatura)
+    sem_json = html.split("<script>")[0]
+    assert len(estruturado.fotos_genericas(sem_json)) == 4
+    # página de outra plataforma: nada muda
+    assert estruturado.fotos_genericas("<html><img src='/a.jpg'></html>") == []
+
+
 def test_cidade_no_inicio_do_titulo_e_bem_que_nao_e_imovel_nao_gasta_ia():
     assert estruturado._local({}, "RIO VERDE/GO - UMA CASA RESIDENCIAL COM 12 CÔMODOS", "") == ("Rio Verde", "GO", None)
     assert estruturado._local({}, "SANTA HELENA DE GOIÁS/GO - FAZENDA", "")[0] == "Santa Helena de Goiás"
