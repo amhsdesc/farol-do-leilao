@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { calcular, custoReformaM2, type Entrada, type Grupo, type Item, type Modalidade } from "@/lib/calculadora/calcular";
 import * as P from "@/lib/calculadora/parametros";
-import { pesquisarValorMercado, type AmostraMercado } from "@/lib/calculadora/pesquisaMercado";
+import type { AmostraMercado, Confianca } from "@/lib/calculadora/mercadoCore.ts";
+import { pesquisarValorMercado } from "@/lib/calculadora/pesquisaMercado";
 import { TIPOS } from "@/lib/formato";
 
 export type Prefill = {
@@ -24,6 +25,11 @@ export type Prefill = {
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
 const TIPOS_CALC = ["apartamento", "casa", "terreno", "comercial", "galpao", "rural"] as const;
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const ROTULO_CONFIANCA: Record<Confianca, string> = {
+  alta: "alta (muitos anúncios do bairro)",
+  media: "média",
+  baixa: "baixa (poucos anúncios ou região ampla): confira os links",
+};
 const pct = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 const GRUPOS: { id: Grupo; titulo: string }[] = [
   { id: "arrematar", titulo: "Para arrematar" },
@@ -94,6 +100,7 @@ export default function CalculadoraApp({ prefill, pesquisaMercadoDisponivel }: {
   const [erroMercado, setErroMercado] = useState("");
   const [amostrasMercado, setAmostrasMercado] = useState<AmostraMercado[] | null>(null);
   const [observacaoMercado, setObservacaoMercado] = useState("");
+  const [faixaMercado, setFaixaMercado] = useState<{ baixo: number; tipico: number; alto: number; confianca: Confianca } | null>(null);
   const [padrao, setPadrao] = useState<P.PadraoReforma>("simples");
   const [meses, setMeses] = useState("12");
   const [condominio, setCondominio] = useState("");
@@ -153,6 +160,7 @@ export default function CalculadoraApp({ prefill, pesquisaMercadoDisponivel }: {
     setBuscandoMercado(true);
     setErroMercado("");
     setAmostrasMercado(null);
+    setFaixaMercado(null);
     const r = await pesquisarValorMercado({ uf, cidade, bairro: bairro || undefined, tipo, area: n(area) });
     setBuscandoMercado(false);
     if (!r.ok) {
@@ -160,9 +168,10 @@ export default function CalculadoraApp({ prefill, pesquisaMercadoDisponivel }: {
       return;
     }
     setModoMercado("m2");
-    setM2(String(r.precoM2Medio));
+    setM2(String(r.precoM2));
+    setFaixaMercado({ baixo: r.baixo, tipico: r.precoM2, alto: r.alto, confianca: r.confianca });
     setAmostrasMercado(r.amostras);
-    setObservacaoMercado(r.observacao ?? "");
+    setObservacaoMercado(r.observacao);
   }
 
   return (
@@ -250,6 +259,21 @@ export default function CalculadoraApp({ prefill, pesquisaMercadoDisponivel }: {
           {erroMercado && <p className="nota ruim">{erroMercado}</p>}
           {mercadoCalc > 0 && (
             <p className="destaque-num">Valor de mercado estimado: <b>{brl.format(mercadoCalc)}</b></p>
+          )}
+          {faixaMercado && modoMercado === "m2" && (
+            <div className="faixa-mercado">
+              <p className="muted nota">
+                Anúncios na região vão de {brl.format(faixaMercado.baixo)} a {brl.format(faixaMercado.alto)} por m² (faixa típica).
+                Confiança: <b>{ROTULO_CONFIANCA[faixaMercado.confianca]}</b>. Para a conta, escolha:
+              </p>
+              <div className="pilulas" role="group" aria-label="Qual preço do m² usar">
+                {([["Cauteloso", faixaMercado.baixo], ["Típico", faixaMercado.tipico], ["Otimista", faixaMercado.alto]] as const).map(([rotulo, valor]) => (
+                  <button key={rotulo} type="button" className={`pilula${n(m2) === valor ? " ligada" : ""}`} onClick={() => setM2(String(valor))}>
+                    {rotulo} · {brl.format(valor)}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
           {prefill.avaliacao ? (
             <p className="muted nota">Avaliação do edital: {brl.format(prefill.avaliacao)}.</p>

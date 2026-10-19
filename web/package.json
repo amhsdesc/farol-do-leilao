@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test \"lib/**/*.test.ts\"",
-    "notificacoes": "node --env-file=.env.local --experimental-strip-types lib/notificacoes/executar.ts"
+    "notificacoes": "node --env-file=.env.local --experimental-strip-types lib/notificacoes/executar.ts",
+    "mercado": "node --env-file=.env.local --experimental-strip-types lib/calculadora/executarPrecalculo.ts"
   },
   "dependencies": {
     "@auth/pg-adapter": "^1.11.3",

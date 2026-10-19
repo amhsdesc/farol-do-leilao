@@ -1,0 +1,30 @@
+name: Valor de mercado
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # segunda de manhã (UTC): renova o preço por m² das regiões com imóvel ativo
+  workflow_dispatch: {}
+
+# Sem IA: só o banco e o portal Chaves na Mão. Uma busca por vez, com intervalo (o portal limita 60 requisições/min por IP).
+# O custo em dinheiro é zero; o que a rodada faz fica registrado em `mercado_preco` (só se acrescenta).
+jobs:
+  mercado:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    concurrency:
+      group: mercado
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: web
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      MERCADO_PRECALC_MAX: ${{ vars.MERCADO_PRECALC_MAX }}
+      MERCADO_PRECALC_MINUTOS: "45"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: node --experimental-strip-types lib/calculadora/executarPrecalculo.ts

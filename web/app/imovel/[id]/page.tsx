@@ -14,6 +14,7 @@ import { buscarFotosCaixa, salvarFotosLote } from "@/lib/fotos/caixa";
 import { Suspense } from "react";
 import EnriquecimentoLote, { EnriquecimentoCarregando, EnriquecimentoTravado } from "@/components/ficha/EnriquecimentoLote";
 import { enriquecimentoSalvo } from "@/lib/enriquecimento";
+import { mercadoDaFicha } from "@/lib/calculadora/mercadoFicha";
 import { aplicarEnriquecimento } from "@/lib/enriquecimento/regras";
 import { area, MODALIDADES, porcento, quando, reais, TAGS, TIPOS } from "@/lib/formato";
 
@@ -148,15 +149,17 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
   if (!d) notFound();
   const { imovel: im, lotes, historico } = d;
   await completarFotosCaixa(lotes);
-  const [vizinhos, motivos, alertaExistente] = await Promise.all([
-    parecidos(im.id),
-    motivosTags(im.id),
-    assinante && usuario ? alertaDoImovel(usuario.id, im.id) : Promise.resolve(null),
-  ]);
-
   const ativos = lotes.filter((l) => l.status === "ativo" || l.status === "suspenso");
   const base = ativos.length ? ativos : lotes;
   const melhor = base[0];
+  const [vizinhos, motivos, alertaExistente, mercado] = await Promise.all([
+    parecidos(im.id),
+    motivosTags(im.id),
+    assinante && usuario ? alertaDoImovel(usuario.id, im.id) : Promise.resolve(null),
+    // só assinante, e só lê o banco (pré-cálculo semanal): a ficha nunca dispara consulta externa nem IA
+    assinante ? mercadoDaFicha(im, melhor?.lance_minimo).catch(() => null) : Promise.resolve(null),
+  ]);
+
   const fotos = [...new Set(lotes.flatMap((l) => l.fotos ?? []))].slice(0, 12);
   const ocupacao = base.some((l) => l.ocupacao === "ocupado")
     ? "ocupado"
@@ -245,7 +248,35 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
               <div className="dado"><span>Lance mínimo agora</span><b>{reais(melhor?.lance_minimo)}</b></div>
               <div className="dado"><span>Avaliação do edital</span><b>{reais(melhor?.valor_avaliacao)}</b></div>
               <div className="dado"><span>Desconto sobre a avaliação</span><b className="bom">{porcento(desconto)}</b></div>
-              <div className="dado"><span>Valor de mercado</span><b className="muted">em breve</b></div>
+              {mercado ? (
+                <>
+                  <div className="dado">
+                    <span>Valor de mercado (estimado)</span>
+                    <b>{reais(mercado.valorEstimado)}</b>
+                    <small className="muted">
+                      {reais(Math.round(mercado.precoM2))}/m² · faixa {reais(Math.round(mercado.baixo))} a {reais(Math.round(mercado.alto))}/m² · confiança {mercado.confianca === "media" ? "média" : mercado.confianca}
+                    </small>
+                  </div>
+                  {mercado.descontoSobreMercado != null && (
+                    <div className="dado">
+                      <span>Lance sobre o mercado</span>
+                      <b className={mercado.descontoSobreMercado > 0 ? "bom" : undefined}>
+                        {mercado.descontoSobreMercado > 0 ? `${porcento(mercado.descontoSobreMercado)} abaixo` : `${porcento(-mercado.descontoSobreMercado)} acima`}
+                      </b>
+                    </div>
+                  )}
+                </>
+              ) : assinante ? (
+                <div className="dado">
+                  <span>Valor de mercado</span>
+                  <Link href={`/calculadora?imovel=${im.id}`} className="muted">Ainda não calculado: pesquisar na calculadora</Link>
+                </div>
+              ) : (
+                <div className="dado">
+                  <span>Valor de mercado</span>
+                  <Link href="/assinar" className="muted"><Cadeado tamanho={12} /> Para assinantes</Link>
+                </div>
+              )}
               {area(im.area_privativa) && <div className="dado"><span>Área privativa</span><b>{area(im.area_privativa)}</b></div>}
               {area(im.area_terreno) && <div className="dado"><span>Área do terreno</span><b>{area(im.area_terreno)}</b></div>}
               {im.quartos != null && <div className="dado"><span>Quartos / vagas</span><b>{im.quartos} / {im.vagas ?? "—"}</b></div>}
@@ -258,6 +289,7 @@ export default async function PaginaImovel({ params }: { params: Promise<{ id: s
             </div>
             <p className="muted nota">
               Avaliação é o valor que o vendedor ou o juiz deu ao imóvel. Não é o preço de mercado: pode estar acima ou abaixo.
+              {mercado && " O valor de mercado vem de anúncios de imóveis parecidos na região (preço pedido, não preço vendido)."}
             </p>
           </section>
 

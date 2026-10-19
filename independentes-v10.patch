@@ -1,0 +1,188 @@
+diff --git a/coletor/coletor/cli.py b/coletor/coletor/cli.py
+index fb48149..4bc123b 100644
+--- a/coletor/coletor/cli.py
++++ b/coletor/coletor/cli.py
+@@ -276,7 +276,7 @@ def cmd_geocodificar(a):
+ 
+ def padronizar_comitentes(conn) -> int:
+     """Aplica as regras atuais de comitente aos lotes que já estão no banco (sem precisar reler os sites)."""
+-    from .normalizar import LEILOEIRO_INDEPENDENTE, SEM_COMITENTE, SEM_COMITENTE_JUDICIAL, comitente, comitente_final
++    from .normalizar import LEILOEIRO_INDEPENDENTE, SEM_COMITENTE, SEM_COMITENTE_JUDICIAL, comitente, comitente_final, mesmo_nome
+     from .registro import carregar
+     individuais = [i for i, f in carregar().items() if f.get("leiloeiro_individual")]
+     n = 0
+@@ -305,11 +305,20 @@ def padronizar_comitentes(conn) -> int:
+             if novo != r["comitente"]:
+                 cur.execute("update lote set comitente = %s where id = %s", (novo, r["id"]))
+                 n += 1
+-        # 3) leiloeiros individuais: o nome da fonte (gravado antes desta regra) passa a ser o rótulo agrupado
++        # 3) leiloeiros individuais: o nome da fonte (gravado antes desta regra, ou reescrito no passo 1 com "da/de/dos" em
++        #    minúscula) passa a ser o rótulo agrupado. Compara sem diferença de maiúsculas/acento: "Gabriel Silva Da Rosa"
++        #    (cadastro da fonte) e "Gabriel Silva da Rosa" (como ficou no lote) são a mesma pessoa.
+         if individuais:
+-            cur.execute("""update lote l set comitente = %s from fonte f
+-                           where f.id = l.fonte_id and f.id = any(%s) and l.comitente = f.nome""", (LEILOEIRO_INDEPENDENTE, individuais))
+-            n += cur.rowcount
++            cur.execute("select id, nome from fonte where id = any(%s)", (individuais,))
++            nomes = {r["id"]: r["nome"] for r in cur.fetchall()}
++            cur.execute("""select distinct fonte_id, comitente from lote
++                           where fonte_id = any(%s) and comitente is not null and comitente <> %s""",
++                        (individuais, LEILOEIRO_INDEPENDENTE))
++            for r in cur.fetchall():
++                if mesmo_nome(r["comitente"], nomes.get(r["fonte_id"])):
++                    cur.execute("update lote set comitente = %s where fonte_id = %s and comitente = %s",
++                                (LEILOEIRO_INDEPENDENTE, r["fonte_id"], r["comitente"]))
++                    n += cur.rowcount
+     conn.commit()
+     return n
+ 
+diff --git a/coletor/coletor/normalizar.py b/coletor/coletor/normalizar.py
+index dba4722..2024704 100644
+--- a/coletor/coletor/normalizar.py
++++ b/coletor/coletor/normalizar.py
+@@ -344,6 +344,12 @@ SEM_COMITENTE = "Não informado"
+ LEILOEIRO_INDEPENDENTE = "Leiloeiro independente"  # onde a fonte é um leiloeiro individual e o lote não diz quem vende
+ 
+ 
++def mesmo_nome(a: Any, b: Any) -> bool:
++    """Mesmo nome escrito de jeitos diferentes ("Gabriel Silva Da Rosa" × "Gabriel Silva da Rosa"; com ou sem acento)."""
++    sa = simplificar(a)
++    return bool(sa) and sa == simplificar(b)
++
++
+ def comitente_padrao(modalidade_lote: str | None) -> str:
+     return SEM_COMITENTE_JUDICIAL if modalidade_lote == "judicial" else SEM_COMITENTE
+ 
+@@ -514,6 +520,16 @@ def extrair_da_descricao(texto: str | None) -> dict[str, Any]:
+ 
+ # ---------------------------------------------------------------- lote
+ 
++def _comitente_do_lote(informado: Any, textos: tuple, padroes: dict[str, Any]) -> str:
++    """Quem vende. Em fonte de leiloeiro individual, o próprio leiloeiro nunca é o vendedor: se o comitente que sobrou é o
++    nome dele (em qualquer grafia), o lote entra no grupo "Leiloeiro independente" do filtro, e não numa linha só dele."""
++    sem = padroes.get("sem_comitente")
++    nome = comitente_final(informado, textos, sem or padroes.get("leiloeiro") or padroes.get("nome"))
++    if sem == LEILOEIRO_INDEPENDENTE and mesmo_nome(nome, padroes.get("leiloeiro") or padroes.get("nome")):
++        return LEILOEIRO_INDEPENDENTE
++    return nome
++
++
+ def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: datetime | None = None) -> Lote:
+     """Converte LoteBruto em Lote. `padroes` preenche campos que a fonte não informa (ex.: uf)."""
+     padroes = padroes or {}
+@@ -584,7 +600,7 @@ def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: d
+         aceita_parcelamento=aceita_parcelamento(campo("aceita_parcelamento"), *textos),
+         debitos_por_conta=debitos_por_conta(campo("debitos_por_conta"), *textos),
+         leiloeiro=limpar(campo("leiloeiro")),
+-        comitente=comitente_final(campo("comitente"), textos, padroes.get("sem_comitente") or padroes.get("leiloeiro") or padroes.get("nome")),
++        comitente=_comitente_do_lote(campo("comitente"), textos, padroes),
+         processo=limpar(campo("processo")),
+         edital_url=limpar(campo("edital_url")),
+         fotos=[f for f in (bruto.fotos or []) if f][:30],
+diff --git a/coletor/tests/test_leiloeiro_padrao.py b/coletor/tests/test_leiloeiro_padrao.py
+index 89452ed..60495d9 100644
+--- a/coletor/tests/test_leiloeiro_padrao.py
++++ b/coletor/tests/test_leiloeiro_padrao.py
+@@ -77,3 +77,34 @@ def test_leiloeiro_individual_agrupa_e_preposicao_fica_minuscula():
+     assert "sem_comitente" not in outro.padroes
+     assert _capitalizar("Cooperativa de Crédito e Investimento Com Interação Solidária Raiz") == \
+         "Cooperativa de Crédito e Investimento com Interação Solidária Raiz"
++
++
++def test_mesmo_nome_ignora_maiuscula_e_acento():
++    from coletor.normalizar import mesmo_nome
++    assert mesmo_nome("Gabriel Silva da Rosa", "Gabriel Silva Da Rosa")
++    assert mesmo_nome("Caroline de Sousa Ribas", "Caroline De Sousa Ribas")
++    assert mesmo_nome("Bruno Cézar Alves Xavier", "BRUNO CEZAR ALVES XAVIER")
++    assert not mesmo_nome("Gabriel Silva da Rosa", "Gabriel Silva Rosa")
++    assert not mesmo_nome("", "")
++    assert not mesmo_nome(None, "Fulano")
++
++
++def test_individual_cujo_comitente_e_o_proprio_nome_vai_para_independente_em_qualquer_grafia():
++    """Plataformas costumam devolver o nome do leiloeiro como "comitente", às vezes com 'Da/De' em outra caixa."""
++    from coletor.normalizar import LEILOEIRO_INDEPENDENTE
++    ad = _ad({"id": "gabriel-silva-da-rosa", "nome": "Gabriel Silva Da Rosa", "leiloeiro_individual": True})
++    for informado in ("Gabriel Silva da Rosa", "GABRIEL SILVA DA ROSA", "Gabriel Silva Da Rosa", None):
++        l = normalizar(LoteBruto(id_externo="1", comitente=informado), ad.padroes)
++        assert l.comitente == LEILOEIRO_INDEPENDENTE, informado
++        assert l.leiloeiro == "Gabriel Silva Da Rosa"  # o nome continua na ficha do lote
++
++
++def test_individual_com_vendedor_de_verdade_mantem_o_vendedor():
++    ad = _ad({"id": "gabriel-silva-da-rosa", "nome": "Gabriel Silva Da Rosa", "leiloeiro_individual": True})
++    assert normalizar(LoteBruto(id_externo="1", comitente="Banco Pan S.A."), ad.padroes).comitente == "Banco Pan"
++    assert normalizar(LoteBruto(id_externo="2", comitente="Tribunal de Justiça do Paraná"), ad.padroes).comitente == "Tribunal de Justiça do Paraná"
++
++
++def test_fonte_que_nao_e_individual_continua_com_o_proprio_nome_como_comitente():
++    ad = _ad({"id": "frazao", "nome": "Frazão Leilões"})
++    assert normalizar(LoteBruto(id_externo="1"), ad.padroes).comitente == "Frazão Leilões"
+diff --git a/coletor/tests/test_padronizar_comitentes_banco.py b/coletor/tests/test_padronizar_comitentes_banco.py
+new file mode 100644
+index 0000000..2b6afe5
+--- /dev/null
++++ b/coletor/tests/test_padronizar_comitentes_banco.py
+@@ -0,0 +1,62 @@
++"""padronizar_comitentes contra um Postgres de verdade. Só roda com FAROL_TEST_DATABASE_URL apontando para um banco
++descartável (cria e apaga tabelas fonte/lote de teste num schema próprio). Sem a variável, é ignorado."""
++import os
++
++import pytest
++
++URL = os.environ.get("FAROL_TEST_DATABASE_URL")
++pytestmark = pytest.mark.skipif(not URL, reason="defina FAROL_TEST_DATABASE_URL para testar com banco")
++
++
++@pytest.fixture()
++def conn():
++    import psycopg
++    from psycopg.rows import dict_row
++
++    c = psycopg.connect(URL, row_factory=dict_row)
++    with c.cursor() as cur:
++        cur.execute("drop schema if exists teste_comitente cascade; create schema teste_comitente; set search_path = teste_comitente")
++        cur.execute("create table fonte (id text primary key, nome text not null)")
++        cur.execute("""create table lote (id serial primary key, fonte_id text references fonte(id), titulo text, descricao text,
++                       comitente text)""")
++    c.commit()
++    yield c
++    with c.cursor() as cur:
++        cur.execute("drop schema teste_comitente cascade")
++    c.commit()
++    c.close()
++
++
++def test_individuais_viram_independente_mesmo_com_preposicao_em_outra_caixa(conn, monkeypatch):
++    from coletor import registro
++    from coletor.cli import padronizar_comitentes
++    from coletor.normalizar import LEILOEIRO_INDEPENDENTE
++
++    monkeypatch.setattr(registro, "carregar", lambda *a, **k: {
++        "gabriel-silva-da-rosa": {"leiloeiro_individual": True},
++        "caroline-de-sousa-ribas": {"leiloeiro_individual": True},
++        "frazao": {},
++    })
++    with conn.cursor() as cur:
++        cur.execute("insert into fonte values ('gabriel-silva-da-rosa','Gabriel Silva Da Rosa'),('caroline-de-sousa-ribas','Caroline De Sousa Ribas'),('frazao','Frazão Leilões')")
++        # como ficaram no banco: o passo 1 reescreve "Da/De" para "da/de"
++        cur.execute("""insert into lote (fonte_id, comitente) values
++            ('gabriel-silva-da-rosa','Gabriel Silva Da Rosa'),
++            ('gabriel-silva-da-rosa','Gabriel Silva da Rosa'),
++            ('caroline-de-sousa-ribas','Caroline de Sousa Ribas'),
++            ('caroline-de-sousa-ribas','Banco Pan'),
++            ('frazao','Frazão Leilões')""")
++    conn.commit()
++    padronizar_comitentes(conn)
++    with conn.cursor() as cur:
++        cur.execute("select fonte_id, comitente from lote order by id")
++        rows = [(r["fonte_id"], r["comitente"]) for r in cur.fetchall()]
++    assert rows == [
++        ("gabriel-silva-da-rosa", LEILOEIRO_INDEPENDENTE),
++        ("gabriel-silva-da-rosa", LEILOEIRO_INDEPENDENTE),
++        ("caroline-de-sousa-ribas", LEILOEIRO_INDEPENDENTE),
++        ("caroline-de-sousa-ribas", "Banco Pan"),  # vendedor de verdade continua
++        ("frazao", "Frazão Leilões"),  # não é individual: continua como estava
++    ]
++    # rodar de novo não muda nada (idempotente)
++    assert padronizar_comitentes(conn) == 0

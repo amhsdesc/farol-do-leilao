@@ -33,6 +33,16 @@ Conta e assinatura: login com Google (Auth.js, `web/auth.ts`), celular validado 
 Regras puras e testadas em `web/lib/conta/regras.ts`. Nunca guardar CPF nem dado de cartão. `evento_pagamento`
 nunca é apagado. Configuração das contas: `docs/configurar-contas.md`.
 
+## Valor de mercado (calculadora e ficha)
+
+Preço por m² de ANÚNCIOS de venda parecidos (preço pedido; nunca o valor do edital). Núcleo em `web/lib/calculadora/mercadoCore.ts`,
+sem rede nem banco dentro (tudo entra por `Dependencias`). Ordem, da mais barata para a mais cara: banco (`mercado_preco`,
+validade 30 dias) → portal Chaves na Mão no bairro → na cidade → IA (só a pedido de assinante, com teto diário em
+`mercado_ia_uso_dia`). Tudo que dá certo é gravado (só se acrescenta; leitura pela view `vw_mercado_atual`), inclusive a
+tentativa vazia (7 dias) e os bairros que vieram de carona na busca da cidade. A ficha só LÊ o banco: abrir ficha nunca
+dispara rede nem IA. `npm run mercado` (workflow semanal `mercado.yml`) pré-calcula as regiões com imóvel ativo, sem IA.
+A Server Action `pesquisarValorMercado` confere assinante: a trava vale no servidor, não só na tela.
+
 ## Estrutura
 
 ```

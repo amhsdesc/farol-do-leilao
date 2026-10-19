@@ -1,14 +1,12 @@
 // Rodar: node --experimental-strip-types --test lib/calculadora/mercadoMcp.test.ts
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
-import { bairroConfere, buscarNoChaves, mediana, resumir } from "./mercadoMcp.ts";
-import { pesquisarValorMercado } from "./pesquisaMercado.ts";
+import { bairroConfere, buscarNoChaves, mediana, quantil, resumir } from "./mercadoMcp.ts";
 
 const FETCH_ORIGINAL = globalThis.fetch;
 const sempausa = async () => {};
 beforeEach(() => {
   delete process.env.MERCADO_SEM_MCP;
-  process.env.ANTHROPIC_API_KEY = "chave-de-teste";
 });
 afterEach(() => {
   globalThis.fetch = FETCH_ORIGINAL;
@@ -45,56 +43,19 @@ test("bairro: 'Asa Norte' não casa com 'Samambaia Norte'; '(Taguatinga)' é ign
   assert.equal(bairroConfere("Norte", "Norte (Águas Claras)"), true);
 });
 
+test("quantis por interpolação e intervalo p25–p75 no resumo", () => {
+  assert.equal(quantil([10, 20, 30, 40, 50], 0.25), 20);
+  assert.equal(quantil([10, 20, 30, 40, 50], 0.75), 40);
+  assert.equal(quantil([7], 0.5), 7);
+  const r = resumir([5000, 6000, 7000, 8000, 9000].map((m, i) => ({ titulo: "x", preco: m * 50, area: 50, precoM2: m, bairro: "b" + i })));
+  assert.deepEqual([r?.p25, r?.precoM2, r?.p75], [6000, 7000, 8000]);
+});
+
 test("mediana e descarte de valores absurdos", () => {
   assert.equal(mediana([1, 3, 2]), 2);
   const r = resumir([6000, 6200, 5800, 6100, 90000].map((m, i) => ({ titulo: "x", preco: m * 50, area: 50, precoM2: m, bairro: "b" + i })));
   assert.equal(r?.usados.length, 4);
   assert.equal(r?.precoM2, 6050);
-});
-
-test("MCP com anúncios suficientes do bairro: calcula sem tocar na IA", async () => {
-  const bons = Array.from({ length: 9 }, (_, i) => anuncio("Asa Norte", 600000 + i * 10000, 60));
-  const outros = Array.from({ length: 6 }, () => anuncio("Samambaia Norte", 300000, 60));
-  const est = mcpFalso([[...bons, ...outros]]);
-  const r = await pesquisarValorMercado({ uf: "DF", cidade: "Brasília", bairro: "Asa Norte", tipo: "apartamento", area: 62 });
-  assert.equal(r.ok, true);
-  if (!r.ok) return;
-  assert.equal(r.fonte, "chaves-na-mao");
-  assert.equal(est.anthropic, 0);
-  assert.equal(r.precoM2Medio, 10666.67); // mediana de 600..680 mil (640 mil) / 60 m²
-  assert.ok(r.amostras.length <= 6);
-  assert.match(r.observacao ?? "", /9 anúncios.*Asa Norte/);
-});
-
-test("MCP com poucos anúncios do bairro: cai para a IA", async () => {
-  const poucos = [anuncio("Asa Norte", 700000, 60), ...Array.from({ length: 14 }, () => anuncio("Samambaia Norte", 300000, 60))];
-  const est = mcpFalso([poucos, [], []]);
-  const r = await pesquisarValorMercado({ uf: "DF", cidade: "Brasília", bairro: "Asa Norte", tipo: "apartamento", area: 62 });
-  assert.equal(est.anthropic, 1);
-  assert.equal(r.ok, true);
-  if (r.ok) assert.equal(r.fonte, "ia");
-});
-
-test("MCP insuficiente e sem chave da IA: erro claro, sem chamar a Anthropic", async () => {
-  delete process.env.ANTHROPIC_API_KEY;
-  const est = mcpFalso([[anuncio("Asa Norte", 700000, 60)]]);
-  const r = await pesquisarValorMercado({ uf: "DF", cidade: "Brasília", bairro: "Asa Norte", tipo: "apartamento", area: 62 });
-  assert.equal(r.ok, false);
-  assert.equal(est.anthropic, 0);
-});
-
-test("MCP fora do ar (HTTP 500): cai para a IA", async () => {
-  let ia = 0;
-  globalThis.fetch = (async (url: string) => {
-    if (String(url).includes("anthropic")) {
-      ia++;
-      return new Response(JSON.stringify({ content: [{ type: "text", text: '```json\n{"amostras":[{"titulo":"A","preco":300000,"area":50}]}\n```' }] }), { status: 200 });
-    }
-    return new Response("erro", { status: 500 });
-  }) as typeof fetch;
-  const r = await pesquisarValorMercado({ uf: "GO", cidade: "Goiânia", bairro: "Setor Bueno", tipo: "apartamento", area: 60 });
-  assert.equal(ia, 1);
-  assert.equal(r.ok, true);
 });
 
 test("sem bairro: usa a cidade, exigindo mais anúncios", async () => {
@@ -121,12 +82,38 @@ test("só vizinhos na 1ª página (bairro sem anúncios): para na hora e falha",
   const est = mcpFalso([cheia(), cheia()]);
   const r = await buscarNoChaves({ uf: "DF", cidade: "Brasília", bairro: "Taguatinga Sul", tipo: "comercial", area: 35 }, { min: 25, max: 52 }, sempausa);
   assert.equal(r.ok, false);
+  assert.equal(!r.ok && r.causa, "insuficiente"); // o portal respondeu: vale guardar a tentativa
   assert.equal(est.buscas, 1);
+});
+
+test("portal fora do ar (HTTP 500): causa indisponivel, que não se guarda", async () => {
+  globalThis.fetch = (async () => new Response("erro", { status: 500 })) as typeof fetch;
+  const r = await buscarNoChaves({ uf: "GO", cidade: "Goiânia", bairro: "Setor Bueno", tipo: "apartamento", area: 60 }, { min: 51, max: 92 }, sempausa);
+  assert.equal(r.ok, false);
+  assert.equal(!r.ok && r.causa, "indisponivel");
+});
+
+test("busca da cidade lê todas as páginas e devolve os anúncios de todos os bairros (reaproveitamento)", async () => {
+  const pag = (b: string) => Array.from({ length: 15 }, (_, i) => anuncio(b, 600000 + i * 1000, 60));
+  const est = mcpFalso([pag("Asa Norte"), pag("Asa Sul"), pag("Lago Sul"), pag("Guará I")]);
+  const r = await buscarNoChaves({ uf: "DF", cidade: "Brasília", tipo: "apartamento", area: 62 }, { min: 51, max: 92 }, sempausa);
+  assert.equal(r.ok, true);
+  assert.equal(est.buscas, 4);
+  assert.equal(r.ok && r.anuncios.length, 60);
+  assert.equal(r.ok && new Set(r.anuncios.map((a) => a.bairro)).size, 4);
+});
+
+test("link de anúncio que não é http(s) é descartado", async () => {
+  const lista = Array.from({ length: 15 }, (_, i) => ({ ...anuncio("Guará I", 500000 + i * 5000, 70), url: "javascript:alert(1)" }));
+  mcpFalso([lista]);
+  const r = await buscarNoChaves({ uf: "DF", cidade: "Brasília", tipo: "apartamento", area: 70 }, { min: 60, max: 92 }, sempausa);
+  assert.equal(r.ok && r.anuncios.every((a) => a.url === undefined), true);
 });
 
 test("tipo sem cobertura (vaga): nem chama o MCP", async () => {
   const est = mcpFalso([]);
   const r = await buscarNoChaves({ uf: "DF", cidade: "Brasília", tipo: "vaga", area: 12 }, { min: 10, max: 20 }, sempausa);
   assert.equal(r.ok, false);
+  assert.equal(!r.ok && r.causa, "sem_cobertura");
   assert.equal(est.buscas, 0);
 });
