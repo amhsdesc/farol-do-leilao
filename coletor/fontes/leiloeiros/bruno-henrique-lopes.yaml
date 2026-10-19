@@ -1,7 +1,8 @@
 # Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: bruno-henrique-lopes
-nome: Bruno Henrique Lopes
+nome: Bruno Henrique Lopes
+leiloeiro_individual: true
 site: https://www.brunoleiloes.com.br
 tipo: automatico
 uf: [DF, PR, SP]

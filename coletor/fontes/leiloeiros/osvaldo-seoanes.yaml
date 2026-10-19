@@ -1,7 +1,8 @@
 # Criado pelo catálogo (2026-09-30). Validação: validado por Junta Comercial (fonte oficial).
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: osvaldo-seoanes
-nome: Osvaldo Seoanes
+nome: Osvaldo Seoanes
+leiloeiro_individual: true
 site: https://www.osvaldoleiloes.com.br
 tipo: automatico
 uf: [SP]

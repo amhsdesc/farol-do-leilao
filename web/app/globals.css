@@ -210,7 +210,7 @@ h1, h2, h3 { font-family: var(--display); line-height: 1.15; margin: 0; text-wra
 .link.ruim { color: var(--bad); }
 .opcoes-lista { display: grid; gap: 7px; }
 .opcoes-lista.rolavel { max-height: 320px; overflow-y: auto; padding-right: 6px; }
-.busca-comitente { width: 100%; margin-bottom: 8px; }
+.busca-comitente { font: 14px var(--body); color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; width: 100%; min-width: 0; margin-bottom: 8px; }
 .vazio-lista { opacity: .7; font-size: .9em; margin: 0; }
 .pilulas { display: flex; flex-wrap: wrap; gap: 6px; }
 .pilula { font: 700 13px var(--body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); cursor: pointer; }

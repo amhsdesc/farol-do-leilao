@@ -1,7 +1,8 @@
 # Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: alglecio-bueno-da-silva
-nome: Alglécio Bueno da Silva
+nome: Alglécio Bueno da Silva
+leiloeiro_individual: true
 site: https://www.leiloesgoias.com.br
 tipo: automatico
 uf: [GO, MS, MT]

@@ -1,7 +1,8 @@
 # Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: marilaine-borges-de-paula
-nome: Marilaine Borges De Paula
+nome: Marilaine Borges De Paula
+leiloeiro_individual: true
 site: https://www.confiancaleiloes.leilao.br
 tipo: automatico
 uf: [MG, PR, SP]

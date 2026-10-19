@@ -1,7 +1,8 @@
 # Criado pelo catálogo (2026-09-30). Validação: validado por FENALEI.
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: antonio-carlos-volpi-santana
-nome: Antonio Carlos Volpi Santana
+nome: Antonio Carlos Volpi Santana
+leiloeiro_individual: true
 site: https://leiloesbrasilto.com.br
 tipo: automatico
 uf: [TO]
