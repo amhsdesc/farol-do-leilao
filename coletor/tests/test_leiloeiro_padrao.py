@@ -65,3 +65,15 @@ def test_comitente_final_usa_vendedor_do_texto_ou_o_nome_da_fonte():
     assert comitente_final("Daycoval", ("x",), "Superbid Exchange") == "Daycoval"
     assert comitente_final(None, ("x",), None) == "Não informado"
     assert modalidade(None, "Casa (Proc. 0003884-31.2013.4.01.3811)") == "judicial"   # número CNJ segue valendo para a modalidade
+
+
+def test_leiloeiro_individual_agrupa_e_preposicao_fica_minuscula():
+    from coletor.adaptadores.base import Adaptador
+    from coletor.normalizar import LEILOEIRO_INDEPENDENTE, _capitalizar
+    ad = Adaptador({"id": "x", "nome": "Irani Flores", "leiloeiro_individual": True}, None, None)
+    assert ad.padroes["sem_comitente"] == LEILOEIRO_INDEPENDENTE
+    assert ad.padroes["leiloeiro"] == "Irani Flores"  # o nome continua na ficha do lote
+    outro = Adaptador({"id": "y", "nome": "Mega Leilões"}, None, None)
+    assert "sem_comitente" not in outro.padroes
+    assert _capitalizar("Cooperativa de Crédito e Investimento Com Interação Solidária Raiz") == \
+        "Cooperativa de Crédito e Investimento com Interação Solidária Raiz"

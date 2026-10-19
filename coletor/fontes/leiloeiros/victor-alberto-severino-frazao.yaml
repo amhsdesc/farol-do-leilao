@@ -2,6 +2,7 @@
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: victor-alberto-severino-frazao
 nome: Victor Alberto Severino Frazao
+leiloeiro_individual: true
 site: https://www.vincoleiloes.com.br
 tipo: automatico
 uf: [GO, MT, RJ, RO, RS, SP]

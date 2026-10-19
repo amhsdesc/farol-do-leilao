@@ -341,6 +341,7 @@ _RECEITA = re.compile(r"\bleilao federal\b|\breceita federal\b|\bsecretaria (?:e
 # Nunca deixa o lote sem comitente: ele precisa aparecer no filtro do site.
 SEM_COMITENTE_JUDICIAL = "Leilão judicial"  # valor antigo, só para limpar o que já foi gravado
 SEM_COMITENTE = "Não informado"
+LEILOEIRO_INDEPENDENTE = "Leiloeiro independente"  # onde a fonte é um leiloeiro individual e o lote não diz quem vende
 
 
 def comitente_padrao(modalidade_lote: str | None) -> str:
@@ -412,7 +413,7 @@ def _nome_tj(estado: str) -> str:
 
 
 _TRIBUNAL = re.compile(r"^(?:tribunal de justica|tj)\s*(?:do estado |de |do |da |-\s*)*([a-z ]+?)\s*(?:\(.*\))?$")
-_MINUSCULAS = {"de", "da", "do", "das", "dos", "e", "em"}
+_MINUSCULAS = {"de", "da", "do", "das", "dos", "e", "em", "com"}
 
 
 def _tribunal(t: str) -> str | None:
@@ -425,8 +426,8 @@ def _tribunal(t: str) -> str | None:
 
 def _capitalizar(texto: str) -> str:
     """Nome todo em maiúsculas (ou minúsculas) vira "Nome Próprio"; sigla (S.A., LTDA, BRB) e misto ficam como vieram."""
-    if texto != texto.upper() and texto != texto.lower():
-        return texto
+    if texto != texto.upper() and texto != texto.lower():  # misto: só ajusta as preposições ("Com" → "com")
+        return " ".join(w.lower() if i > 0 and w.lower() in _MINUSCULAS else w for i, w in enumerate(texto.split(" ")))
     palavras = []
     for i, w in enumerate(texto.lower().split(" ")):
         if re.fullmatch(r"(?:[a-z]\.){2,}|s/?a|ltda|me|epp|eireli|cef|bb|brb|bndes|spu|fgts|inss", w):
@@ -583,7 +584,7 @@ def normalizar(bruto: LoteBruto, padroes: dict[str, Any] | None = None, agora: d
         aceita_parcelamento=aceita_parcelamento(campo("aceita_parcelamento"), *textos),
         debitos_por_conta=debitos_por_conta(campo("debitos_por_conta"), *textos),
         leiloeiro=limpar(campo("leiloeiro")),
-        comitente=comitente_final(campo("comitente"), textos, padroes.get("leiloeiro") or padroes.get("nome")),
+        comitente=comitente_final(campo("comitente"), textos, padroes.get("sem_comitente") or padroes.get("leiloeiro") or padroes.get("nome")),
         processo=limpar(campo("processo")),
         edital_url=limpar(campo("edital_url")),
         fotos=[f for f in (bruto.fotos or []) if f][:30],

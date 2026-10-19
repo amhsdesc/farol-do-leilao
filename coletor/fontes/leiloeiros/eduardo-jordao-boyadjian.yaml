@@ -2,6 +2,7 @@
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: eduardo-jordao-boyadjian
 nome: Eduardo Jordão Boyadjian
+leiloeiro_individual: true
 site: https://www.leilaovip.com.br
 tipo: automatico
 uf: [SP]

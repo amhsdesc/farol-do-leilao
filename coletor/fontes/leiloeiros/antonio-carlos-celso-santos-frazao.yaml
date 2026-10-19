@@ -2,6 +2,7 @@
 # Site PHP próprio: a home lista os leilões com onClick="goTo('leilao.php?idLeilao=N')" e cada leilão lista os lotes (lote.php?idLote=N).
 id: antonio-carlos-celso-santos-frazao
 nome: Antonio Carlos Celso Santos Frazao
+leiloeiro_individual: true
 site: https://www.sfrazao.com.br
 tipo: automatico
 uf: [GO, MT, RJ, RO, SP]

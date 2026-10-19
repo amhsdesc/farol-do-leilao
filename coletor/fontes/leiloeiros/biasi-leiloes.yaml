@@ -3,6 +3,7 @@
 # Leilões de venda direta (slug com "venda-direta") usam vendaDireta=True (o adaptador troca sozinho).
 id: biasi-leiloes
 nome: Biasi Leilões
+leiloeiro_individual: true
 site: https://www.biasileiloes.com.br
 tipo: automatico
 uf: [todas]

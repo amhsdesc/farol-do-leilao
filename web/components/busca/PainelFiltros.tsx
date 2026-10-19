@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import SalvarBusca from "@/components/alertas/SalvarBusca";
 import { contarFiltros, TAGS_INVESTIMENTO, type Filtros } from "@/lib/busca/filtros";
@@ -10,6 +11,40 @@ export type Opcoes = {
   comitentes: { comitente: string; n: number }[];
   leiloeiros: { leiloeiro: string; n: number }[];
 };
+
+/** Lista completa de quem vende, com busca; os marcados ficam no topo. */
+function ListaComitentes({ comitentes, marcados, onAlternar }: {
+  comitentes: { comitente: string; n: number }[];
+  marcados: string[];
+  onAlternar: (c: string) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const termo = norm(busca.trim());
+  const visiveis = comitentes.filter((c) => !termo || norm(c.comitente).includes(termo) || marcados.includes(c.comitente));
+  const ordenados = [
+    ...visiveis.filter((c) => marcados.includes(c.comitente)),
+    ...visiveis.filter((c) => !marcados.includes(c.comitente)),
+  ];
+  return (
+    <>
+      <input
+        type="search"
+        className="busca-comitente"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        placeholder={`Buscar entre ${comitentes.length} vendedores`}
+        aria-label="Buscar banco ou vendedor"
+      />
+      <div className="opcoes-lista rolavel">
+        {ordenados.map((c) => (
+          <Marcar key={c.comitente} rotulo={`${c.comitente} (${c.n})`} valor={marcados.includes(c.comitente)} onValor={() => onAlternar(c.comitente)} />
+        ))}
+        {ordenados.length === 0 && <p className="vazio-lista">Nenhum vendedor com esse nome.</p>}
+      </div>
+    </>
+  );
+}
 
 export function Cadeado({ tamanho = 13 }: { tamanho?: number }) {
   return (
@@ -145,16 +180,11 @@ export default function PainelFiltros({ filtros: f, opcoes, centroMapa, mudar, l
 
       <fieldset>
         <legend>Quem vende</legend>
-        <div className="opcoes-lista">
-          {opcoes.comitentes.slice(0, 10).map((c) => (
-            <Marcar
-              key={c.comitente}
-              rotulo={`${c.comitente} (${c.n})`}
-              valor={f.comitente?.includes(c.comitente)}
-              onValor={() => mudar({ comitente: alternar(f.comitente, c.comitente) })}
-            />
-          ))}
-        </div>
+        <ListaComitentes
+          comitentes={opcoes.comitentes}
+          marcados={f.comitente ?? []}
+          onAlternar={(c) => mudar({ comitente: alternar(f.comitente, c) })}
+        />
         <div className="pilulas" role="group" aria-label="Modalidade">
           {(["judicial", "extrajudicial", "venda_direta", "licitacao"] as const).map((m) => (
             <button

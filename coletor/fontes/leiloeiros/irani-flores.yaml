@@ -2,6 +2,7 @@
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: irani-flores
 nome: Irani Flores
+leiloeiro_individual: true
 site: https://www.leilaobrasil.com.br
 tipo: automatico
 uf: [AL, AM, BA, CE, DF, ES, GO, MA, MG, MS, MT, PB, PE, PI, PR, RJ, RO, RS, SC, SE, SP]

@@ -2,6 +2,7 @@
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: lucas-andreatta-de-oliveira
 nome: Lucas Andreatta de Oliveira
+leiloeiro_individual: true
 site: https://leiloariasmart.com.br
 tipo: automatico
 uf: [MT]

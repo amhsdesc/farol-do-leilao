@@ -276,7 +276,9 @@ def cmd_geocodificar(a):
 
 def padronizar_comitentes(conn) -> int:
     """Aplica as regras atuais de comitente aos lotes que já estão no banco (sem precisar reler os sites)."""
-    from .normalizar import SEM_COMITENTE, SEM_COMITENTE_JUDICIAL, comitente, comitente_final
+    from .normalizar import LEILOEIRO_INDEPENDENTE, SEM_COMITENTE, SEM_COMITENTE_JUDICIAL, comitente, comitente_final
+    from .registro import carregar
+    individuais = [i for i, f in carregar().items() if f.get("leiloeiro_individual")]
     n = 0
     with conn.cursor() as cur:
         # 1) nomes já gravados: reescreve com a grafia padrão (tribunais, maiúsculas) ou descarta título de leilão ("SOLD")
@@ -292,16 +294,22 @@ def padronizar_comitentes(conn) -> int:
             n += cur.rowcount
         # 2) sem comitente, com o valor padrão antigo, ou tribunal deduzido pela UF (regra descartada) nas fontes de plataforma:
         #    passa a valer o nome de onde o leilão acontece (a fonte), ou o vendedor citado no texto
-        cur.execute("""select l.id, l.titulo, l.descricao, l.comitente, f.nome fonte
+        cur.execute("""select l.id, l.titulo, l.descricao, l.comitente, f.nome fonte, f.id fonte_id
                        from lote l join fonte f on f.id = l.fonte_id
                        where l.comitente is null or l.comitente in (%s, %s)
                           or (f.nome ilike '%%Lance%%' and (l.comitente ilike 'Tribunal de Justi%%' or l.comitente ilike 'Justi%%'))""",
                     (SEM_COMITENTE, SEM_COMITENTE_JUDICIAL))
         for r in cur.fetchall():
-            novo = comitente_final(None, (r["titulo"], r["descricao"]), r["fonte"])
+            novo = comitente_final(None, (r["titulo"], r["descricao"]),
+                                   LEILOEIRO_INDEPENDENTE if r["fonte_id"] in individuais else r["fonte"])
             if novo != r["comitente"]:
                 cur.execute("update lote set comitente = %s where id = %s", (novo, r["id"]))
                 n += 1
+        # 3) leiloeiros individuais: o nome da fonte (gravado antes desta regra) passa a ser o rótulo agrupado
+        if individuais:
+            cur.execute("""update lote l set comitente = %s from fonte f
+                           where f.id = l.fonte_id and f.id = any(%s) and l.comitente = f.nome""", (LEILOEIRO_INDEPENDENTE, individuais))
+            n += cur.rowcount
     conn.commit()
     return n
 

@@ -39,6 +39,9 @@ class Adaptador:
             p.setdefault("comitente", self.fonte["comitente"])
         elif self.fonte.get("nome"):  # fonte de leiloeiro: o nome da fonte é o leiloeiro (filtro "Leiloeiro" do site)
             p.setdefault("leiloeiro", self.fonte["nome"])
+            if self.fonte.get("leiloeiro_individual"):  # sem vendedor no lote, aparece agrupado no filtro "Quem vende"
+                from ..normalizar import LEILOEIRO_INDEPENDENTE
+                p.setdefault("sem_comitente", LEILOEIRO_INDEPENDENTE)
         return p
 
     def coletar(self) -> Iterator[LoteBruto]:  # pragma: no cover

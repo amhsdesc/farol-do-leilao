@@ -2,6 +2,7 @@
 # Tipo automático (IA). Se o volume passar de ~50 lotes, rode `inspecionar` e troque por json_api/seletores.
 id: marciano-aguiar-carneiro
 nome: Marciano Aguiar Carneiro
+leiloeiro_individual: true
 site: https://vecchileiloes.com.br
 tipo: automatico
 uf: [BA, GO, MT, SP, TO]
