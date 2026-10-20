@@ -385,6 +385,20 @@ _PARECE_TITULO = re.compile(
 )
 
 
+# Descrição de imóvel/anúncio gravada como se fosse o vendedor ("Fração de Terras Rurais com Superfície de 53.765m²",
+# "Ótimo Terreno Urbano Sem Benfeitorias Na Cidade de Pelotas/r..."). Vendedor de verdade é nome curto de pessoa ou empresa.
+_PARECE_DESCRICAO = re.compile(
+    r"\b(?:terrenos?|fracao|fracoes|gleba|benfeitorias?|superficie|apartamentos?|matriculas?|imovel|imoveis|"
+    r"otimo|excelente|oportunidade|lote|lotes|casa de|sala comercial)\b"
+    r"|\d\s*(?:m2|m²|ha|hectares?)\b|\bna cidade de\b|\bsem benfeitorias\b"
+)
+
+
+def _parece_descricao(texto: Any) -> bool:
+    bruto = str(texto or "")
+    return len(simplificar(bruto)) > 70 or "..." in bruto or "…" in bruto or bool(_PARECE_DESCRICAO.search(simplificar(bruto)))
+
+
 def _comitente_do_titulo(texto: Any) -> tuple[bool, str | None]:
     """(parece título de leilão?, entidade citada no título). "LEILÃO DE IMÓVEIS DA CELESC S.A." → (True, "CELESC S.A.")."""
     t = simplificar(texto)
@@ -459,7 +473,7 @@ def comitente(valor: Any, *textos_extra: Any) -> str | None:
             titulo, entidade = _comitente_do_titulo(valor)
             if entidade:
                 return entidade
-            if not titulo:
+            if not titulo and not _parece_descricao(valor):
                 return _capitalizar(limpar(valor))
     return None
 
