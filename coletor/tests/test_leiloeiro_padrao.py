@@ -77,3 +77,14 @@ def test_leiloeiro_individual_agrupa_e_preposicao_fica_minuscula():
     assert "sem_comitente" not in outro.padroes
     assert _capitalizar("Cooperativa de Crédito e Investimento Com Interação Solidária Raiz") == \
         "Cooperativa de Crédito e Investimento com Interação Solidária Raiz"
+
+
+def test_descricao_de_imovel_nao_vira_comitente():
+    from coletor.normalizar import comitente
+    for lixo in ["Fração de Terras Rurais com Superfície de 53.765m²",
+                 "Ótimo Terreno Urbano Sem Benfeitorias Na Cidade de Pelotas/r...",
+                 "Fração Ideal de Terreno Urbano com Benfeitorias",
+                 "Fração Ideal de Terreno Urbano / Porto União"]:
+        assert comitente(lixo) is None, lixo
+    for ok in ["Justiça do Trabalho (TRT 17ª Região)", "Condomínio Edifício Solar das Flores", "Casas Bahia S.A.", "Banco do Brasil"]:
+        assert comitente(ok), ok
