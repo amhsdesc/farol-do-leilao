@@ -1,0 +1,17 @@
+# Teste avulso (só roda quando alguém clica em "Run workflow"): os portais de anúncios (ZAP, Viva Real, Imovelweb,
+# QuintoAndar) deixam o GitHub Actions ler a página de lista de venda? Serve para decidir se vale usá-los como
+# degrau extra do valor de mercado. Uma requisição por portal, com o nome do nosso robô; não guarda nada, não usa
+# banco nem IA e não gasta nada. Pode ser apagado depois.
+name: Testar acesso aos portais de anúncios
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Uma requisição por portal
+        run: bash scripts/testar_portais.sh
