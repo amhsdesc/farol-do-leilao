@@ -318,6 +318,7 @@ COMITENTES: dict[str, list[str]] = {
     "Emgea": [r"\bemgea\b"],
     "Sicoob": [r"\bsicoob\b"],
     "Sicredi": [r"\bsicredi\b"],
+    "Cresol": [r"\bcresol\b"],
     "Banco Inter": [r"\bbanco inter\b"],
     "BTG Pactual": [r"\bbtg\b"],
     "Banco BV": [r"\bbanco bv\b", r"\bbv financeira\b", r"\bbanco votorantim\b"],
@@ -396,13 +397,19 @@ _PARECE_TITULO = re.compile(
 _PARECE_DESCRICAO = re.compile(
     r"\b(?:terrenos?|fracao|fracoes|gleba|benfeitorias?|superficie|apartamentos?|matriculas?|imovel|imoveis|"
     r"otimo|excelente|oportunidade|lote|lotes|casa de|sala comercial)\b"
-    r"|\d\s*(?:m2|m²|ha|hectares?)\b|\bna cidade de\b|\bsem benfeitorias\b"
+    r"|\d\s*(?:m2|m²|ha|hectares?|metros)\b|\bna cidade de\b|\bsem benfeitorias\b"
+    r"|\b(?:rua|avenida|travessa|rodovia)\s"
+    # começo típico de anúncio: "Casa - Rua…", "Apto 201…", "Box de Garagem", "Complexo Industrial…", "Direitos e Ações…"
+    r"|^(?:casa|apto?|apart|apt|box|cobertura|complexo|edificio|predio|direitos|unidades?|galpao|galpoes|sala|salas|loja|lojas|"
+    r"sitio|chacara|area|vaga|vagas|duplex|triplex|kitnet|studio|garagem|terras?|conjunto de)\b"
+    r"|^\d[\d.,]*\s"  # começa por número: "12 Apartamentos…", "39.729.100 Fulano…", "110.000.00m2 - …"
 )
 
 
 def _parece_descricao(texto: Any) -> bool:
     bruto = str(texto or "")
-    return len(simplificar(bruto)) > 70 or "..." in bruto or "…" in bruto or bool(_PARECE_DESCRICAO.search(simplificar(bruto)))
+    t = simplificar(bruto)
+    return len(t) > 70 or "..." in bruto or "…" in bruto or bool(_PARECE_DESCRICAO.search(t))
 
 
 def _comitente_do_titulo(texto: Any) -> tuple[bool, str | None]:
@@ -434,6 +441,23 @@ def _nome_tj(estado: str) -> str:
 
 _TRIBUNAL = re.compile(r"^(?:tribunal de justica|tj)\s*(?:do estado |de |do |da |-\s*)*([a-z ]+?)\s*(?:\(.*\))?$")
 _MINUSCULAS = {"de", "da", "do", "das", "dos", "e", "em", "com"}
+
+
+_UF_ESTADO = {
+    "ac": "acre", "al": "alagoas", "ap": "amapa", "am": "amazonas", "ba": "bahia", "ce": "ceara", "df": "distrito federal",
+    "es": "espirito santo", "go": "goias", "ma": "maranhao", "mt": "mato grosso", "ms": "mato grosso do sul",
+    "mg": "minas gerais", "pa": "para", "pb": "paraiba", "pr": "parana", "pe": "pernambuco", "pi": "piaui",
+    "rj": "rio de janeiro", "rn": "rio grande do norte", "rs": "rio grande do sul", "ro": "rondonia", "rr": "roraima",
+    "sc": "santa catarina", "sp": "sao paulo", "se": "sergipe", "to": "tocantins",
+}
+_COMARCA = re.compile(r"^comarca d[eao]s? .+?[-/ ]\s*([a-z]{2})\s*(?:\(.*\))?$")
+
+
+def _comarca(t: str) -> str | None:
+    """"Comarca de Tijucas-SC (eletrônico)" → o tribunal do estado: a comarca é só o foro, quem vende é a Justiça."""
+    m = _COMARCA.match(t)
+    estado = _UF_ESTADO.get(m.group(1)) if m else None
+    return _nome_tj(estado) if estado else None
 
 
 def _tribunal(t: str) -> str | None:
@@ -473,7 +497,7 @@ def comitente(valor: Any, *textos_extra: Any) -> str | None:
                 return nome
         if texto is valor and _RECEITA.search(t):
             return "Receita Federal"
-        if texto is valor and (trib := _tribunal(t)):
+        if texto is valor and (trib := _tribunal(t) or _comarca(t)):
             return trib
         if texto is valor:  # comitente informado e não reconhecido: mantém como veio, salvo se for título de leilão
             titulo, entidade = _comitente_do_titulo(valor)

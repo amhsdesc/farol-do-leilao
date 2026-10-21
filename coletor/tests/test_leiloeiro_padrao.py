@@ -119,3 +119,19 @@ def test_individual_com_vendedor_de_verdade_mantem_o_vendedor():
 def test_fonte_que_nao_e_individual_continua_com_o_proprio_nome_como_comitente():
     ad = _ad({"id": "frazao", "nome": "Frazão Leilões"})
     assert normalizar(LoteBruto(id_externo="1"), ad.padroes).comitente == "Frazão Leilões"
+
+
+def test_anuncio_comarca_e_cresol():
+    from coletor.normalizar import comitente
+    for lixo in ["Apartamento 102, Bloco A, Rua General Osório Nº 264, Pelotas", "Casa - Rua Dr. Darcy Xavier Nº 409 - Pelotas - Rs",
+                 "12 Apartamentos em 2 Blocos de 6 Aptos Cada - Arapongas Pr", "3 Unidades de Box de Garagem", "2 Frações de Terras Capané",
+                 "39.729.100 Fabio Pereira dos Santos", "110.000.00m2 - do Lote Rural", "Apto 201 - Tv. Antônio Xavier, 15.",
+                 "Apart. em Esteio, Av. Farrapos", "Cobertura Duplex 270m2 Na Rua Redentor", "Complexo Industrial - Cesa - São Gabriel - Rs.",
+                 "Direitos e Ações - Casa - Rua Rui Barbosa", "Edifício Comercial No Bairro de Fátima", "Box de Garagem 03 : Direitos"]:
+        assert comitente(lixo) is None, lixo
+    for ok in ["Banco Rendimento", "Banco do Nordeste", "B. B. P. S.A.", "Ciplan - Cimento Planalto SA", "CNP Seguradora",
+               "Edp Energias do Brasil S.A.", "Casas Bahia S.A.", "Fazenda Nacional", "Convef Administradora de Consorcios LTDA"]:
+        assert comitente(ok), ok
+    assert comitente("Comarca de Tijucas-sc (eletrônico)") == "Tribunal de Justiça de Santa Catarina"
+    assert comitente("Comarca de Presidente Getúlio-sc (eletrônico)") == "Tribunal de Justiça de Santa Catarina"
+    assert comitente("Cooperativa de Credito e Economia com Interacao Solidaria - Cresol Litoral") == "Cresol"
