@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 from datetime import datetime
@@ -14,6 +15,7 @@ from psycopg.types.json import Jsonb
 from . import dedup
 from .modelos import Lote
 
+LOTE_VISTOS = 200  # quantos lotes "sem mudança" juntar antes de gravar o "visto agora"
 CAMPOS_LOTE = [
     "url", "titulo", "descricao", "modalidade", "status", "valor_avaliacao", "lance_minimo",
     "praca_atual", "data_praca1", "valor_praca1", "data_praca2", "valor_praca2", "ocupacao",
@@ -38,10 +40,17 @@ def snapshot(lote: Lote) -> dict[str, Any]:
     return json.loads(json.dumps(lote.model_dump(), default=_json_padrao))
 
 
+# contador de visitas que algumas páginas escrevem dentro da descrição ("Nº de visitas: 7127"): muda a cada leitura
+_VISITAS = re.compile(r"N[ºo°]\s*de\s*visitas:\s*\d+", re.IGNORECASE)
+
+
 def hash_lote(lote: Lote) -> str:
-    """Hash do conteúdo relevante. `dados` fica de fora (campos voláteis como visualizações)."""
+    """Hash do conteúdo relevante. `dados` fica de fora (campos voláteis como visualizações), e o contador
+    de visitas dentro da descrição também: senão todo lote da fonte vira "alterado" a cada rodada."""
     d = snapshot(lote)
     d.pop("dados", None)
+    if isinstance(d.get("descricao"), str):
+        d["descricao"] = _VISITAS.sub("Nº de visitas: -", d["descricao"])
     # campos criados depois (migração 003): sem valor, ficam fora do hash para não marcar
     # todos os lotes antigos como "alterado" na primeira coleta depois da atualização
     for campo, vazio in (("aceita_parcelamento", None), ("debitos_por_conta", "nao_informado")):
@@ -64,6 +73,7 @@ class Contadores:
 class Repositorio:
     def __init__(self, conn: psycopg.Connection):
         self.conn = conn
+        self._vistos_pendentes: list[int] = []
 
     # ------------------------------------------------------------ fontes
 
@@ -110,6 +120,7 @@ class Repositorio:
         concluida: bool, mensagem: str | None = None,
     ) -> str:
         """Fecha a execução. Só marca lotes como removidos se a leitura foi completa e plausível."""
+        self.descarregar_vistos()
         status = "ok" if concluida and c.erros == 0 else ("parcial" if concluida else "erro")
         # remoção só com leitura limpa e completa: sem erros e com volume plausível
         pode_remover = (
@@ -243,17 +254,43 @@ class Repositorio:
                 ),
             )
 
+    def descarregar_vistos(self, cur=None) -> None:
+        """Marca de uma vez os lotes lidos sem mudança como vistos agora."""
+        if not self._vistos_pendentes:
+            return
+        ids, self._vistos_pendentes = self._vistos_pendentes, []
+        if cur is not None:
+            cur.execute("update lote set ultimo_visto_em = now() where id = any(%s)", (ids,))
+            return
+        with self.conn.cursor() as cur2:
+            cur2.execute("update lote set ultimo_visto_em = now() where id = any(%s)", (ids,))
+        self.conn.commit()
+
     def gravar(self, fonte_id: str, lote: Lote, execucao_id: int, c: Contadores) -> str:
         """Insere ou atualiza o lote. Grava leitura só quando algo mudou. Devolve o evento."""
         h = hash_lote(lote)
         snap = snapshot(lote)
         with self.conn.cursor() as cur:
             cur.execute(
-                """select id, hash_conteudo, status, imovel_id, lance_minimo, data_praca1, data_praca2
+                """select id, hash_conteudo, status, imovel_id, lance_minimo, data_praca1, data_praca2, dados
                    from lote where fonte_id = %s and id_externo = %s""",
                 (fonte_id, lote.id_externo),
             )
             atual = cur.fetchone()
+            if (
+                atual is not None and atual["status"] != "removido" and atual["imovel_id"] is not None
+                and atual["hash_conteudo"] == h and atual["dados"] == lote.dados
+            ):
+                # lote igual ao já gravado: nada a atualizar além de "visto agora". Fazer isso em lote (poucas idas
+                # ao banco) em vez de reescrever lote, imóvel e chaves a cada leitura (~1 s por lote na nuvem).
+                self._vistos_pendentes.append(atual["id"])
+                c.iguais += 1
+                c.lidos += 1
+                c.vistos.add(atual["id"])
+                if len(self._vistos_pendentes) >= LOTE_VISTOS:
+                    self.descarregar_vistos(cur)
+                    self.conn.commit()
+                return "igual"
             imovel_id = self._resolver_imovel(cur, lote, fonte_id, atual["imovel_id"] if atual else None)
             valores = {c_: getattr(lote, c_) for c_ in CAMPOS_LOTE}
             valores.update(dados=Jsonb(lote.dados), hash=h, imovel_id=imovel_id)
