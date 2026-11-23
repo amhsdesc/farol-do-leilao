@@ -142,3 +142,38 @@ test("erro 401 não é repetido", async () => {
   assert.equal(chamadas, 1);
   assert.equal(r.ok, false);
 });
+
+test("pause_turn: reenvia o que veio e continua até ter o JSON (sem gastar uma pesquisa nova)", async () => {
+  let chamadas = 0;
+  let corpos: { messages: { role: string }[] }[] = [];
+  globalThis.fetch = (async (_url: unknown, init: RequestInit) => {
+    chamadas++;
+    corpos.push(JSON.parse(String(init.body)));
+    if (chamadas === 1) {
+      return { ok: true, json: async () => ({ stop_reason: "pause_turn", content: [{ type: "server_tool_use", name: "web_search" }] }) } as Response;
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: '```json\n{"amostras":[{"titulo":"A","preco":300000,"area":60,"url":"https://x/1"}]}\n```' }],
+      }),
+    } as Response;
+  }) as typeof fetch;
+  const r = await pesquisarValorMercado({ uf: "DF", cidade: "Brasília", bairro: "Taguatinga Norte", tipo: "apartamento", area: 64 });
+  assert.equal(r.ok, true);
+  assert.equal(chamadas, 2);
+  assert.equal(corpos[1].messages.at(-1)?.role, "assistant"); // reenviou a vez da API, sem nova pergunta
+});
+
+test("max_tokens sem texto: mensagem própria e nenhuma segunda tentativa (já cobrou)", async () => {
+  let chamadas = 0;
+  globalThis.fetch = (async () => {
+    chamadas++;
+    return { ok: true, json: async () => ({ stop_reason: "max_tokens", content: [{ type: "server_tool_use", name: "web_search" }] }) } as Response;
+  }) as typeof fetch;
+  const r = await pesquisarValorMercado({ uf: "DF", cidade: "Brasília", bairro: "Taguatinga Norte", tipo: "apartamento", area: 64 });
+  assert.equal(r.ok, false);
+  assert.equal(chamadas, 1);
+  assert.match((r as { erro: string }).erro, /longa demais/);
+});

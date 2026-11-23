@@ -24,8 +24,8 @@ const TIPOS_MCP: Record<string, string> = {
 };
 
 /** Quantos anúncios do próprio bairro (ou da cidade, sem bairro) precisamos para confiar na mediana. */
-export const MINIMO_BAIRRO = 8;
-export const MINIMO_CIDADE = 15;
+export const MINIMO_BAIRRO = 5;
+export const MINIMO_CIDADE = 8;
 const MAX_PAGINAS = 4;
 const PAUSA_MS = 1100; // ≤ 1 requisição/s, bem abaixo do limite de 60/min
 
