@@ -68,36 +68,49 @@ type RespostaMercado = { amostras?: unknown[]; precoM2Medio?: number; observacao
 class FalhaDefinitiva extends Error {}
 
 async function perguntar(prompt: string): Promise<{ texto: string; parou: string | undefined }> {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODELO_MERCADO || process.env.MODELO_LLM || "claude-haiku-5-5",
-      max_tokens: 1500,
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
-      messages: [{ role: "user", content: prompt }],
-    }),
-    signal: AbortSignal.timeout(50_000),
-  });
-  if (!resp.ok) {
-    const corpo = (await resp.text().catch(() => "")).slice(0, 300);
-    console.error(`[mercado] Anthropic respondeu ${resp.status}: ${corpo}`);
-    if (resp.status === 429 || resp.status >= 500) throw new Error(`HTTP ${resp.status}`);
-    throw new FalhaDefinitiva(`HTTP ${resp.status}`);
+  type Bloco = { type: string; text?: string };
+  const mensagens: { role: string; content: unknown }[] = [{ role: "user", content: prompt }];
+  let texto = "";
+  let parou: string | undefined;
+  // "pause_turn": a busca na web é longa e a API devolve a vez; basta reenviar o que veio para ela continuar (no máx. 2 vezes)
+  for (let volta = 0; volta < 3; volta++) {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODELO_MERCADO || process.env.MODELO_LLM || "claude-haiku-5-5",
+        // 1.500 faltava: as buscas e o raciocínio consumiam tudo antes do JSON (stop_reason=max_tokens, cobrado e sem resposta)
+        max_tokens: 4000,
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
+        messages: mensagens,
+      }),
+      signal: AbortSignal.timeout(50_000),
+    });
+    if (!resp.ok) {
+      const corpo = (await resp.text().catch(() => "")).slice(0, 300);
+      console.error(`[mercado] Anthropic respondeu ${resp.status}: ${corpo}`);
+      if (resp.status === 429 || resp.status >= 500) throw new Error(`HTTP ${resp.status}`);
+      throw new FalhaDefinitiva(`HTTP ${resp.status}`);
+    }
+    const dados = await resp.json();
+    const blocos: Bloco[] = dados.content ?? [];
+    parou = dados.stop_reason;
+    console.info(
+      `[mercado] resposta: stop_reason=${parou} blocos=${blocos.map((b) => b.type).join(",")} tokens=${dados.usage?.input_tokens ?? "?"}/${dados.usage?.output_tokens ?? "?"}`,
+    );
+    texto += blocos.filter((b) => b.type === "text").map((b) => b.text ?? "").join("\n");
+    if (parou !== "pause_turn") break;
+    mensagens.push({ role: "assistant", content: blocos });
   }
-  const dados = await resp.json();
-  const texto = (dados.content ?? [])
-    .filter((b: { type: string }) => b.type === "text")
-    .map((b: { text: string }) => b.text)
-    .join("\n");
-  return { texto, parou: dados.stop_reason };
+  return { texto, parou };
 }
 
-const LIMITES_AREA = [0, 30, 45, 60, 80, 100, 130, 170, 250, 400, 700, 1500, 5000, Infinity];
+// faixas largas: mais pesquisas caem na mesma faixa e reaproveitam o resultado guardado
+const LIMITES_AREA = [0, 40, 60, 90, 130, 200, 400, 1000, 5000, Infinity];
 
 /** Agrupa áreas parecidas na mesma faixa: pesquisas de imóveis de tamanho próximo reaproveitam o mesmo resultado. */
 function faixaDeArea(area: number): { min: number; max: number } {
@@ -135,7 +148,7 @@ async function comCache(chave: string[], buscar: () => Promise<ResultadoPesquisa
         if (!r.ok) throw new NaoGuardar(r); // lançar impede que a falha vire "resposta guardada"
         return r;
       },
-      ["mercado-v2", ...chave],
+      ["mercado-v3", ...chave],
       { revalidate: TRINTA_DIAS },
     )();
   } catch (err) {
@@ -154,7 +167,7 @@ export async function pesquisarValorMercado(e: EntradaPesquisaMercado): Promise<
   const local = [e.bairro, e.cidade, e.uf].filter(Boolean).join(", ");
   const faixa = faixaDeArea(e.area);
 
-  const prompt = `Busque anúncios de VENDA de ${tipoBusca} em ${local}, Brasil (Viva Real, ZAP, Imovelweb, OLX, QuintoAndar), com ${faixa.min} a ${faixa.max} m²${e.quartos ? ` e cerca de ${e.quartos} quarto(s)` : ""}. Reúna 4 a 6 anúncios, ignore aluguel e outliers.
+  const prompt = `Busque anúncios de VENDA de ${tipoBusca} em ${local}, Brasil (Viva Real, ZAP, Imovelweb, OLX, QuintoAndar), com ${faixa.min} a ${faixa.max} m²${e.quartos ? ` e cerca de ${e.quartos} quarto(s)` : ""}. Reúna 4 a 6 anúncios (no máximo 2 buscas), ignore aluguel e outliers.
 Responda SÓ com este JSON, sem texto antes ou depois (título com até 6 palavras):
 \`\`\`json
 {"amostras":[{"titulo":"...","preco":0,"area":0,"url":"https://..."}],"observacao":"opcional, 1 frase curta"}
@@ -190,6 +203,7 @@ async function buscarNaWeb(prompt: string): Promise<ResultadoPesquisaMercado> {
     let texto = "";
     let json: RespostaMercado | null = null;
     let timeout = false;
+    let paradaPorTamanho = false;
     // 2ª tentativa só quando a 1ª falhou ANTES de gastar tokens (API sobrecarregada, rede). Resposta ilegível ou
     // demora não são repetidas: uma nova busca na web custaria tudo de novo.
     for (let tentativa = 1; tentativa <= 2 && !json; tentativa++) {
@@ -198,6 +212,7 @@ async function buscarNaWeb(prompt: string): Promise<ResultadoPesquisaMercado> {
         texto = r.texto;
         if (!texto.trim()) {
           console.error(`[mercado] resposta sem texto (stop_reason=${r.parou})`);
+          paradaPorTamanho = r.parou === "max_tokens";
           break;
         }
         json = extrairJson(texto) as RespostaMercado;
@@ -216,7 +231,9 @@ async function buscarNaWeb(prompt: string): Promise<ResultadoPesquisaMercado> {
           ? "A pesquisa demorou demais. Tente de novo; costuma funcionar na segunda vez."
           : texto.trim()
             ? "A pesquisa voltou num formato que não consegui ler. Tente de novo."
-            : "Não consegui pesquisar agora. Tente de novo em instantes.",
+            : paradaPorTamanho
+              ? "A pesquisa ficou longa demais e foi cortada. Tente de novo; costuma funcionar na segunda vez."
+              : "Não consegui pesquisar agora. Tente de novo em instantes.",
       };
     }
 
