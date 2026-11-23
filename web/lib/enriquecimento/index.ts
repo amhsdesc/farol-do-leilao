@@ -35,7 +35,7 @@ const MAX_BYTES_PAGINA = 2_000_000;
 const AGENTE = "FarolDoLeilaoBot/1.0 (+https://faroldoleilao.com.br)";
 
 const maxChamadasPorDia = () => Math.max(0, Number(process.env.ENRIQUECIMENTO_MAX_CHAMADAS_DIA ?? 300) || 0);
-const modelo = () => process.env.MODELO_LLM || "claude-haiku-4-5-20251001";
+const modelo = () => process.env.MODELO_LLM || "claude-haiku-5-5";
 
 export type Enriquecimento = { dados: Extracao; atualizado_em: string | null };
 
