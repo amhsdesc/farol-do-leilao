@@ -150,14 +150,14 @@ CIDADES_PRAIA |= _pares({
 # Aqui a cidade sozinha NÃO marca "praia": só bairro de orla, texto do anúncio forte ou endereço com "praia".
 CIDADES_PRAIA_SO_ORLA = _pares({
     "RN": "ceara-mirim|extremoz|nisia floresta|canguaretama|areia branca|macau|porto do mangue|grossos",
-    "RJ": "itaguai|marica|sao pedro da aldeia|araruama|quissama|sao francisco de itabapoana",
+    "RJ": "itaguai|marica|sao pedro da aldeia|araruama|iguaba grande|quissama|sao francisco de itabapoana",
     "ES": "aracruz|presidente kennedy|itapemirim|conceicao da barra",
-    "BA": "camacari|una|jaguaripe|nilo pecanha|camamu|urucuca|marau",
+    "BA": "una|jaguaripe|nilo pecanha|camamu|urucuca|marau",
     "SE": "estancia|pirambu|japaratuba",
     "AL": "passo de camaragibe|coruripe|piacabucu",
-    "PE": "igarassu|goiana|sirinhaem|rio formoso|barreiros|ipojuca|cabo de santo agostinho",
+    "PE": "igarassu|goiana|sirinhaem|rio formoso|barreiros",
     "PB": "conde|pitimbu|mataraca",
-    "CE": "caucaia|sao goncalo do amarante|itapipoca|cruz|cascavel|beberibe|aquiraz|paraipaba|amontada",
+    "CE": "sao goncalo do amarante|itapipoca|cruz|paraipaba|amontada",
     "MA": "paco do lumiar|icatu|alcantara",
     "PA": "maracana|marapanim|curuca|braganca|vigia",
     "SC": "paulo lopes|jaguaruna",
