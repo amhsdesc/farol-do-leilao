@@ -85,6 +85,6 @@ No site (Vercel → *Settings → Environment Variables*), não no coletor:
    existir, o site usa `ANTHROPIC_API_KEY`, caso essa esteja configurada.
 2. `ENRIQUECIMENTO_MAX_CHAMADAS_DIA` (opcional, padrão 300) — teto de chamadas de IA por dia. Passou do teto, o site
    segue normal, só deixa de enriquecer fichas novas até o dia seguinte (fuso de São Paulo).
-3. `MODELO_LLM` (opcional) — padrão `claude-haiku-4-5-20251001`.
+3. `MODELO_LLM` (opcional) — padrão `claude-haiku-5-5`.
 
 Sem a chave, nada quebra: o bloco só fica sem conteúdo. O gasto do dia está em `llm_uso_dia`.

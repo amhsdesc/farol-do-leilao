@@ -17,7 +17,7 @@ class Config:
     database_url: str = os.getenv("DATABASE_URL", "postgresql://farol:farol@localhost:5432/farol")
     contato: str = os.getenv("CONTATO_EMAIL", "contato@exemplo.com")
     anthropic_api_key: str | None = os.getenv("ANTHROPIC_API_KEY") or None
-    modelo_llm: str = os.getenv("MODELO_LLM", "claude-haiku-4-5-20251001")
+    modelo_llm: str = os.getenv("MODELO_LLM", "claude-haiku-5-5")
     intervalo_minimo: float = float(os.getenv("INTERVALO_MINIMO_SEGUNDOS", "2"))
     # Tempo máximo de UMA fonte numa coleta (a fonte pode mudar com `max_segundos:` no YAML). Estourou: grava o que já leu e para.
     fonte_max_segundos: int = int(os.getenv("FONTE_MAX_SEGUNDOS") or "1200")
