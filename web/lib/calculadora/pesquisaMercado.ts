@@ -28,7 +28,7 @@ export type AmostraMercado = {
 };
 
 export type ResultadoPesquisaMercado =
-  | { ok: true; precoM2Medio: number; amostras: AmostraMercado[]; observacao?: string; fonte?: "chaves-na-mao" | "ia" }
+  | { ok: true; precoM2Medio: number; amostras: AmostraMercado[]; observacao?: string; fonte?: "chaves-na-mao" | "ia"; confianca?: "baixa" }
   | { ok: false; erro: string };
 
 const TIPOS_BUSCA: Record<string, string> = {
@@ -85,7 +85,7 @@ async function perguntar(prompt: string): Promise<{ texto: string; parou: string
         model: process.env.ANTHROPIC_MODELO_MERCADO || process.env.MODELO_LLM || "claude-haiku-5-5",
         // 1.500 faltava: as buscas e o raciocínio consumiam tudo antes do JSON (stop_reason=max_tokens, cobrado e sem resposta)
         max_tokens: 4000,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
         messages: mensagens,
       }),
       signal: AbortSignal.timeout(50_000),
@@ -133,6 +133,8 @@ class NaoGuardar extends Error {
 }
 
 const TRINTA_DIAS = 30 * 24 * 3600;
+// com menos anúncios que isso a média é pouco confiável: avisa e não guarda no cache
+const MIN_AMOSTRAS_CONFIAVEL = 3;
 
 async function comCache(chave: string[], buscar: () => Promise<ResultadoPesquisaMercado>): Promise<ResultadoPesquisaMercado> {
   let unstable_cache: typeof import("next/cache").unstable_cache;
@@ -145,7 +147,8 @@ async function comCache(chave: string[], buscar: () => Promise<ResultadoPesquisa
     return await unstable_cache(
       async () => {
         const r = await buscar();
-        if (!r.ok) throw new NaoGuardar(r); // lançar impede que a falha vire "resposta guardada"
+        // lançar impede que a falha (ou um resultado de baixa confiança) vire "resposta guardada" por 30 dias
+        if (!r.ok || r.confianca === "baixa") throw new NaoGuardar(r);
         return r;
       },
       ["mercado-v3", ...chave],
@@ -167,7 +170,7 @@ export async function pesquisarValorMercado(e: EntradaPesquisaMercado): Promise<
   const local = [e.bairro, e.cidade, e.uf].filter(Boolean).join(", ");
   const faixa = faixaDeArea(e.area);
 
-  const prompt = `Busque anúncios de VENDA de ${tipoBusca} em ${local}, Brasil (Viva Real, ZAP, Imovelweb, OLX, QuintoAndar), com ${faixa.min} a ${faixa.max} m²${e.quartos ? ` e cerca de ${e.quartos} quarto(s)` : ""}. Reúna 4 a 6 anúncios (no máximo 2 buscas), ignore aluguel e outliers.
+  const prompt = `Busque anúncios de VENDA de ${tipoBusca} em ${local}, Brasil (Viva Real, ZAP, Imovelweb, OLX, QuintoAndar), com ${faixa.min} a ${faixa.max} m²${e.quartos ? ` e cerca de ${e.quartos} quarto(s)` : ""}. Reúna 4 a 6 anúncios (no máximo 3 buscas), ignore aluguel e outliers.
 Responda SÓ com este JSON, sem texto antes ou depois (título com até 6 palavras):
 \`\`\`json
 {"amostras":[{"titulo":"...","preco":0,"area":0,"url":"https://..."}],"observacao":"opcional, 1 frase curta"}
@@ -257,7 +260,12 @@ async function buscarNaWeb(prompt: string): Promise<ResultadoPesquisaMercado> {
     if (!precoM2Medio || !amostras.length) {
       return { ok: false, erro: "Não encontrei anúncios parecidos o bastante para estimar um preço por m². Tente com outra cidade ou bairro." };
     }
-    return { ok: true, precoM2Medio, amostras, observacao: typeof json.observacao === "string" ? json.observacao : undefined };
+    const observacao = typeof json.observacao === "string" ? json.observacao : undefined;
+    if (amostras.length < MIN_AMOSTRAS_CONFIAVEL) {
+      const aviso = `Só ${amostras.length} anúncio${amostras.length > 1 ? "s" : ""} encontrado${amostras.length > 1 ? "s" : ""}: poucos anúncios, confiança baixa. Confira o preço por m² em outros portais antes de decidir.`;
+      return { ok: true, precoM2Medio, amostras, observacao: observacao ? `${aviso} ${observacao}` : aviso, confianca: "baixa" };
+    }
+    return { ok: true, precoM2Medio, amostras, observacao };
   } catch (err) {
     console.error("[mercado] erro inesperado:", err);
     return { ok: false, erro: "Não consegui pesquisar agora. Tente de novo em instantes." };

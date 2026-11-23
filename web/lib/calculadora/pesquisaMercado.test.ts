@@ -67,7 +67,8 @@ test("extrai o bloco json da resposta e calcula a média quando ela não vem pro
   if (!r.ok) return;
   assert.equal(r.precoM2Medio, 6081.76);
   assert.equal(r.amostras.length, 2);
-  assert.equal(r.observacao, "poucos anúncios recentes na região");
+  // só 2 anúncios: o aviso de baixa confiança vem na frente, e a observação da IA é mantida
+  assert.match(r.observacao ?? "", /^Só 2 anúncios encontrados: poucos anúncios, confiança baixa\..*poucos anúncios recentes na região$/);
 });
 
 test("sem precoM2Medio explícito, calcula a média das amostras", async () => {
@@ -176,4 +177,22 @@ test("max_tokens sem texto: mensagem própria e nenhuma segunda tentativa (já c
   assert.equal(r.ok, false);
   assert.equal(chamadas, 1);
   assert.match((r as { erro: string }).erro, /longa demais/);
+});
+
+test("só 1 anúncio: devolve com aviso de confiança baixa (e marca para não guardar no cache)", async () => {
+  globalThis.fetch = (async () => respostaAnthropic('```json\n{"amostras":[{"titulo":"A","preco":290000,"area":56,"url":"https://x/1"}]}\n```')) as typeof fetch;
+  const r = await pesquisarValorMercado({ uf: "DF", cidade: "Brasília", bairro: "Taguatinga Norte", tipo: "apartamento", area: 64 });
+  assert.equal(r.ok, true);
+  if (r.ok) {
+    assert.equal(r.confianca, "baixa");
+    assert.match(r.observacao ?? "", /confiança baixa/);
+  }
+});
+
+test("3 ou mais anúncios: sem aviso de baixa confiança", async () => {
+  const am = [1, 2, 3].map((i) => `{"titulo":"A${i}","preco":${300000 + i * 1000},"area":60,"url":"https://x/${i}"}`).join(",");
+  globalThis.fetch = (async () => respostaAnthropic('```json\n{"amostras":[' + am + ']}\n```')) as typeof fetch;
+  const r = await pesquisarValorMercado({ uf: "DF", cidade: "Brasília", bairro: "Asa Norte", tipo: "apartamento", area: 64 });
+  assert.equal(r.ok, true);
+  if (r.ok) assert.equal(r.confianca, undefined);
 });
