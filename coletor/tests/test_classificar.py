@@ -56,7 +56,7 @@ def test_universidade_privada_e_regioes_novas():
 
 
 def test_praia_cidades_novas():
-    for cidade, uf in (("Maragogi", "AL"), ("Parnaíba", "PI"), ("Guarapari", "ES"), ("Armação de Búzios", "RJ")):
+    for cidade, uf in (("Maragogi", "AL"), ("Aquiraz", "CE"), ("Caucaia", "CE"), ("Camaçari", "BA"), ("Ipojuca", "PE"), ("Parnaíba", "PI"), ("Armação de Búzios", "RJ")):
         assert "praia" in classificar_imovel(im(cidade=cidade, uf=uf)), cidade
     assert "praia" in classificar_imovel(im(cidade="Linhares", uf="ES", bairro="Pontal do Ipiranga"))
     assert "praia" not in classificar_imovel(im(cidade="Linhares", uf="ES", bairro="Centro"))
