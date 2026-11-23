@@ -56,7 +56,7 @@ def test_universidade_privada_e_regioes_novas():
 
 
 def test_praia_cidades_novas():
-    for cidade, uf in (("Maragogi", "AL"), ("Aquiraz", "CE"), ("Parnaíba", "PI"), ("Osório", "RS"), ("Aracruz", "ES"), ("Armação de Búzios", "RJ")):
+    for cidade, uf in (("Maragogi", "AL"), ("Parnaíba", "PI"), ("Guarapari", "ES"), ("Armação de Búzios", "RJ")):
         assert "praia" in classificar_imovel(im(cidade=cidade, uf=uf)), cidade
     assert "praia" in classificar_imovel(im(cidade="Linhares", uf="ES", bairro="Pontal do Ipiranga"))
     assert "praia" not in classificar_imovel(im(cidade="Linhares", uf="ES", bairro="Centro"))
@@ -116,10 +116,17 @@ def test_cada_tag_traz_o_motivo():
 def test_airbnb_praia_so_pela_cidade_nao_basta():
     from coletor.classificar import explicar_imovel
     # município litorâneo grande, sem nenhum outro fator: tem praia, mas não airbnb
-    r = explicar_imovel(im(cidade="Camaçari", uf="BA", quartos=2))
+    r = explicar_imovel(im(cidade="Pontal do Paraná", uf="PR", quartos=2))
     assert "praia" in r and "airbnb" not in r
     # bairro de orla (3 pontos) basta
     orla = explicar_imovel(im(cidade="Salvador", uf="BA", bairro="Barra", quartos=2))
     assert "praia" in orla and "airbnb" in orla
     # só cidade de praia + um segundo fator (texto de temporada) passa
-    assert "airbnb" in explicar_imovel(im(cidade="Camaçari", uf="BA", quartos=2), "Flat para temporada")
+    assert "airbnb" in explicar_imovel(im(cidade="Pontal do Paraná", uf="PR", quartos=2), "Flat para temporada")
+
+
+def test_praia_municipio_com_sede_no_interior_so_pela_orla():
+    # Ceará-Mirim (RN): a sede é no interior; a cidade sozinha não marca praia
+    assert "praia" not in classificar_imovel(im(cidade="Ceará-Mirim", uf="RN", bairro="Centro"))
+    assert "praia" in classificar_imovel(im(cidade="Ceará-Mirim", uf="RN", bairro="Muriú"))
+    assert "praia" in classificar_imovel(im(cidade="Ceará-Mirim", uf="RN", bairro="Centro", endereco="Rua da Praia, 10"))

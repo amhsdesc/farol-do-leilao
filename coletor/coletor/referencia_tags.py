@@ -146,6 +146,25 @@ CIDADES_PRAIA |= _pares({
     "RS": "osorio|santa vitoria do palmar|mostardas|tavares|sao jose do norte|palmares do sul|balneario pinhal|cidreira|tramandai|imbe|xangri-la|capao da canoa|arroio do sal|terra de areia|torres|dom pedro de alcantara",
 })
 
+# Municípios litorâneos cuja sede/maior parte do território fica longe do mar (a praia é um distrito ou povoado).
+# Aqui a cidade sozinha NÃO marca "praia": só bairro de orla, texto do anúncio forte ou endereço com "praia".
+CIDADES_PRAIA_SO_ORLA = _pares({
+    "RN": "ceara-mirim|extremoz|nisia floresta|canguaretama|areia branca|macau|porto do mangue|grossos",
+    "RJ": "itaguai|marica|sao pedro da aldeia|araruama|quissama|sao francisco de itabapoana",
+    "ES": "aracruz|presidente kennedy|itapemirim|conceicao da barra",
+    "BA": "camacari|una|jaguaripe|nilo pecanha|camamu|urucuca|marau",
+    "SE": "estancia|pirambu|japaratuba",
+    "AL": "passo de camaragibe|coruripe|piacabucu",
+    "PE": "igarassu|goiana|sirinhaem|rio formoso|barreiros|ipojuca|cabo de santo agostinho",
+    "PB": "conde|pitimbu|mataraca",
+    "CE": "caucaia|sao goncalo do amarante|itapipoca|cruz|cascavel|beberibe|aquiraz|paraipaba|amontada",
+    "MA": "paco do lumiar|icatu|alcantara",
+    "PA": "maracana|marapanim|curuca|braganca|vigia",
+    "SC": "paulo lopes|jaguaruna",
+    "RS": "osorio|santa vitoria do palmar|mostardas|tavares|palmares do sul|dom pedro de alcantara",
+})
+CIDADES_PRAIA -= CIDADES_PRAIA_SO_ORLA
+
 # Bairros de orla em cidades grandes ou médias (acrescenta aos de cima)
 BAIRROS_PRAIA.setdefault(("salvador", "BA"), set()).update(
     {"ribeira", "bonfim", "monte serrat", "boa viagem", "porto da barra", "graca", "pituacu", "jardim armacao", "praia do flamengo", "itapagipe", "paripe"})
@@ -250,3 +269,12 @@ CIDADES_TURISTICAS |= _pares({
     "GO": "trindade",
     "MG": "congonhas|santa rita do sapucai",
 })
+
+# Orla dentro de municípios "só orla" (acrescenta; o texto com "praia" no bairro/endereço também marca)
+BAIRROS_PRAIA.setdefault(("ceara-mirim", "RN"), set()).update({"muriu", "jacuma", "barra de ceara-mirim"})
+BAIRROS_PRAIA.setdefault(("extremoz", "RN"), set()).update({"genipabu", "redinha nova", "gracandu"})
+BAIRROS_PRAIA.setdefault(("caucaia", "CE"), set()).update({"iparana", "pacheco", "icarai", "cumbuco", "tabuba", "barra do ceara"})
+BAIRROS_PRAIA.setdefault(("aquiraz", "CE"), set()).update({"prainha", "porto das dunas", "iguape"})
+BAIRROS_PRAIA.setdefault(("ipojuca", "PE"), set()).update({"porto de galinhas", "muro alto", "camboa", "maracaipe"})
+BAIRROS_PRAIA.setdefault(("cabo de santo agostinho", "PE"), set()).update({"gaibu", "suape", "enseada dos corais", "calhetas"})
+BAIRROS_PRAIA.setdefault(("camacari", "BA"), set()).update({"arembepe", "guarajuba", "jaua", "abrantes", "itacimirim", "barra do jacuipe"})
