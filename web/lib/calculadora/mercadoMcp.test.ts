@@ -105,14 +105,13 @@ test("sem bairro: usa a cidade, exigindo mais anúncios", async () => {
   if (r.ok) assert.equal(r.escopo, "cidade");
 });
 
-test("pagina enquanto só há anúncios do bairro; para quando aparecem vizinhos; envia filtros certos", async () => {
+test("1ª página já tem o dobro do mínimo (5) só do bairro: não pede a 2ª; envia filtros certos", async () => {
   const doBairro = () => Array.from({ length: 15 }, () => anuncio("Asa Norte", 600000, 60));
-  const misto = [...Array.from({ length: 5 }, () => anuncio("Asa Norte", 600000, 60)), ...Array.from({ length: 10 }, () => anuncio("Samambaia Norte", 300000, 60))];
-  const est = mcpFalso([doBairro(), misto, doBairro()]);
+  const est = mcpFalso([doBairro(), doBairro()]);
   const r = await buscarNoChaves({ uf: "df", cidade: "Brasília", bairro: "Asa Norte", tipo: "apartamento", area: 62 }, { min: 51, max: 92 }, sempausa);
   assert.equal(r.ok, true);
-  assert.equal(est.buscas, 2); // pág. 1 só do bairro (15 < 16): pede a 2ª; ela traz vizinhos, então não pede a 3ª
-  assert.equal(r.ok && r.total, 20);
+  assert.equal(est.buscas, 1); // 15 >= 10 (2 x MINIMO_BAIRRO): não precisa de mais páginas
+  assert.equal(r.ok && r.total, 15);
   assert.deepEqual(est.filtros[0], { transaction: "venda", propertyType: "apartamento", city: "Brasília", state: "DF", minArea: 51, maxArea: 92, neighborhood: "Asa Norte" });
 });
 
